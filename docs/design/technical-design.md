@@ -59,7 +59,7 @@ the `edge` network.
 | Concern | Choice | Why |
 |---------|--------|-----|
 | Language | Python 3.13 | Same as the sailing report; strong data and HTTP tooling |
-| Packaging | `uv` + `pyproject.toml`, locked | Fast, reproducible image builds |
+| Packaging | `uv` + `pyproject.toml`, locked; `[tool.uv] exclude-newer` holds resolution to releases at least two weeks old | Fast, reproducible image builds |
 | HTTP client | `httpx` (sync) with a small retry helper | Timeouts, HTTP/1.1, simple |
 | Schemas | Pydantic v2 | One model per JSON shape; also generates Claude output schemas |
 | Database | stdlib `sqlite3`, WAL, numbered SQL migrations, `PRAGMA user_version` | No ORM; SQL is the spec |
