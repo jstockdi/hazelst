@@ -157,7 +157,9 @@ def from_payload(
             ],
             storm_type=m.forecast.storm_type,
             alerts=[DigestAlert(event=e) for e in m.alerts],
-            accumulation=DigestAccumulation(**m.accumulation.model_dump())
+            accumulation=DigestAccumulation(
+                **m.accumulation.model_dump(include=set(DigestAccumulation.model_fields))
+            )
             if m.accumulation
             else None,
         )
