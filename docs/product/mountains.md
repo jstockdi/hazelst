@@ -28,7 +28,7 @@ build.
   "lat": 43.604, "lon": -72.820,
   "summit_ft": 4241, "base_ft": 1165,
   "nws": { "office": "BTV", "grid": "BTV/XX,YY" },
-  "report_adapter": "killington",
+  "report_adapter": { "preset": "dor_html", "params": { "host": "killington.com" } },
   "wind_hold_mph": { "watch": 40, "likely": 55 },
   "season_open": "2026-11-22",
   "favored_by": ["nw_upslope", "clipper"]
@@ -38,3 +38,24 @@ build.
 `nws.grid` is resolved once from `api.weather.gov/points/{lat},{lon}` and cached.
 `favored_by` lists the pattern tags that historically favor this mountain; the
 narrative uses it to explain why totals differ (see narrative.md).
+
+## Report adapters
+
+`report_adapter` for each mountain. Presets and field paths are in
+[data-sources.md → Resort adapters](../design/data-sources.md#resort-adapters).
+
+```json
+{
+  "killington":   { "preset": "dor_html",        "params": { "host": "killington.com" } },
+  "pico":         { "preset": "dor_html",        "params": { "host": "picomountain.com" } },
+  "sugarbush":    { "preset": "mtnpowder",       "params": { "feed_key": "sugarbush", "resort_id": 70 } },
+  "stratton":     { "preset": "mtnpowder",       "params": { "feed_key": "stratton", "resort_id": 1 } },
+  "loon":         { "preset": "boyne_reportpal", "params": { "host": "www.loonmtn.com", "code": "lm" } },
+  "cranmore":     { "preset": "cranmore_html",   "params": {} },
+  "sunday_river": { "preset": "boyne_reportpal", "params": { "host": "www.sundayriver.com", "code": "sr" } },
+  "sugarloaf":    { "preset": "boyne_reportpal", "params": { "host": "www.sugarloaf.com", "code": "sl" } }
+}
+```
+
+Set `"report_adapter": null` to disable a mountain's adapter (build-plan
+Fallbacks); its accumulation then comes from PNS, LSR, and NOHRSC.

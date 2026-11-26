@@ -195,13 +195,15 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
 
 ## Bootstrapping before the first storm
 
-- **Open-Meteo Historical Forecast API** (archived model runs) can backfill
-  past seasons' forecasts for the same coordinates.
+- **Open-Meteo Previous Runs API** gives past forecasts at 1–7 day lead for
+  the same coordinates (GFS and GEM snowfall for the 2025–26 season; ECMWF has
+  no snowfall at lead).
 - **Iowa Environmental Mesonet** archives NWS Local Storm Reports and PNS text
   with snowfall and coordinates — past ground truth for `snow_report`.
 
-Both are free and keyless (to confirm during build). With them, `skill` can
-start with prior seasons instead of zero.
+Both are free and keyless (confirmed 2026-11-26; endpoints in
+[data-sources.md](data-sources.md#observation-and-backfill-endpoints)). With
+them, `skill` can start with prior seasons instead of zero.
 
 ## Size
 

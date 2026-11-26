@@ -84,7 +84,7 @@ hazelst/
     models.py            # Pydantic: ReportPayload, ForecastWindow, ForecastDay, ...
     sources/             # one module per source: fetch() -> raw, normalize() -> rows
       open_meteo.py  nws.py  discussions.py  iem.py  nohrsc.py
-      resorts/  base.py  killington.py  sugarbush.py  ...
+      resorts/  adapter.py (json / embedded_json / html parsers)  presets.json
     derive.py            # forecast_hourly -> forecast_window, forecast_day (+ tags, precip_type)
     tags.py              # pattern tag rules
     verify.py            # forecast-verify
@@ -271,7 +271,7 @@ Summarized from [agent-runs.md](agent-runs.md):
 | M1 | Skeleton | Repo, `pyproject`, DB + migrations, CLI, `/health`, Dockerfile, CI green, image in GHCR |
 | M2 | Forecast + numbers-only page | `ingest-forecast`, `derive`, render ported from the prototype; golden + unit tests; page matches the sample run |
 | M3 | Claude report | `report-write`, `report-check`, `report-revise`, `agent_call`, daily call cap; numbers-only fallback tested |
-| M4 | Ground truth | PNS + IEM LSR + NOHRSC; resort adapters (the five that return 200 first, then the three that redirect); `conditions-extract`; `forecast-verify`; accumulation section live |
+| M4 | Ground truth | PNS + IEM LSR + NOHRSC; resort adapters (four presets covering all eight, mapped in J00); `conditions-extract`; `forecast-verify`; accumulation section live |
 | M5 | Learning | `skill-learn`, corrected method behind its gate, `knowledge-review`, CLI approvals |
 | M6 | Production on frank | frank PR (compose, Caddy, tunnel, systemd, SOPS secret), deploy, smoke, nightly backup, rollback rehearsed |
 | M7 | Backfill | Prior-season forecasts and reports loaded; `skill` seeded |
@@ -293,4 +293,4 @@ backup exists, and a rollback to the previous digest has been rehearsed.
 | 5 | Models | `claude-opus-5-5` for every role, effort per role through the SDK's `effort` option | `conditions-extract` is rare (adapter failures only) and disabled for Boyne sites, so a cheaper model would save little subscription usage |
 | 6 | Storage | New LV **`lv-hazelst`, 10 GB**, at `/srv/hazelst` | frank gives each stack its own LV (`lv-terra-pg`, `lv-homestead-pg`, `lv-bcl-*`); `ubuntu-vg` has ~450 GB free. < 1 GB per season plus backfill fits with room |
 | 7 | Host actions on frank | Approve the M6 runbook as one bundle: create and mount `lv-hazelst`, create `/srv/hazelst` (65532, 0750), decrypt the secret, `make deploy STACK=hazelst`, install `frank-hazelst.service`. I pause for a separate go-ahead before the ingress change (Caddyfile, tunnel config, DNS route), since it restarts the shared platform stack | frank is permission-gated; ingress is shared with mixtape and bcl |
-| 8 | Resort sites | Code adapters only, 3 fetches per resort per day, identifying `User-Agent`. **No `conditions-extract` on Loon, Sunday River, or Sugarloaf** | robots.txt (2026-11-25): Killington, Pico, Sugarbush, Cranmore allow general crawling; Stratton has no rules. Boyne sites (Loon, Sunday River, Sugarloaf) publish Cloudflare content signals `search=yes, ai-train=no, use=reference` and set no `ai-input` signal, so their page text is not sent to Claude |
+| 8 | Resort sites | Code adapters only, 3 fetches per resort per day, identifying `User-Agent`. **No `conditions-extract` on Loon, Sunday River, or Sugarloaf** | robots.txt (2026-11-26): Killington, Pico, Sugarbush, Cranmore allow the report path; Stratton's site returns an Imperva challenge, and its adapter reads the `mtnpowder.com` feed, whose robots.txt allows it. Boyne sites (Loon, Sunday River, Sugarloaf) allow `/` and publish `Content-Signal: search=yes,ai-train=no,use=reference` with no `ai-input` signal, so their content is not sent to Claude. Details: [data-sources.md](data-sources.md#resort-report-map) |
