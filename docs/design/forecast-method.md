@@ -34,8 +34,8 @@ Daily buckets (6 AM → 6 AM) feed the forecast chart.
 ## Accumulation (observed)
 
 Per mountain: resort-reported new snow for each of the last 7 days, season
-total, and base depth. If the resort adapter fails, use NOHRSC 24 h snowfall and
-depth and mark `source: "nohrsc"`.
+total, and base depth. If the resort adapter fails, use NOHRSC 24 h snowfall
+(no base depth) and mark `source: "nohrsc"`.
 
 ## Pattern tags
 

@@ -107,8 +107,8 @@ accumulation empty state if J14 is not done.
 
 | Job | Name | Scope | Done when |
 |-----|------|-------|-----------|
-| J12 | `source-obs` | PNS, IEM LSR, NOHRSC → `observation`; confirm the IEM and NOHRSC endpoints first | Normalize tests on fixtures; a live ingest stores observations near each mountain |
-| J13 | `resort-adapters` | Map the eight report pages; declarative adapters (JSON first, selectors only where needed); 3 fetches per resort per day; identifying `User-Agent`; contract tests; `conditions-extract` only for non-Boyne failures | Contract tests on saved pages; a live ingest fills `snow_report` for all eight |
+| J12 | `source-obs` | PNS, IEM LSR, NOHRSC → `observation` / `snow_report`, using the endpoints and fixtures from J00 ([data-sources.md](data-sources.md#observation-and-backfill-endpoints)) | Normalize tests on fixtures; a live ingest stores observations near each mountain |
+| J13 | `resort-adapters` | The three shared parsers and four presets mapped in J00 ([data-sources.md](data-sources.md#resort-adapters)); fixtures in `tests/fixtures/resorts/`; 3 fetches per resort per day; identifying `User-Agent`; contract tests; `conditions-extract` only for non-Boyne failures | Contract tests on saved pages; a live ingest fills `snow_report` for all eight |
 | J14 | `forecast-verify` | Per-edition scoring at 9 PM (HIT / MISS / NO_OBS), observation priority; accumulation section on the page | A day with observations produces `verification` rows for each edition; accumulation chart renders |
 
 ### M5 — Learning
@@ -132,7 +132,7 @@ accumulation empty state if J14 is not done.
 
 | Job | Name | Scope | Done when |
 |-----|------|-------|-----------|
-| J22 | `season-backfill` | Open-Meteo Historical Forecast and IEM LSR / PNS for the prior season into the same tables; seed `skill` | `skill` has rows per mountain × model; backfill is idempotent |
+| J22 | `season-backfill` | Open-Meteo Previous Runs (GFS, GEM; ECMWF has no snowfall at lead) and IEM LSR / PNS for the prior season into the same tables; seed `skill` | `skill` has rows per mountain × backfilled model; backfill is idempotent |
 
 ## Owner actions
 
