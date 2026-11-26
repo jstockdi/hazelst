@@ -210,9 +210,13 @@ Summarized from [agent-runs.md](agent-runs.md):
 
 ## 11. CI/CD
 
-- `ci.yml` (every PR and push): `ruff`, `mypy`, `pytest`, Docker build, smoke test.
-- `image.yml` (push to `main`): build `amd64`, push `ghcr.io/jstockdi/hazelst:<sha>`,
-  print the digest. No `latest` tag.
+- `ci.yml` (every PR and push): `ruff`, `mypy`, `pytest`, Docker build, smoke test
+  (`scripts/smoke.sh`: the container under the §12 constraints, `/health` 200,
+  `/metrics`, migrate is a no-op, rootfs read-only, uid 65532).
+- `image.yml` (push to `main`): build `amd64`, smoke test the built image, push
+  `ghcr.io/jstockdi/hazelst:<sha>` with `GITHUB_TOKEN` (`packages: write`), print
+  the digest. Single-platform manifest (no provenance attestation); no `latest`
+  tag. The package is public because the repo is public.
 - Deploy: a PR to the frank repo pins the digest in
   `projects/hazelst/compose.yml`; after merge, `make deploy STACK=hazelst` on
   frank. Rollback = previous digest. Details:
