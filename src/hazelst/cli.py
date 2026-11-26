@@ -11,7 +11,7 @@ import json
 import sys
 from collections.abc import Callable, Sequence
 
-from hazelst import __version__, config
+from hazelst import __version__, config, db
 
 Handler = Callable[[argparse.Namespace], int]
 
@@ -29,6 +29,29 @@ def _cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_migrate(args: argparse.Namespace) -> int:
+    cfg = config.load()
+    conn = db.connect(cfg.settings.db_path)
+    try:
+        before = db.user_version(conn)
+        applied = db.migrate(conn)
+        synced = db.sync_mountains(conn, cfg.mountains)
+        after = db.user_version(conn)
+    finally:
+        conn.close()
+    print(
+        json.dumps(
+            {
+                "db": str(cfg.settings.db_path),
+                "user_version": {"before": before, "after": after},
+                "applied": applied,
+                "mountains": synced,
+            }
+        )
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hazelst",
@@ -42,6 +65,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_config.add_argument("--full", action="store_true", help="include every mountain field")
     p_config.set_defaults(handler=_cmd_config)
+
+    p_migrate = sub.add_parser(
+        "migrate", help="apply pending database migrations and sync the mountain roster"
+    )
+    p_migrate.set_defaults(handler=_cmd_migrate)
 
     return parser
 
