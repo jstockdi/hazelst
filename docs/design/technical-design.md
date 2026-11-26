@@ -79,7 +79,7 @@ hazelst/
   pyproject.toml  uv.lock  Dockerfile  .dockerignore
   src/hazelst/
     config.py            # env + mountains.json + accepted config_change overrides
-    db.py                # connect (WAL, FKs), migrate, job lock
+    db.py                # connect (WAL, FKs), migrate (user_version), run rows, job lock (flock)
     migrations/0001_init.sql ...
     models.py            # Pydantic: ReportPayload, ForecastWindow, ForecastDay, ...
     sources/             # one module per source: fetch() -> raw, normalize() -> rows

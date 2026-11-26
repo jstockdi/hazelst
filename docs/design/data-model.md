@@ -7,8 +7,16 @@ those comparisons into per-mountain, per-model, per-pattern corrections and
 local knowledge.
 
 One file: `/data/hazelst.db` on frank (`/srv/hazelst`), WAL mode,
-`foreign_keys=ON`. Migrations are numbered, additive SQL files applied at
-startup.
+`foreign_keys=ON`. Migrations are numbered, additive SQL files
+(`src/hazelst/migrations/NNNN_<name>.sql`), each applied in one transaction at
+startup and by `hazelst migrate`; `PRAGMA user_version` holds the last one
+applied. A database newer than the code (after a rollback) is used as is.
+`0001_init.sql` creates every table below.
+
+**Job lock.** One job at a time: an exclusive `flock` on `<db>.lock` (here
+`/data/hazelst.db.lock`), held for the whole job. The kernel releases it when
+the process exits, so a crashed job leaves no stale lock. A job that cannot take
+the lock writes no `run` row.
 
 ## Layers
 
@@ -41,7 +49,7 @@ CREATE TABLE mountain (
 CREATE TABLE run (
   id INTEGER PRIMARY KEY, kind TEXT,        -- ingest-forecast | ingest-obs | report-build | report-refresh | forecast-verify | skill-learn | knowledge-review | season-backfill
   for_date DATE, started_at TEXT, finished_at TEXT,
-  status TEXT, error TEXT,
+  status TEXT, error TEXT,                  -- running | ok | failed
   code_version TEXT                          -- image git SHA
 );
 CREATE TABLE fetch (
@@ -161,6 +169,11 @@ CREATE TABLE config_change (                -- threshold / weight changes, same 
   old JSON, new JSON, reason TEXT, evidence JSON,
   status TEXT, created_at TEXT, decided_at TEXT
 );
+
+-- Indexes -------------------------------------------------------------------
+CREATE INDEX fetch_body_sha256 ON fetch (body_sha256);
+CREATE INDEX run_kind_for_date ON run (kind, for_date);
+CREATE INDEX agent_call_created_at ON agent_call (created_at);
 ```
 
 ## How the data compounds
