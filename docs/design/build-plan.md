@@ -122,7 +122,7 @@ accumulation empty state if J14 is not done.
 
 | Job | Name | Scope | Owner gate | Done when |
 |-----|------|-------|------------|-----------|
-| J17 | `frank-stack` | frank PR from a worktree off `origin/main`: `projects/hazelst/compose.yml` (digest-pinned), `secrets.enc.env` (SOPS), `systemd/frank-hazelst.service` | P1 token; P4(b) merge | PR merged |
+| J17 | `frank-stack` | frank PR from a worktree off `origin/main` (frank `main` requires signed commits and allows squash merges only): `projects/hazelst/compose.yml` (digest-pinned), `secrets.enc.env` (SOPS), `systemd/frank-hazelst.service` | P1 token; P4(b) merge | PR merged |
 | J18 | `frank-deploy` | Confirm `ordinance-member-stack` is in `main`, then `git switch main && git pull` in `/opt/frank` (P3); create and mount `lv-hazelst` (10 GB) at `/srv/hazelst` (65532, 0750), decrypt the secret, `make deploy STACK=hazelst`, enable the unit | P4(c) | Container healthy on frank; `/health` 200 on the `edge` network |
 | J19 | `frank-ingress` | Caddyfile site and tunnel ingress rule (frank PR, merged, pulled into `/opt/frank`), DNS route for `hazelst.thmxtp.com`, platform restart | P4(d) (restarts the shared platform stack) | Public hostname serves the page |
 | J20 | `ops-hardening` | Nightly `sqlite3 .backup`, report-age alert, rollback to the previous digest rehearsed | — | Backup file exists; rollback and roll-forward done once |
