@@ -151,7 +151,9 @@ def test_ingest_forecast_fills_forecast_hourly(
         "SELECT elevation, count(*) FROM forecast_hourly GROUP BY elevation ORDER BY elevation"
     ).fetchall()
     assert [tuple(r) for r in counts] == [("base", 8064), ("summit", 8064)]
-    sources = conn.execute("SELECT source, count(*) FROM fetch GROUP BY source").fetchall()
+    sources = conn.execute(
+        "SELECT source, count(*) FROM fetch WHERE source LIKE 'open_meteo%' GROUP BY source"
+    ).fetchall()
     assert dict((r[0], r[1]) for r in sources) == {"open_meteo": 2, "open_meteo_meta": 4}
 
 

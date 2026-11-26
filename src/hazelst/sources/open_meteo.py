@@ -11,9 +11,9 @@ from __future__ import annotations
 import math
 import sqlite3
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import astuple, dataclass
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 import httpx
 
@@ -61,8 +61,7 @@ class NormalizeError(ValueError):
     """A response does not have the expected shape."""
 
 
-@dataclass(frozen=True)
-class HourlyRow:
+class HourlyRow(NamedTuple):
     """One `forecast_hourly` row, in column order after `fetch_id`."""
 
     mountain: str
@@ -308,7 +307,7 @@ def normalize(fetched: Fetched, runs: Mapping[str, RunTime]) -> list[HourlyRow]:
 
 def store(conn: sqlite3.Connection, fetch_id: int, rows: Iterable[HourlyRow]) -> int:
     """Insert normalized rows for one fetch; returns the number written."""
-    params = [(fetch_id, *astuple(r)) for r in rows]
+    params = [(fetch_id, *r) for r in rows]
     conn.executemany(
         "INSERT OR REPLACE INTO forecast_hourly (fetch_id, mountain, model, elevation, issued_at,"
         " valid_at, lead_h, snowfall_in, precip_in, temp_f, gust_mph, freezing_level_ft,"

@@ -52,6 +52,29 @@ All sources below are free and keyless (NWS requires a `User-Agent` header).
 - Fixtures: `hazelst record open-meteo` writes each raw response to
   `tests/fixtures/open_meteo/<date>/<label>.json.gz`.
 
+### NWS request details (verified 2026-11-26)
+
+- Every request sends `User-Agent: hazelst-forecast (github.com/jstockdi/hazelst)`.
+- Points cache: `/points/{lat},{lon}` runs only for a mountain whose
+  `mountain.nws_grid` is empty; the result is stored there as `OFFICE/x,y`
+  (for example `BTV/108,19`). Stratton resolves to ALY, Loon / Cranmore /
+  Sunday River / Sugarloaf to GYX, the others to BTV.
+- Gridpoint layers are stored as given, one `nws_grid` row per interval:
+  `valid_start` in UTC, `hours` from the ISO-8601 duration (`PT6H`, `P1D`,
+  `P1DT6H`), `value`, and `unit` without the `wmoUnit:` prefix (`mm`,
+  `km_h-1`). Proration into the 6 AM windows happens in `derive`.
+- Alerts: `/alerts/active?point=…` per mountain → `alert`; `onset` falls back
+  to `effective` and `expires` prefers `ends` (the event end) over `expires`
+  (the message expiry). A repeated alert keeps its `first_seen_run`.
+- AFDs: the office's product list, then its latest product; `discussion.text`
+  is the full product text. `discussions.summary()` keeps What Has Changed,
+  Key Messages, Synopsis, Discussion, and the Near / Short / Long Term
+  sections, whitespace-normalized; `discussions.storm_words()` matches on
+  whitespace-normalized text so wrapped phrases match.
+- One mountain or office failing is recorded in the ingest summary and does
+  not stop the others. WPC products are not fetched yet.
+- Fixtures: `hazelst record nws` and `hazelst record discussions`.
+
 ## Accumulation and conditions
 
 | Source | Endpoint | Fields used | Feeds |

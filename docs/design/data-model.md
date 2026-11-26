@@ -40,7 +40,7 @@ Job names used in `run.kind` follow [agent-runs.md](agent-runs.md).
 CREATE TABLE mountain (
   key TEXT PRIMARY KEY, name TEXT, state TEXT,
   lat REAL, lon REAL, summit_ft INT, base_ft INT,
-  nws_office TEXT, nws_grid TEXT,          -- "108,19"
+  nws_office TEXT, nws_grid TEXT,          -- "BTV/108,19": the /points cache
   season_open DATE, season_close DATE,
   config JSON                               -- wind_hold_mph, favored_by, adapter
 );
