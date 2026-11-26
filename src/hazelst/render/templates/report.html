@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Hazel St Forecast · {{ p.date.isoformat() }}{% endblock %}
+{% block body %}
+<div class="band">
+  <div class="k">Hazel St Forecast</div>
+  <h1>{{ headline }}</h1>
+  <div class="when">{{ issued }}{% if p.status == "numbers_only" %} · numbers only{% endif %}</div>
+</div>
+<main>
+{% if narrative and narrative.best_bet %}
+  <div class="call"><small>Best bet</small><b>{{ narrative.best_bet.mountain }}, {{ narrative.best_bet.day }}</b><span>{{ narrative.best_bet.why }}</span></div>
+{% endif %}
+{% if narrative %}
+{{ body }}
+{% else %}
+  <div class="call notice"><small>Numbers only</small><b>The written report is delayed.</b><span>The forecast numbers below are current; the report text follows when it passes its checks.</span></div>
+{% if cautions %}
+  <h2>Cautions</h2>
+  <div class="caution">
+{% for line in cautions %}
+    <p>{{ line }}</p>
+{% endfor %}
+  </div>
+{% endif %}
+{% endif %}
+
+  <div class="part">Forecast · what falls next</div>
+  <h2>Next 5 days</h2>
+  <p class="lead">From 6 AM {{ p.days[0] if p.days else "" }}, at summit elevation. Average of {{ used_names | join(", ") }}; range is the spread between them.</p>
+  <figure>{{ forecast_chart }}<figcaption>Forecast new snow, stacked by day.</figcaption></figure>
+  <figure>
+    <table class="types">
+      <thead><tr><th></th>{% for d in p.days %}<th>{{ d.split(" ")[0] }}<br>{{ d.split(" ")[1] }}</th>{% endfor %}</tr></thead>
+      <tbody>
+{% for m, cells in types %}
+        <tr><th>{{ m.name }}{% if not m.is_open %} <em>closed</em>{% endif %}</th>{% for c in cells %}<td style="background:{{ c.background }};color:{{ c.color }}">{{ c.label }}{% if c.wind %} <i title="lift-hold wind">💨</i>{% endif %}{% if c.liquid %}<small>{{ c.liquid }}</small>{% endif %}</td>{% endfor %}</tr>
+{% endfor %}
+      </tbody>
+    </table>
+    <figcaption>Precipitation type at the summit, liquid inches. 💨 = lift-hold wind.</figcaption>
+  </figure>
+  <table id="fct">
+    <thead><tr><th>Mountain</th><th>Next<br>24 h</th><th>Next<br>3 days</th><th>Next<br>5 days</th></tr></thead>
+    <tbody>
+{% for m in rows %}
+      <tr><td class="name">{{ m.name }}{% if not m.is_open %}<small>closed</small>{% endif %}</td>
+{%- for key in ("1d", "3d", "5d") %}{% set w = m.forecast.windows[key] %}<td><b>{{ w.snow_in | num }}″</b>{% if w.range[1] > w.range[0] %}<small>{{ w.range[0] | num }}–{{ w.range[1] | num }}</small>{% endif %}{% if w.nws_in is not none %}<small>NWS {{ w.nws_in | num }}</small>{% endif %}</td>{% endfor %}</tr>
+{% endfor %}
+    </tbody>
+  </table>
+
+  <div class="part">Accumulation · snow that has fallen</div>
+  <h2>Last 7 days</h2>
+{% if accumulation_state == "chart" %}
+  <p class="lead">Reported snowfall this season; the dark segment is the last 7 days.</p>
+  <figure>{{ accumulation_chart }}<figcaption>Season total (in) · last 7 days highlighted · base depth at right.</figcaption></figure>
+{% else %}
+  <div class="empty">{{ accumulation_empty }}</div>
+{% endif %}
+
+  <div class="foot">
+    <p>Forecast: Open-Meteo ({% for label, stale in runs %}{{ label }}{% if stale %} (stale, not in the average){% endif %}{{ ", " if not loop.last }}{% endfor %}) at summit and base elevation; NWS gridpoints and alerts{% if offices %}; NWS forecast discussions ({{ offices | join(", ") }}){% endif %}.</p>
+{% if p.sources_unavailable %}
+    <p>Source unavailable: {{ p.sources_unavailable | join(", ") }}.</p>
+{% endif %}
+    <p>Verification: none yet.</p>
+    <p><a href="/archive">Archive</a> · <a href="/api/report/{{ p.date.isoformat() }}.json">JSON</a></p>
+  </div>
+</main>
+{% endblock %}
