@@ -14,7 +14,7 @@ asking.
 
 | # | Item | Status |
 |---|------|--------|
-| P1 | Claude token: owner runs `claude setup-token`; the token arrives through the secret prompt and is stored at `~/.config/hazelst/claude.env` (`CLAUDE_CODE_OAUTH_TOKEN=…`, mode 600, outside the repo). Threads source it for live calls; J17 SOPS-encrypts it for frank | Owner |
+| P1 | Claude token: owner runs `claude setup-token`; the token arrives through the secret prompt and is stored at `~/.config/hazelst/claude.env` (`CLAUDE_CODE_OAUTH_TOKEN=…`, mode 600, outside the repo). Threads source it for live calls; J17 SOPS-encrypts it for frank | Verified 2026-11-26: stored; one CLI call with a clean `HOME` succeeded |
 | P2 | GHCR: an image pushed by Actions from this public repo is public with no extra step | Verified 2026-11-26 (probe tag `probe`; package visibility `public`, anonymous pull token issued). J04 deletes the `probe` version after the first real push |
 | P3 | frank checkout: `/opt/frank` is on branch `ordinance-member-stack`, 14 commits ahead of `origin/main`, no PR open. `ordinance-member-stack` merges to `main` first; then J17 opens the hazelst frank PR against `main`, and J18 switches `/opt/frank` to `main` (which then contains both) before deploying | Owner decided 2026-11-26 (merge first); merge pending |
 | P4 | Unattended approvals: (a) each thread squash-merges its own hazelst PR when CI is green; (b) J17 merges the frank PR; (c) J18 host bundle (already approved); (d) J19 ingress change, which restarts the shared platform stack (`play.`, `bcl.` blip for seconds) | Approved 2026-11-26 (all four) |
