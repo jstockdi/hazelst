@@ -16,8 +16,8 @@ asking.
 |---|------|--------|
 | P1 | Claude token: owner runs `claude setup-token`; the token arrives through the secret prompt and is stored at `~/.config/hazelst/claude.env` (`CLAUDE_CODE_OAUTH_TOKEN=…`, mode 600, outside the repo). Threads source it for live calls; J17 SOPS-encrypts it for frank | Owner |
 | P2 | GHCR: an image pushed by Actions from this public repo is public with no extra step | Verified 2026-11-26 (probe tag `probe`; package visibility `public`, anonymous pull token issued). J04 deletes the `probe` version after the first real push |
-| P3 | frank checkout: `/opt/frank` is on branch `ordinance-member-stack`, 14 commits ahead of `origin/main`, no PR open. J17 opens the frank PR against `main`; J18 cherry-picks that one commit onto the branch checked out on the box (additive files plus one Caddy site and one tunnel rule) and does not switch branches | Owner approves the approach |
-| P4 | Unattended approvals: (a) each thread squash-merges its own hazelst PR when CI is green; (b) J17 merges the frank PR; (c) J18 host bundle (already approved); (d) J19 ingress change, which restarts the shared platform stack (`play.`, `bcl.` blip for seconds) | Owner |
+| P3 | frank checkout: `/opt/frank` is on branch `ordinance-member-stack`, 14 commits ahead of `origin/main`, no PR open. `ordinance-member-stack` merges to `main` first; then J17 opens the hazelst frank PR against `main`, and J18 switches `/opt/frank` to `main` (which then contains both) before deploying | Owner decided 2026-11-26 (merge first); merge pending |
+| P4 | Unattended approvals: (a) each thread squash-merges its own hazelst PR when CI is green; (b) J17 merges the frank PR; (c) J18 host bundle (already approved); (d) J19 ingress change, which restarts the shared platform stack (`play.`, `bcl.` blip for seconds) | Approved 2026-11-26 (all four) |
 | P5 | Access and tools: PyPI and GitHub reachable; `ssh frank` with passwordless `sudo`; frank is `x86_64` with Docker 29.5, `sops`, `age`; no `sqlite3` CLI on frank, so backups use Python's `sqlite3.backup` inside the container | Verified 2026-11-26 |
 | P6 | Claude usage counts against the owner's subscription (no API workspace cap). The in-app daily call cap (config, default 10 calls) is the limit | Noted |
 
@@ -123,8 +123,8 @@ accumulation empty state if J14 is not done.
 | Job | Name | Scope | Owner gate | Done when |
 |-----|------|-------|------------|-----------|
 | J17 | `frank-stack` | frank PR from a worktree off `origin/main`: `projects/hazelst/compose.yml` (digest-pinned), `secrets.enc.env` (SOPS), `systemd/frank-hazelst.service` | P1 token; P4(b) merge | PR merged |
-| J18 | `frank-deploy` | Cherry-pick the J17 commit onto the branch checked out in `/opt/frank` (P3); create and mount `lv-hazelst` (10 GB) at `/srv/hazelst` (65532, 0750), decrypt the secret, `make deploy STACK=hazelst`, enable the unit | P4(c) | Container healthy on frank; `/health` 200 on the `edge` network |
-| J19 | `frank-ingress` | Caddyfile site and tunnel ingress rule (frank PR, merged and cherry-picked as in J17–J18), DNS route for `hazelst.thmxtp.com`, platform restart | P4(d) (restarts the shared platform stack) | Public hostname serves the page |
+| J18 | `frank-deploy` | Confirm `ordinance-member-stack` is in `main`, then `git switch main && git pull` in `/opt/frank` (P3); create and mount `lv-hazelst` (10 GB) at `/srv/hazelst` (65532, 0750), decrypt the secret, `make deploy STACK=hazelst`, enable the unit | P4(c) | Container healthy on frank; `/health` 200 on the `edge` network |
+| J19 | `frank-ingress` | Caddyfile site and tunnel ingress rule (frank PR, merged, pulled into `/opt/frank`), DNS route for `hazelst.thmxtp.com`, platform restart | P4(d) (restarts the shared platform stack) | Public hostname serves the page |
 | J20 | `ops-hardening` | Nightly `sqlite3 .backup`, report-age alert, rollback to the previous digest rehearsed | — | Backup file exists; rollback and roll-forward done once |
 | J21 | `burn-in` | Scheduled check at 7:20 AM ET on three consecutive mornings: today's report status, edition times, last night's `forecast-verify` run, backup file; posts a one-line result each morning | — | Report by 7:15 AM ET on 3 consecutive days; `forecast-verify` ran each night |
 
@@ -141,5 +141,5 @@ All owner input happens in pre-flight, so threads do not stop:
 | When | Action |
 |------|--------|
 | Pre-flight P1 | Run `claude setup-token`; hand over the token through the secret prompt (never in chat) |
-| Pre-flight P3, P4 | Approve the frank checkout approach and the unattended approvals |
+| Pre-flight P3 | Merge `ordinance-member-stack` into frank `main` (J17 waits for it) |
 | After J16, weekly | Accept or reject `knowledge` and `config_change` proposals (not a build blocker) |
