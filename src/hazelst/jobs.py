@@ -21,10 +21,11 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from hazelst import config, db, derive, verify
+from hazelst import config, db, derive, digest, narrative, verify
 from hazelst.agents import conditions_extract
 from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable
-from hazelst.models import BestBet, Narrative, ReportPayload, ReportStatus
+from hazelst.agents.schemas import ReportDraft
+from hazelst.models import Narrative, ReportPayload, ReportStatus
 from hazelst.render import page
 from hazelst.render.payload import build_payload
 from hazelst.sources import base, discussions, iem, nohrsc, nws, open_meteo, pns, snow_report
@@ -471,16 +472,89 @@ def unavailable_sources(conn: sqlite3.Connection, ingest_run_id: int) -> list[st
     return [name for source, name in SOURCE_NAMES.items() if source not in ok]
 
 
-def write_narrative(ctx: JobContext, payload: ReportPayload) -> Narrative | None:
-    """The written report for a payload; None publishes the page as `numbers_only`.
+def make_agents(ctx: JobContext) -> AgentClient:
+    """The Claude client for a job (patched in tests with a stub backend)."""
+    return AgentClient(ctx.conn, ctx.cfg.settings)
 
-    Numbers only until `report-write` lands (J11).
+
+def morning_draft(conn: sqlite3.Connection, for_date: date) -> ReportDraft | None:
+    """The newest draft for the date that passed `report-check` (from `agent_call`)."""
+    row = conn.execute(
+        "SELECT a.output FROM agent_call a JOIN run r ON r.id = a.run_id"
+        " WHERE r.for_date = ? AND r.kind IN ('report-build', 'report-refresh')"
+        " AND a.role IN ('report-write', 'report-revise') AND a.status = 'ok'"
+        " AND a.check_errors = '[]' ORDER BY a.id DESC LIMIT 1",
+        (for_date.isoformat(),),
+    ).fetchone()
+    return ReportDraft.model_validate_json(row[0]) if row else None
+
+
+def write_narrative(ctx: JobContext, payload: ReportPayload, kind: str) -> Narrative | None:
+    """The checked written report for a payload; None publishes the page as `numbers_only`.
+
+    report-build: report-write -> report-check -> (report-revise -> report-check).
+    report-refresh: report-check the newest checked draft against the new numbers;
+    report-revise only if it now fails.
     """
-    return None
+    report_digest = digest.build(ctx.conn, payload)
+    agents = make_agents(ctx)
+    knowledge = narrative.accepted_knowledge(ctx.conn)
+    if kind == "report-refresh":
+        draft = morning_draft(ctx.conn, ctx.for_date)
+        if draft is None:
+            result = narrative.Narrative("numbers_only", reason="no checked narrative today")
+        else:
+            result = narrative.recheck_narrative(
+                agents, report_digest, draft, knowledge, run_id=ctx.run_id
+            )
+    else:
+        result = narrative.build_narrative(agents, report_digest, knowledge, run_id=ctx.run_id)
+    ctx.summary["narrative"] = {
+        "status": result.status,
+        "reason": result.reason,
+        "check_errors": result.errors,
+        "agent_calls": result.call_ids,
+    }
+    log_event(run_id=ctx.run_id, step="narrative", **ctx.summary["narrative"])
+    return result.page
+
+
+def rebuild_target(ctx: JobContext) -> tuple[str | None, str]:
+    """The edition a 15-minute rebuild should rewrite, or None and why not.
+
+    Today's newest edition, when its newest version is `numbers_only` and a
+    Claude call can still be made (agent-runs.md, Failure behavior).
+    """
+    if not ctx.cfg.settings.enable_agents:
+        return None, "agents disabled"
+    rows = ctx.conn.execute(
+        "SELECT json_extract(payload, '$.edition'), status FROM report WHERE for_date = ?"
+        " ORDER BY version DESC",
+        (ctx.for_date.isoformat(),),
+    ).fetchall()
+    newest: dict[str, str] = {}
+    for edition, status in rows:
+        newest.setdefault(edition, status)
+    editions = [e for e in EDITIONS if e in newest]
+    if not editions:
+        return None, "no edition published yet"
+    edition = editions[-1]
+    if newest[edition] != "numbers_only":
+        return None, f"{edition} already has a checked narrative"
+    agents = make_agents(ctx)
+    if agents.calls_today() >= ctx.cfg.settings.agent_daily_calls:
+        return None, "daily call cap reached"
+    return edition, "numbers_only"
 
 
 def build_report(ctx: JobContext, kind: str) -> None:
     """Derive from the latest ingest and publish a new report version for one edition."""
+    if ctx.options.get("rebuild"):
+        target, why = rebuild_target(ctx)
+        if target is None:
+            ctx.summary.update({"status": f"skipped ({why})"})
+            return
+        ctx.options.update({"edition": target, "force": True})
     now = clock()
     edition = pick_edition(ctx, kind)
     if not ctx.options.get("force") and edition in edition_rows(ctx.conn, ctx.for_date):
@@ -525,10 +599,8 @@ def build_report(ctx: JobContext, kind: str) -> None:
         ),
         verification=verify.latest_summary(ctx.conn, ctx.for_date),
     )
-    narrative = write_narrative(ctx, payload)
-    if narrative is None and kind == "report-refresh":
-        narrative = morning_narrative(ctx.conn, ctx.for_date)
-    status: ReportStatus = "published" if narrative else "numbers_only"
+    written = write_narrative(ctx, payload, kind)
+    status: ReportStatus = "published" if written else "numbers_only"
     payload = payload.model_copy(update={"status": status})
     with db.transaction(ctx.conn):
         derive.store(ctx.conn, ctx.run_id, forecast)
@@ -543,9 +615,9 @@ def build_report(ctx: JobContext, kind: str) -> None:
                 ctx.for_date.isoformat(),
                 version,
                 ctx.run_id,
-                narrative.headline if narrative else page.numbers_only_headline(payload),
-                narrative.best_bet.model_dump_json() if narrative and narrative.best_bet else None,
-                narrative.body_md if narrative else None,
+                written.headline if written else page.numbers_only_headline(payload),
+                written.best_bet.model_dump_json() if written and written.best_bet else None,
+                written.body_md if written else None,
                 payload.model_dump_json(),
                 status,
                 now.isoformat(timespec="seconds"),
@@ -564,22 +636,6 @@ def build_report(ctx: JobContext, kind: str) -> None:
         }
     )
     log_event(run_id=ctx.run_id, step=kind, edition=edition, version=version, status=status)
-
-
-def morning_narrative(conn: sqlite3.Connection, for_date: date) -> Narrative | None:
-    """The newest written report for the date, carried into a refresh (report-check re-runs
-    against it once `report-write` exists)."""
-    row = conn.execute(
-        "SELECT headline, best_bet, narrative_md FROM report WHERE for_date = ?"
-        " AND status = 'published' AND narrative_md IS NOT NULL ORDER BY version DESC LIMIT 1",
-        (for_date.isoformat(),),
-    ).fetchone()
-    if row is None:
-        return None
-    best = json.loads(row[1]) if row[1] else None
-    return Narrative(
-        headline=row[0], best_bet=BestBet.model_validate(best) if best else None, body_md=row[2]
-    )
 
 
 def report_build(ctx: JobContext) -> None:

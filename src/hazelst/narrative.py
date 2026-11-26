@@ -8,7 +8,6 @@ A narrative is published only when `report_check` passes. Any agent failure
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -19,6 +18,8 @@ from hazelst.agents.report_revise import revise_report
 from hazelst.agents.report_write import write_report
 from hazelst.agents.schemas import ReportDraft
 from hazelst.digest import ReportDigest
+from hazelst.models import BestBet as PageBestBet
+from hazelst.models import Narrative as PageNarrative
 from hazelst.report_check import check
 
 NarrativeStatus = Literal["published", "numbers_only"]
@@ -28,7 +29,7 @@ NarrativeStatus = Literal["published", "numbers_only"]
 class Narrative:
     status: NarrativeStatus
     draft: ReportDraft | None = None
-    markdown: str | None = None
+    page: PageNarrative | None = None
     reason: str | None = None  # why the page is numbers_only
     errors: list[str] = field(default_factory=list)  # the last report-check errors
     call_ids: list[int] = field(default_factory=list)
@@ -51,7 +52,7 @@ def _checked(
 
 
 def _published(digest: ReportDigest, draft: ReportDraft, call_ids: list[int]) -> Narrative:
-    return Narrative("published", draft, to_markdown(draft, digest), call_ids=call_ids)
+    return Narrative("published", draft, page_narrative(draft, digest), call_ids=call_ids)
 
 
 def revise_until_checked(
@@ -123,32 +124,38 @@ def recheck_narrative(
     )
 
 
-# --- markdown --------------------------------------------------------------------
+# --- page ------------------------------------------------------------------------
 
 
-def to_markdown(draft: ReportDraft, digest: ReportDigest) -> str:
-    """`report.narrative_md`: front matter, then Best bet, The storm, Mountain by mountain,
-    Cautions (narrative.md, Output structure)."""
+def body_markdown(draft: ReportDraft, digest: ReportDigest) -> str:
+    """`report.narrative_md`: The storm, Mountain by mountain, Cautions.
+
+    The headline and best bet have their own `report` columns; the page shows
+    them in the band and the best-bet card (narrative.md, Output structure).
+    The markdown uses only what `render.page.md_to_html` supports: `## `
+    headings, paragraphs, and `**bold**`.
+    """
     names = {m.key: m.name for m in digest.mountains}
+    blocks = ["## The storm", draft.storm, "## Mountain by mountain"]
+    order = [m.key for m in digest.mountains if m.key in draft.mountains]
+    order += [k for k in draft.mountains if k not in names]
+    blocks += [
+        f"**{names.get(k, k)}.** {draft.mountains[k]}" for k in order if k in draft.mountains
+    ]
+    blocks += ["## Cautions", *(draft.cautions or ["None today."])]
+    return "\n\n".join(blocks) + "\n"
+
+
+def page_narrative(draft: ReportDraft, digest: ReportDigest) -> PageNarrative:
+    """The narrative as the page and the `report` row store it."""
     bet = draft.best_bet
-    bet_name = names.get(bet.mountain, bet.mountain)
-    front = {
-        "title": digest.date.strftime("%a %-d %b %Y"),
-        "headline": draft.headline,
-        "best_bet": {
-            "mountain": bet_name,
-            "day": bet.day.strftime("%a %-d"),
-            "why": bet.why,
-        },
-    }
-    lines = ["---"]
-    lines += [f"{k}: {json.dumps(v, ensure_ascii=False)}" for k, v in front.items()]
-    lines += ["---", "", "## Best bet", "", f"**{bet_name}, {bet.day.strftime('%A')}.** {bet.why}"]
-    lines += ["", "## The storm", "", draft.storm, "", "## Mountain by mountain", ""]
-    order = [m.key for m in digest.mountains] + [k for k in draft.mountains if k not in names]
-    for key in order:
-        if key in draft.mountains:
-            lines += [f"**{names.get(key, key)}.** {draft.mountains[key]}", ""]
-    lines += ["## Cautions", ""]
-    lines += [f"- {c}" for c in draft.cautions] or ["None today."]
-    return "\n".join(lines).rstrip() + "\n"
+    mountain = digest.mountain(bet.mountain)
+    return PageNarrative(
+        headline=draft.headline,
+        best_bet=PageBestBet(
+            mountain=mountain.name if mountain else bet.mountain,
+            day=f"{bet.day:%a} {bet.day.day:02d}",
+            why=bet.why,
+        ),
+        body_md=body_markdown(draft, digest),
+    )

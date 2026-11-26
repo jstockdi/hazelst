@@ -228,8 +228,9 @@ def _cmd_agents_narrate(args: argparse.Namespace) -> int:
         "call_ids": result.call_ids,
     }
     print(json.dumps(summary, indent=2))
-    if result.markdown:
-        print(result.markdown)
+    if result.page:
+        print(result.page.model_dump_json(indent=2, exclude={"body_md"}))
+        print(result.page.body_md)
     return 0 if result.status == "published" else 1
 
 

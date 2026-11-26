@@ -20,9 +20,10 @@ from hazelst.digest import ReportDigest
 from hazelst.narrative import (
     accepted_knowledge,
     build_narrative,
+    page_narrative,
     recheck_narrative,
-    to_markdown,
 )
+from hazelst.render.page import md_to_html
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "report" / "2026-11-25"
 NOW = datetime(2026, 11, 25, 12, 0, tzinfo=UTC)
@@ -125,7 +126,7 @@ def test_second_failed_check_is_numbers_only(conn: sqlite3.Connection) -> None:
     assert result.status == "numbers_only"
     assert result.reason == "report-check failed twice"
     assert len(result.errors) == 3
-    assert result.markdown is None
+    assert result.page is None
 
 
 def test_disabled_agents_are_numbers_only(conn: sqlite3.Connection) -> None:
@@ -173,12 +174,16 @@ def test_refresh_revises_when_numbers_changed(conn: sqlite3.Connection) -> None:
 # --- markdown --------------------------------------------------------------------------
 
 
-def test_markdown_sections_in_order() -> None:
-    md = to_markdown(GOOD, DIGEST)
-    assert md.startswith('---\ntitle: "Wed 25 Nov 2026"\nheadline: ')
-    assert '"mountain": "Sunday River", "day": "Thu 26"' in md
-    order = ["## Best bet", "## The storm", "## Mountain by mountain", "## Cautions"]
+def test_page_narrative_matches_the_page_renderer() -> None:
+    page = page_narrative(GOOD, DIGEST)
+    assert page.headline == GOOD.headline
+    assert page.best_bet is not None
+    assert (page.best_bet.mountain, page.best_bet.day) == ("Sunday River", "Thu 26")
+    md = page.body_md
+    order = ["## The storm", "## Mountain by mountain", "## Cautions"]
     assert [md.index(h) for h in order] == sorted(md.index(h) for h in order)
     names = [f"**{m.name}.**" for m in DIGEST.mountains]
     assert [md.index(n) for n in names] == sorted(md.index(n) for n in names)
-    assert "**Sunday River, Thursday.** Dry until afternoon" in md
+    html = md_to_html(md)
+    assert "<h2>The storm</h2>" in html and "<b>Killington.</b>" in html
+    assert html.count("<p>") == 1 + len(DIGEST.mountains) + len(GOOD.cautions)

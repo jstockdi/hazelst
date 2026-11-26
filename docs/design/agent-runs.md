@@ -84,7 +84,7 @@ job lock, and a failed step does not stop the next one.
 | `ingest-forecast` | 6:45 AM, 8:10 AM, 2:30 PM | Open-Meteo (summit, base), NWS grids, alerts, discussions → `fetch` → normalize | — |
 | `ingest-obs` | 6:50 AM, 8:10 AM, 2:30 PM | Resort adapters, PNS, LSR, NOHRSC → `fetch` → `observation`, `snow_report` | `conditions-extract`, only when an adapter fails |
 | `report-build` | 7:00 AM | derive → digest → `report-write` → `report-check` → (`report-revise` → `report-check`) → `report` | `report-write`, `report-revise` |
-| `report-refresh` | 8:15 AM, 2:40 PM | re-derive from the latest ingest; update numbers, alerts, conditions; re-run `report-check` against the morning narrative | `report-revise` only if the check now fails |
+| `report-refresh` | 8:15 AM, 2:40 PM | re-derive from the latest ingest; update numbers, alerts, conditions; re-run `report-check` against the newest checked draft of the day (the `agent_call` output that passed); with no checked draft the edition is `numbers_only` | `report-revise` only if the check now fails |
 | `forecast-verify` | 9:00 PM | read the NOHRSC grid ending 12Z today (published ~7:30 PM), then score yesterday's 1d forecast from each edition (7:00, 8:15, 2:40) against observations → `verification`; re-score the date a week before that (NOHRSC re-read) | — |
 | `skill-learn` | 2:00 AM nightly | rebuild `skill` from `verification` + `forecast_hourly` | — |
 | `knowledge-review` | Monday 3:00 AM | gather the week's evidence → `knowledge-propose` → proposed rows | `knowledge-propose` |
@@ -263,5 +263,5 @@ small structured-output call measured $0.005–0.034 per call at that price.
 |---------|----------|
 | One source down | That section shows "source unavailable" in the footer; the run continues |
 | Open-Meteo down | Retry 3× over 20 min; then publish yesterday's forecast marked stale |
-| `report-write` / `report-revise` fail or `report-check` fails twice | `numbers_only` page; rebuild every 15 min until 9 AM |
+| `report-write` / `report-revise` fail or `report-check` fails twice | `numbers_only` page; the `report-rebuild` slot (7:15, 7:30, … 9:00) runs `report-build` for today's newest edition while its newest version is `numbers_only`; it skips when agents are disabled or the daily call cap is reached |
 | Container down at 7:00 | `report-build` runs on startup if today has no report |
