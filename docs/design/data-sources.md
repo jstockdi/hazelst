@@ -310,8 +310,12 @@ in `mountains.json`; store `nearest_mountain` and `distance_mi` in
 (data-model.md, observation priority). Reports are mostly valley spotters and
 read lower than summits; elevation is not given (`elev_ft` is `null`). The same
 CoCoRaHS observation can appear in both an LSR and a PNS: deduplicate on
-rounded `(lat, lon)` to 3 decimals, `ending_at`, and `snow_in`, keeping the PNS
-row.
+`(lat, lon)` rounded to 2 decimals, `ending_at`, and `snow_in`, keeping the PNS
+row. LSR coordinates carry only two decimals (PNS carries four), so a
+3-decimal key matched 1 of the 38 BTV reports on 2026-02-07 that also appear
+in an LSR; 2 decimals matches all 38. The key is the `snow_report.id`
+(`44.30,-73.98,2026-02-07T12:00:00+00:00,3`): a PNS row replaces a row with the
+same id, and an LSR row never replaces one.
 
 ### NOHRSC National Snowfall Analysis
 
@@ -323,15 +327,39 @@ and season to date
 upper-left corner 126° W, 55° N, nodata `-99999`; values are inches (the
 2026-02-07 grid gives 1.00 at Cranmore, matching the North Conway PNS report of
 1.0). Read the nearest pixel at each mountain's `lat`/`lon`:
-`col = (lon + 126) / 0.04`, `row = (55 - lat) / 0.04`. Decoding needs
-`tifffile` and `imagecodecs` (LZW); `.nc` versions are NetCDF4/HDF5 and need
-`h5py`, so the GeoTIFF is the lighter choice.
+`col = floor((lon + 126) / 0.04)`, `row = floor((55 - lat) / 0.04)` (the
+origin and pixel size come from the file's `ModelTiepointTag` and
+`ModelPixelScaleTag`). The grid is stored one row per strip, so
+`sources/geotiff.py` decodes only the strips holding the eight mountains (a
+small stdlib LZW decoder, about 10 ms per grid); no `tifffile`, `imagecodecs`,
+or `numpy` dependency. The `.nc` versions are NetCDF4/HDF5 and would need
+`h5py`.
 
 Latency: the 24 h grid ending 12Z on day D appeared at about 00Z on D+1
 (`sfav2_CONUS_24h_2026112512.tif` last-modified 2026-11-26 00:06Z). It feeds
 the 9 PM `forecast-verify` and the next morning's accumulation fallback, not the
 same morning. Files are reprocessed later (the 2026-02-07 file was regenerated
 2026-02-12), so verification re-reads a grid once after 7 days.
+
+### How `ingest-obs` reads these sources (J12)
+
+Each `ingest-obs` run for report date D:
+
+| Step | Reads | Writes |
+|------|-------|--------|
+| `pns` | For each office, the api.weather.gov PNS listing (the IEM AFOS listing for D − 1 and D when the live listing fails, or when D is older than yesterday); then each product issued from the start of D − 1 to the end of D (local) that is not stored yet | Text in `discussion` (`kind = 'PNS'`, AFOS product id, so a product is fetched once whichever path found it); reports in `snow_report` |
+| `lsr` | IEM LSR GeoJSON for the same window (UTC) | `snow_report` (`hours` null) |
+| `nohrsc` | The 24 h, 48 h, and season grids ending 12Z on the newest published date (D − 1 during the day; D after 00:30Z on D + 1, which covers the 9 PM `forecast-verify`), plus the grids ending D − 8 once more if they were first read before the 7-day reprocessing window | One `observation` row per mountain per end date: `source = 'nohrsc'`, `obs_date` = the end date, `reported_at` = 12Z on it, `new_24h_in`, `new_48h_in`, `season_in`; `fetch_id` is the 24 h grid and `raw` holds the pixel, grid URLs, and every grid's `fetch` id. A re-read replaces the rows |
+
+The 72 h grid has no `observation` column and is not fetched. A step fails
+(and its section shows "source unavailable") when no office listing could be
+read (`pns`), the LSR request fails (`lsr`), or the newest NOHRSC 24 h grid is
+neither stored nor fetchable (`nohrsc`); the other steps still run.
+
+`obs_date` convention (all `observation` sources): obs_date D is the 24 h
+ending the morning of D. NOHRSC's grid ending 12Z on D (7 AM EST) and a resort
+report posted the morning of D both have obs_date D, so the 1d forecast from
+report date D (6 AM D to 6 AM D + 1) is verified against obs_date D + 1.
 
 The SNODAS grids named earlier are not used: they are large tar archives, and
 the snowfall analysis gives the needed field directly. NOAA's
