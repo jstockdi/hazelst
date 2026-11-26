@@ -120,8 +120,8 @@ CREATE TABLE forecast_day (
 );
 CREATE TABLE verification (
   for_date DATE, edition TEXT,              -- 0700 | 0815 | 1440
-  mountain TEXT, window TEXT, method TEXT,
-  forecast_in REAL, observed_in REAL, observed_source TEXT,
+  mountain TEXT, window TEXT, method TEXT,  -- window 1d; method raw_mean | corrected | a model id
+  forecast_in REAL, observed_in REAL, observed_source TEXT,  -- resort | resort_llm | pns | lsr | nohrsc
   error_in REAL, ratio REAL, result TEXT,   -- HIT | MISS | NO_OBS
   tags JSON,                                -- tags that fired, copied for slicing
   PRIMARY KEY (for_date, edition, mountain, window, method)
@@ -185,7 +185,15 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
    against the best available observation: resort 24 h > PNS/LSR within 5 mi >
    NOHRSC > none. Resort and NOHRSC values are `observation` rows; PNS and LSR
    points stay in `snow_report` (with `nearest_mountain` and `distance_mi`) and
-   are not copied into `observation`.
+   are not copied into `observation`. Day X (6 AM X to 6 AM X + 1) reads
+   obs_date X + 1: the earliest non-stale resort report that day (`resort_llm`
+   only without an adapter value); else the highest PNS / LSR report within
+   5 mi, using 24 h reports ending 4–10 AM on X + 1, or reports of unknown span
+   (LSRs, storm totals) ending in the window by 10 AM; else the NOHRSC 24 h
+   grid ending 12Z on X + 1. HIT is within 2″ or 30% of the observation.
+   `forecast-verify` runs at 9 PM on X + 1 and scores the newest report
+   version of each edition, for the mean and each model; rows are replaced
+   when a date is re-scored.
 3. **skill-learn** (nightly) rebuilds `skill`: bias ratio and error per mountain ×
    model × lead time × pattern tag.
 4. **Corrected forecast** — once a cell in `skill` has n ≥ 10 verified snow days,

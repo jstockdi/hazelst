@@ -21,7 +21,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from hazelst import config, db, derive
+from hazelst import config, db, derive, verify
 from hazelst.agents import conditions_extract
 from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable
 from hazelst.models import BestBet, Narrative, ReportPayload, ReportStatus
@@ -520,6 +520,10 @@ def build_report(ctx: JobContext, kind: str) -> None:
         discussion_texts=inputs.discussions,
         sources_unavailable=unavailable_sources(ctx.conn, ingest_run),
         notes=notes,
+        accumulation=verify.accumulation(
+            ctx.conn, ctx.cfg.mountains, ctx.for_date, ctx.cfg.timezone
+        ),
+        verification=verify.latest_summary(ctx.conn, ctx.for_date),
     )
     narrative = write_narrative(ctx, payload)
     if narrative is None and kind == "report-refresh":
@@ -586,11 +590,42 @@ def report_refresh(ctx: JobContext) -> None:
     build_report(ctx, "report-refresh")
 
 
+# --- forecast-verify -------------------------------------------------------------------
+
+# Re-score this many days back too: NOHRSC grids are re-read once after 7 days.
+RESCORE_DAYS = 7
+
+
+def forecast_verify(ctx: JobContext) -> None:
+    """Score yesterday's editions (and the day a week before that) against observations.
+
+    Runs at 9 PM: the NOHRSC grid ending 12Z today (the 24 h ending this
+    morning) is published by then, so it is read first; resort and point
+    reports for this morning came in with today's `ingest-obs`. The run's
+    date is the evening it runs: `hazelst run forecast-verify --date D` scores D - 1.
+    """
+    try:
+        ctx.summary["nohrsc"] = {"status": "ok", **ingest_nohrsc(ctx)}
+    except Exception as exc:  # a missing grid leaves the resort and point reports
+        ctx.summary["nohrsc"] = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
+    yesterday = ctx.for_date - timedelta(days=1)
+    days = [yesterday, yesterday - timedelta(days=RESCORE_DAYS)]
+    scored: dict[str, Any] = {}
+    for day in days:
+        rows = verify.verify_date(ctx.conn, ctx.cfg.mountains, day, ctx.cfg.timezone)
+        with db.transaction(ctx.conn):
+            written = verify.store(ctx.conn, rows)
+        scored[day.isoformat()] = {"rows": written, "model_mean": verify.summarize(rows)}
+    ctx.summary["scored"] = scored
+    log_event(run_id=ctx.run_id, step="forecast-verify", scored=scored)
+
+
 JOBS: dict[str, Callable[[JobContext], None]] = {
     "ingest-forecast": ingest_forecast,
     "ingest-obs": ingest_obs,
     "report-build": report_build,
     "report-refresh": report_refresh,
+    "forecast-verify": forecast_verify,
 }
 
 

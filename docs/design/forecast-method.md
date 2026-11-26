@@ -43,9 +43,19 @@ Daily buckets (6 AM → 6 AM) feed the forecast chart.
 
 ## Accumulation (observed)
 
-Per mountain: resort-reported new snow for each of the last 7 days, season
-total, and base depth. If the resort adapter fails, use NOHRSC 24 h snowfall
-(no base depth) and mark `source: "nohrsc"`.
+Per mountain: new snow observed on each of the 7 days before the report date,
+season total, and base depth (`verify.accumulation`).
+
+- Each day (6 AM to 6 AM) takes the best observation by the verification
+  priority: resort 24 h (non-stale; `resort_llm` only without an adapter
+  value) > PNS / LSR within 5 mi > NOHRSC 24 h > none (`null`). A day D reads
+  `observation.obs_date` D + 1 (the 24 h ending the morning after).
+- Season total and base depth come from the newest non-stale resort report of
+  the last 3 days; without one, the NOHRSC season-to-date grid (no base depth),
+  and `source` is `"nohrsc"`. `sources` lists every source used; the footer
+  names them.
+- A mountain with no observation at all has no accumulation; the section shows
+  its empty state when no mountain has 0.5″ or more in the 7 days.
 
 ## Pattern tags
 

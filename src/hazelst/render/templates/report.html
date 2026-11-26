@@ -66,7 +66,10 @@
 {% if p.sources_unavailable %}
     <p>Source unavailable: {{ p.sources_unavailable | join(", ") }}.</p>
 {% endif %}
-    <p>Verification: none yet.</p>
+{% if accumulation_sources %}
+    <p>Accumulation: {{ accumulation_sources | join(", ") }}.</p>
+{% endif %}
+    <p>{{ verification }}</p>
     <p><a href="/archive">Archive</a> · <a href="/api/report/{{ p.date.isoformat() }}.json">JSON</a></p>
   </div>
 </main>

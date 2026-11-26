@@ -85,7 +85,7 @@ job lock, and a failed step does not stop the next one.
 | `ingest-obs` | 6:50 AM, 8:10 AM, 2:30 PM | Resort adapters, PNS, LSR, NOHRSC → `fetch` → `observation`, `snow_report` | `conditions-extract`, only when an adapter fails |
 | `report-build` | 7:00 AM | derive → digest → `report-write` → `report-check` → (`report-revise` → `report-check`) → `report` | `report-write`, `report-revise` |
 | `report-refresh` | 8:15 AM, 2:40 PM | re-derive from the latest ingest; update numbers, alerts, conditions; re-run `report-check` against the morning narrative | `report-revise` only if the check now fails |
-| `forecast-verify` | 9:00 PM | score the 1d forecast from each edition (7:00, 8:15, 2:40) against observations → `verification` | — |
+| `forecast-verify` | 9:00 PM | read the NOHRSC grid ending 12Z today (published ~7:30 PM), then score yesterday's 1d forecast from each edition (7:00, 8:15, 2:40) against observations → `verification`; re-score the date a week before that (NOHRSC re-read) | — |
 | `skill-learn` | 2:00 AM nightly | rebuild `skill` from `verification` + `forecast_hourly` | — |
 | `knowledge-review` | Monday 3:00 AM | gather the week's evidence → `knowledge-propose` → proposed rows | `knowledge-propose` |
 | `season-backfill` | manual | historical forecasts and reports into the same tables | — |

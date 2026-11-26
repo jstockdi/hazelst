@@ -12,6 +12,7 @@ from hazelst.models import (
     MountainReport,
     ReportPayload,
     ReportStatus,
+    VerificationSummary,
 )
 from hazelst.sources import discussions
 
@@ -33,6 +34,7 @@ def build_payload(
     accumulation: Mapping[str, Accumulation] | None = None,
     sources_unavailable: Sequence[str] = (),
     notes: Sequence[str] = (),
+    verification: VerificationSummary | None = None,
 ) -> ReportPayload:
     alerts = alerts or {}
     accumulation = accumulation or {}
@@ -72,5 +74,6 @@ def build_payload(
         storm_words=forecast.storm_words,
         sources_unavailable=list(sources_unavailable),
         notes=list(notes),
+        verification=verification,
         mountains=reports,
     )

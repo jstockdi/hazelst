@@ -14,7 +14,14 @@ from jinja2 import Environment, PackageLoader, StrictUndefined, select_autoescap
 from markupsafe import Markup
 
 from hazelst.config import TIMEZONE
-from hazelst.models import BestBet, MountainReport, Narrative, PrecipType, ReportPayload
+from hazelst.models import (
+    BestBet,
+    MountainReport,
+    Narrative,
+    PrecipType,
+    ReportPayload,
+    VerificationSummary,
+)
 from hazelst.render import charts
 
 MODEL_NAMES = {"gfs_seamless": "GFS", "ecmwf_ifs025": "ECMWF", "gem_seamless": "GEM"}
@@ -160,6 +167,42 @@ def accumulation_state(payload: ReportPayload) -> tuple[str, str]:
     return "chart", ""
 
 
+ACCUMULATION_SOURCE_NAMES = {
+    "resort": "resort reports",
+    "resort_llm": "resort report pages read by Claude",
+    "pns": "NWS snowfall reports",
+    "lsr": "NWS local storm reports",
+    "nohrsc": "NOHRSC snowfall analysis",
+}
+RESULT_WORDS = (("HIT", "HIT"), ("MISS", "MISS"), ("NO_OBS", "no report"))
+
+
+def accumulation_sources(payload: ReportPayload) -> list[str]:
+    """Names of every observation source behind the accumulation section."""
+    used = {s for m in payload.mountains if m.accumulation for s in m.accumulation.sources}
+    return [name for key, name in ACCUMULATION_SOURCE_NAMES.items() if key in used]
+
+
+def verification_counts(summary: VerificationSummary) -> str:
+    """ "7:00 AM 5 HIT · 2 MISS; 8:15 AM 6 HIT · 1 MISS" (model mean, next 24 h)."""
+    parts = []
+    for edition, counts in summary.editions.items():
+        tally = " · ".join(f"{counts[key]} {word}" for key, word in RESULT_WORDS if counts.get(key))
+        parts.append(f"{EDITIONS.get(edition, edition)} {tally}")
+    return "; ".join(parts)
+
+
+def verification_line(payload: ReportPayload) -> str:
+    summary = payload.verification
+    if summary is None:
+        return "Verification: none yet."
+    day = f"{summary.for_date:%a} {summary.for_date.day} {summary.for_date:%b}"
+    return (
+        f"Verification, {day} (next 24 h, model mean, within 2″ or 30% is a HIT):"
+        f" {verification_counts(summary)}."
+    )
+
+
 def cautions(payload: ReportPayload) -> list[str]:
     """Numbers-only cautions: active alerts and lift-hold wind days, straight from the data."""
     lines: list[str] = []
@@ -201,6 +244,8 @@ def render_report(payload: ReportPayload, narrative: Narrative | None = None) ->
         if state == "chart"
         else Markup(""),
         "cautions": cautions(payload),
+        "accumulation_sources": accumulation_sources(payload),
+        "verification": verification_line(payload),
         "runs": [(run_label(r.model, r.issued_at), r.stale) for r in payload.models],
         "offices": [f"{OFFICE_NAMES.get(o, o)}" for o in payload.discussions],
         "used_names": [MODEL_NAMES.get(m, m) for m in payload.used_models],

@@ -49,6 +49,7 @@ def test_slots_follow_agent_runs_schedule() -> None:
         ("08:10", ["ingest-forecast", "ingest-obs", "report-refresh"]),
         ("14:30", ["ingest-forecast", "ingest-obs"]),
         ("14:40", ["report-refresh"]),
+        ("21:00", ["forecast-verify"]),
     ]
     morning = scheduler.SLOTS[3].steps
     assert morning[0].ecmwf_gate_until == dtime(8, 45)

@@ -92,12 +92,25 @@ class BestBet(_Model):
 
 
 class Accumulation(_Model):
-    """Snow that has fallen (observations); filled by forecast-verify's sources."""
+    """Snow that has fallen (observations), chosen by `verify.accumulation`.
+
+    `last7_in` holds the 7 days before the report date (6 AM to 6 AM, oldest
+    first); `source` is where the season total and base came from, and
+    `sources` every source used.
+    """
 
     source: str
     last7_in: list[float | None]
     season_in: float | None = None
     base_in: float | None = None
+    sources: list[str] = []
+
+
+class VerificationSummary(_Model):
+    """Result counts for the model mean's 1d forecast, per edition, for one date."""
+
+    for_date: date
+    editions: dict[str, dict[str, int]]  # edition -> {HIT | MISS | NO_OBS: count}
 
 
 class MountainReport(_Model):
@@ -138,6 +151,7 @@ class ReportPayload(_Model):
     storm_words: dict[str, list[str]] = {}
     sources_unavailable: list[str] = []
     notes: list[str] = []  # footer notes, e.g. an edition published without ECMWF 06Z
+    verification: VerificationSummary | None = None  # the newest verified date before this one
     mountains: list[MountainReport]
 
     def mountain(self, key: str) -> MountainReport:
