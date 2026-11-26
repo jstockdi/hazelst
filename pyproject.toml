@@ -5,6 +5,7 @@ description = "Hazel St Forecast: a daily ski forecast for the Ikon mountains of
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "claude-agent-sdk==0.2.180",
     "httpx>=0.28",
     "prometheus-client>=0.23",
     "pydantic>=2.12",
