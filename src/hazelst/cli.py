@@ -150,6 +150,50 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_season_backfill(args: argparse.Namespace) -> int:
+    """Backfill `--from`..`--to` one month per job run, then rebuild `skill`."""
+    import time
+
+    from hazelst import backfill
+
+    cfg = config.load()
+    if args.to < args.start:
+        raise config.ConfigError("--to is before --from")
+    steps = tuple(args.steps.split(",")) if args.steps else backfill.STEPS
+    unknown = set(steps) - set(backfill.STEPS)
+    if unknown:
+        raise config.ConfigError(f"unknown steps {sorted(unknown)}; known: {backfill.STEPS}")
+    started = time.monotonic()
+    chunks = []
+    code = 0
+    for first, last in backfill.chunks(args.start, args.to):
+        options = {"start": first, "end": last, "steps": steps}
+        try:
+            summary = jobs.run_job(
+                cfg, "season-backfill", first, options=options, lock_timeout_s=args.lock_wait
+            )
+        except Exception as exc:  # report the month and continue; a rerun fills it in
+            summary = {"from": first.isoformat(), "to": last.isoformat(), "error": str(exc)}
+            code = 1
+        chunks.append(summary)
+        print(json.dumps(summary, default=str), flush=True)
+    learned = None
+    if not args.no_learn:
+        learned = jobs.run_job(cfg, "skill-learn", lock_timeout_s=args.lock_wait)
+    db_path = cfg.settings.db_path
+    size = sum(p.stat().st_size for p in (db_path, Path(f"{db_path}-wal")) if p.exists())
+    out = {
+        "from": args.start.isoformat(),
+        "to": args.to.isoformat(),
+        "months": len(chunks),
+        "seconds": round(time.monotonic() - started, 1),
+        "db_bytes": size,
+        "skill_learn": learned,
+    }
+    print(json.dumps(out, indent=2, default=str))
+    return code
+
+
 SMOKE_PAGE = """\
 Snow Report - updated 6:42 AM
 Sample page for the hazelst agent smoke test.
@@ -314,6 +358,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--date", type=date.fromisoformat, help="report date (default: today, America/New_York)"
     )
     p_run.set_defaults(handler=_cmd_run)
+
+    p_backfill = sub.add_parser(
+        "season-backfill",
+        help="load a past range (Previous Runs, IEM LSR / PNS, NOHRSC), then rebuild skill",
+    )
+    p_backfill.add_argument("--from", dest="start", type=date.fromisoformat, required=True)
+    p_backfill.add_argument("--to", type=date.fromisoformat, required=True)
+    p_backfill.add_argument(
+        "--steps", help="comma-separated subset of previous_runs,lsr,pns,nohrsc (default: all)"
+    )
+    p_backfill.add_argument("--no-learn", action="store_true", help="skip the skill-learn run")
+    p_backfill.add_argument(
+        "--lock-wait",
+        type=float,
+        default=1200.0,
+        help="seconds to wait for the job lock per month (default 1200)",
+    )
+    p_backfill.set_defaults(handler=_cmd_season_backfill)
 
     p_schedule = sub.add_parser("schedule", help="print the job schedule and each slot's next run")
     p_schedule.set_defaults(handler=_cmd_schedule)

@@ -92,7 +92,7 @@ job lock, and a failed step does not stop the next one.
 | `skill-learn` | 2:00 AM nightly | rebuild `skill` from `verification` + `forecast_hourly` | — |
 | `knowledge-review` | Monday 3:00 AM | gather the week's evidence → `knowledge-propose` → proposed rows | `knowledge-propose` |
 | `backup` | 4:00 AM nightly | online copy of the database to `backups/hazelst-<date>.db`; keeps 14 | — |
-| `season-backfill` | manual | historical forecasts and reports into the same tables | — |
+| `season-backfill` | manual (`hazelst season-backfill --from D --to D`) | Open-Meteo Previous Runs (GFS, GEM, lead days 1–5), IEM LSR and PNS, NOHRSC 24 h grids into the same tables, one job per month; then `skill-learn` ([data-sources.md](data-sources.md#season-backfill-j22)) | — |
 
 ## Claude roles
 

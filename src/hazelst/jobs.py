@@ -21,8 +21,8 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from hazelst import backfill, config, corrected, db, derive, digest, learn, narrative, verify
 from hazelst import backup as db_backup
-from hazelst import config, corrected, db, derive, digest, learn, narrative, verify
 from hazelst.agents import conditions_extract
 from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable
 from hazelst.agents.schemas import ReportDraft
@@ -720,6 +720,25 @@ def skill_learn(ctx: JobContext) -> None:
     log_event(run_id=ctx.run_id, step="skill-learn", samples=len(found), skill=written)
 
 
+# --- season-backfill ---------------------------------------------------------------------
+
+
+def season_backfill(ctx: JobContext) -> None:
+    """Load a past range (options `start`, `end`; optional `steps`) into the live tables."""
+    start, end = ctx.options.get("start"), ctx.options.get("end")
+    if not isinstance(start, date) or not isinstance(end, date) or end < start:
+        raise JobError("season-backfill needs start and end dates: hazelst season-backfill")
+    steps = tuple(ctx.options.get("steps") or backfill.STEPS)
+    bf = backfill.Backfill(ctx.conn, ctx.client, ctx.run_id, ctx.cfg, log_event)
+    result = backfill.run(bf, start, end, steps)
+    ctx.summary.update(result)
+    if all(
+        result[s]["error_count"] and not result[s]["rows"] and not result[s]["cached"]
+        for s in steps
+    ):
+        raise JobError(f"season-backfill {start}..{end}: every step failed")
+
+
 JOBS: dict[str, Callable[[JobContext], None]] = {
     "ingest-forecast": ingest_forecast,
     "ingest-obs": ingest_obs,
@@ -728,6 +747,7 @@ JOBS: dict[str, Callable[[JobContext], None]] = {
     "forecast-verify": forecast_verify,
     "backup": backup,
     "skill-learn": skill_learn,
+    "season-backfill": season_backfill,
 }
 
 

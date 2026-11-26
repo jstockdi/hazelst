@@ -4,6 +4,7 @@ Newest first. Each entry: the decision, why, and what it replaced.
 
 | # | Date | Decision | Why | Replaces |
 |---|------|----------|-----|----------|
+| 19 | 2026-11-26 | `season-backfill` also loads NOHRSC 24 h grids for the backfilled days | Point reports within 5 mi are sparse and skewed to snowy days; NOHRSC gives every mountain-day an observation by the same priority rule the live verification uses (~13 MB per month) | Previous Runs plus IEM LSR / PNS only |
 | 18 | 2026-11-26 | NOHRSC data comes from the National Snowfall Analysis v2 GeoTIFF (24 h / 48 h / 72 h / season grids), read at each mountain's pixel | Gives snowfall directly in small files (~0.3–0.5 MB); confirmed in J00 | SNODAS daily grids (large tar archives; snow depth and SWE, not snowfall) |
 | 17 | 2026-11-26 | `season-backfill` seeds `skill` from the Open-Meteo Previous Runs API at matching lead (GFS, GEM); ECMWF is not backfilled | The Historical Forecast API stitches short-lead output, which does not measure 1d / 3d / 5d skill; Previous Runs has no ECMWF snowfall at lead (J00) | Open-Meteo Historical Forecast API for all three models |
 | 16 | 2026-11-26 | Resort adapters are four declarative presets (`boyne_reportpal`, `mtnpowder`, `dor_html`, `cranmore_html`) over three shared parsers (`json`, `embedded_json`, `html`) | J00 found shared platforms: one Boyne API, one Alterra feed, one Killington–Pico CMS; no resort needs its own code | One code module per resort |

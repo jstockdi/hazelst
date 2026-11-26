@@ -462,6 +462,34 @@ J22 backfills `skill` from Previous Runs at the matching lead
 so the Fallbacks rule applies ("backfill the models and dates it has"): J22
 backfills GFS and GEM, and ECMWF `skill` rows start from live verification.
 
+### Season backfill (J22)
+
+`hazelst season-backfill --from D --to D` loads report days D..D into the
+live tables, one `season-backfill` job per calendar month, then runs
+`skill-learn` (`backfill.py`, `sources/previous_runs.py`):
+
+| Step | Request | Writes |
+|------|---------|--------|
+| `previous_runs` | Previous Runs, one request per lead day N = 1–5: all eight mountains (summit elevation), `gfs_seamless,gem_seamless`, `snowfall_previous_dayN`, `precipitation_previous_dayN`, `temperature_2m_previous_dayN`, `timezone=GMT`, UTC dates D..end + 1 | `forecast_hourly` at summit, `issued_at` NULL (a stitched series has no single run), nominal `lead_h` = 24 × (N − 1) so `skill-learn` places the day at lead day N |
+| `lsr` | IEM LSR GeoJSON from midnight before D to midnight after the morning of end + 1 | `snow_report` |
+| `pns` | IEM AFOS listing per office per day (D..end + 1), then each new product's text | `discussion` (`PNS`), `snow_report` |
+| `nohrsc` | The 24 h grid ending 12Z on each obs_date (D + 1..end + 1) | `observation` (`nohrsc`) |
+
+Idempotent: a request already stored with HTTP 200 (same source, URL, and
+query) is not sent again; PNS products are fetched once (`discussion` ids); a
+PNS listing is stored only when all its products were fetched, so a failed
+product is retried; NOHRSC dates with stored rows are skipped. Previous
+Runs `previous_day1` is the run from the day before each hour, so backfilled
+lead day 1 is up to a day older than a live 7 AM forecast's day 1 (decisions
+row 17 accepted this to keep one lead convention).
+
+Proof on 2026-11-26 (local DB, 2026-02-01 to 2026-02-14): 5 + 1 + 77 + 14
+requests in 64 s; 28,800 `forecast_hourly` rows, 850 `snow_report` rows, 32
+PNS products, 112 NOHRSC observations; `skill-learn` built 48 cells (8
+mountains × GFS, GEM × `1d`, `2-3d`, `4-5d`). A rerun sent no requests and
+changed no row counts. A full month (2026-01) took 67 s and added 30 MB:
+about 7 minutes and 180 MB for Nov 1 – Apr 30.
+
 ## Excluded
 
 | Source | Why |
