@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from hazelst import backup as db_backup
-from hazelst import config, db, derive, digest, narrative, verify
+from hazelst import config, corrected, db, derive, digest, learn, narrative, verify
 from hazelst.agents import conditions_extract
 from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable
 from hazelst.agents.schemas import ReportDraft
@@ -569,6 +569,9 @@ def build_report(ctx: JobContext, kind: str) -> None:
     if not inputs.hourly:
         raise JobError(f"ingest run {ingest_run} has no forecast rows")
     forecast = derive.derive(ctx.cfg.mountains, inputs, for_date=ctx.for_date, as_of=now)
+    corrections = corrected.correct(forecast, corrected.load_cells(ctx.conn))
+    passed = corrected.shown(ctx.conn, corrections, ctx.for_date)
+    forecast = corrected.apply(forecast, corrections, passed)
     notes: list[str] = []
     ingested = datetime.fromisoformat(started[0])
     if now - ingested > STALE_INGEST:
@@ -605,6 +608,7 @@ def build_report(ctx: JobContext, kind: str) -> None:
     payload = payload.model_copy(update={"status": status})
     with db.transaction(ctx.conn):
         derive.store(ctx.conn, ctx.run_id, forecast)
+        corrected.store(ctx.conn, ctx.run_id, forecast, corrections)
         version = ctx.conn.execute(
             "SELECT coalesce(max(version), 0) + 1 FROM report WHERE for_date = ?",
             (ctx.for_date.isoformat(),),
@@ -634,6 +638,7 @@ def build_report(ctx: JobContext, kind: str) -> None:
                 r.model: {"issued_at": r.issued_at, "stale": r.stale} for r in forecast.models
             },
             "notes": notes,
+            "corrected": {"mountains": sorted(corrections), "shown": sorted(passed)},
         }
     )
     log_event(run_id=ctx.run_id, step=kind, edition=edition, version=version, status=status)
@@ -695,6 +700,26 @@ def backup(ctx: JobContext) -> None:
     log_event(run_id=ctx.run_id, step="backup", status="ok", **ctx.summary["backup"])
 
 
+# --- skill-learn ---------------------------------------------------------------------------
+
+
+def skill_learn(ctx: JobContext) -> None:
+    """Rebuild `skill` from verified days and stored forecasts (learn.py)."""
+    found = learn.samples(ctx.conn, ctx.cfg.mountains, ctx.for_date, ctx.cfg.timezone)
+    rows = learn.build(found)
+    with db.transaction(ctx.conn):
+        written = learn.store(ctx.conn, rows, clock())
+    ctx.summary.update(
+        {
+            "samples": len(found),
+            "snow_day_samples": sum(1 for s in found if learn.is_snow_day(s)),
+            "skill": written,
+            **learn.summarize(rows, corrected.MIN_N),
+        }
+    )
+    log_event(run_id=ctx.run_id, step="skill-learn", samples=len(found), skill=written)
+
+
 JOBS: dict[str, Callable[[JobContext], None]] = {
     "ingest-forecast": ingest_forecast,
     "ingest-obs": ingest_obs,
@@ -702,6 +727,7 @@ JOBS: dict[str, Callable[[JobContext], None]] = {
     "report-refresh": report_refresh,
     "forecast-verify": forecast_verify,
     "backup": backup,
+    "skill-learn": skill_learn,
 }
 
 

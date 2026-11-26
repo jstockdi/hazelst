@@ -62,6 +62,9 @@ job lock, and a failed step does not stop the next one.
 | 8:10 AM | `ingest-forecast` (polls ECMWF `meta.json` every 5 min until the 06Z run or 8:45), `ingest-obs`, `report-refresh` (edition 0815, not before 8:15) |
 | 2:30 PM | `ingest-forecast`, `ingest-obs` |
 | 2:40 PM | `report-refresh` (edition 1440) |
+| 9:00 PM | `forecast-verify` |
+| 2:00 AM | `skill-learn` (on the day DST starts, 2:00 AM does not exist and the slot runs at 3:00 AM EDT) |
+| 4:00 AM | `backup` |
 
 - **Editions**: each report version records its edition in `payload.edition`.
   A scheduled report job for an edition already published that day is skipped

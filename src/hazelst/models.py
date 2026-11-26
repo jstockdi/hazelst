@@ -40,6 +40,8 @@ class ForecastWindow(_Model):
     nws_in: float | None
     nws_ice_in: float | None
     nws_disagrees: bool
+    # The `corrected` method's value, set only once it beats the mean (corrected.py gate).
+    corrected_in: float | None = None
 
 
 class ForecastDay(_Model):

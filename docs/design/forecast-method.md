@@ -41,6 +41,15 @@ Daily buckets (6 AM → 6 AM) feed the forecast chart.
 - Base-elevation snowfall is computed the same way and shown when the rain/snow
   line falls between base and summit.
 
+## Corrected value (learned)
+
+Once `skill` has at least 10 verified snow days for a mountain and model at
+a lead, `report-build` also stores a `corrected` window (bias-scaled models
+blended by 1 / MAE; [data-model.md](data-model.md#how-the-data-compounds),
+step 4). The window table shows it as "Corrected N″" under the mean, and only
+for a mountain where `corrected` has beaten the mean on its last 20 verified
+days. The mean stays the headline, so the chart and the table still agree.
+
 ## Accumulation (observed)
 
 Per mountain: new snow observed on each of the 7 days before the report date,
