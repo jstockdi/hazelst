@@ -83,13 +83,14 @@ hazelst/
     migrations/0001_init.sql ...
     models.py            # Pydantic: ReportPayload, ForecastWindow, ForecastDay, ...
     sources/             # one module per source: fetch() -> raw, normalize() -> rows
-      open_meteo.py  nws.py  discussions.py  pns.py  iem.py  nohrsc.py
+      open_meteo.py  previous_runs.py  nws.py  discussions.py  pns.py  iem.py  nohrsc.py
       snow_report.py (PNS / LSR rows, nearest mountain)  geotiff.py (NOHRSC pixel reader)
       resorts/  adapter.py (json / embedded_json / html parsers)  presets.json  source.py (fetch, budget, normalize)
     derive.py            # forecast_hourly -> forecast_window, forecast_day (+ tags, precip_type)
     tags.py              # pattern tag rules
     verify.py            # forecast-verify
     learn.py             # skill-learn (SQL + bias/weights)
+    backfill.py          # season-backfill (Previous Runs, IEM LSR / PNS, NOHRSC → same tables)
     corrected.py         # corrected forecast method
     digest.py            # DB -> report-write input
     agents/
@@ -101,7 +102,7 @@ hazelst/
     web.py               # Starlette app
     jobs.py              # job functions (ingest-forecast, report-build, ...)
     scheduler.py         # cron wiring + startup catch-up
-    cli.py               # hazelst serve|run|rebuild|replay|knowledge|backup|record
+    cli.py               # hazelst serve|run|rebuild|replay|knowledge|backup|record|season-backfill
   config/mountains.json
   .claude/skills/hazel-st/SKILL.md     # regional knowledge; part of the report-write system prompt
   .claude/commands/                    # /forecast, /powder, /mountain (call the CLI locally)

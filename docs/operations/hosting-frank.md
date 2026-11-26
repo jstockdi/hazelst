@@ -77,7 +77,8 @@ Cloudflare, like `bcl-gateway`).
 
 ## Outbound traffic
 
-The container needs HTTPS egress to: `api.open-meteo.com`, `api.weather.gov`,
+The container needs HTTPS egress to: `api.open-meteo.com`,
+`previous-runs-api.open-meteo.com` (`season-backfill` only), `api.weather.gov`,
 `mesonet.agron.iastate.edu`, the NOHRSC data host, each enabled resort report site, and
 `api.anthropic.com` (Claude Agent SDK; nonessential CLI traffic such as
 telemetry and update checks is disabled). frank is dual-stack with no per-container egress filter
@@ -103,6 +104,22 @@ today; if one is added, this is the allowlist.
   `HazelstBackupStale` (newest backup older than 26 h for 30 min), and
   `HazelstScrapeDown` (`up == 0` for 10 min). Like frank's other rules they
   surface in Prometheus `/alerts` and Grafana; no Alertmanager pages yet.
+- **Season backfill** (manual, once after the first deploy): loads the
+  2025–26 season and rebuilds `skill`:
+
+  ```bash
+  docker exec hazelst hazelst season-backfill --from 2025-11-01 --to 2026-04-30
+  ```
+
+  It runs one `season-backfill` job per month (the job lock is released between
+  months, so scheduled jobs wait at most one month's run), then `skill-learn`,
+  and prints one JSON line per month and a final summary (`seconds`,
+  `db_bytes`, the `skill-learn` summary). Measured locally on 2026-11-26: a
+  full month took 67 s (Previous Runs 32 s, PNS 22 s, NOHRSC 12 s, LSR 1 s)
+  and added 30 MB, so the season takes about 7 minutes and about 180 MB
+  (NOHRSC grids are half of it). Run it outside the 6:45–9:00 AM and
+  2:30–2:45 PM slots. It is idempotent: a rerun sends only the requests that
+  failed before, so after an error the same command fills the gaps.
 - **Failure behavior:** a failed source degrades that section (noted in the page
   footer); a failed Claude call publishes the numbers-only page with "report
   delayed" and retries every 15 minutes until 9 AM.

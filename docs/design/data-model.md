@@ -225,10 +225,17 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
   no snowfall at lead).
 - **Iowa Environmental Mesonet** archives NWS Local Storm Reports and PNS text
   with snowfall and coordinates — past ground truth for `snow_report`.
+- **NOHRSC** 24 h snowfall grids for the same days — the `observation`
+  fallback the live verification uses, so every backfilled mountain-day has
+  an observation.
 
-Both are free and keyless (confirmed 2026-11-26; endpoints in
+All are free and keyless (confirmed 2026-11-26; endpoints in
 [data-sources.md](data-sources.md#observation-and-backfill-endpoints)). With
-them, `skill` can start with prior seasons instead of zero.
+them, `skill` can start with prior seasons instead of zero. `hazelst
+season-backfill` loads them into the live tables (details in
+[data-sources.md](data-sources.md#season-backfill-j22)); a backfilled day has
+no `report` or `verification` rows, and `skill-learn` reads its observation
+with `verify.observed`.
 
 ## Size
 
