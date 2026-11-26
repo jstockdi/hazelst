@@ -137,6 +137,7 @@ class ReportPayload(_Model):
     discussions: dict[str, str] = {}  # office -> summary text
     storm_words: dict[str, list[str]] = {}
     sources_unavailable: list[str] = []
+    notes: list[str] = []  # footer notes, e.g. an edition published without ECMWF 06Z
     mountains: list[MountainReport]
 
     def mountain(self, key: str) -> MountainReport:

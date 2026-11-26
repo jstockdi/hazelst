@@ -60,6 +60,9 @@
 
   <div class="foot">
     <p>Forecast: Open-Meteo ({% for label, stale in runs %}{{ label }}{% if stale %} (stale, not in the average){% endif %}{{ ", " if not loop.last }}{% endfor %}) at summit and base elevation; NWS gridpoints and alerts{% if offices %}; NWS forecast discussions ({{ offices | join(", ") }}){% endif %}.</p>
+{% for note in p.notes %}
+    <p>{{ note }}</p>
+{% endfor %}
 {% if p.sources_unavailable %}
     <p>Source unavailable: {{ p.sources_unavailable | join(", ") }}.</p>
 {% endif %}
