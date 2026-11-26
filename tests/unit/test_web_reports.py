@@ -116,3 +116,24 @@ def test_empty_database(tmp_path: Path) -> None:
     assert resp.status_code == 404 and "No report yet." in resp.text
     assert "No reports yet." in client(path).get("/archive").text
     assert json.loads(client(path).get("/health").text)["status"] == "ok"
+
+
+def test_page_renders_payload_from_a_newer_release(tmp_path: Path) -> None:
+    """After a rollback, rows written by the newer image carry fields this one lacks."""
+    payload = json.loads(sample_payload().model_dump_json())
+    payload["field_from_next_release"] = {"x": 1}
+    payload["mountains"][0]["another_new_field"] = 2
+    path = tmp_path / "hazelst.db"
+    conn = db.connect(path)
+    db.migrate(conn)
+    conn.execute(
+        "INSERT INTO report (for_date, version, payload, status, published_at)"
+        " VALUES (?, 1, ?, 'numbers_only', ?)",
+        (payload["date"], json.dumps(payload), payload["issued"]),
+    )
+    conn.close()
+    resp = client(path).get(f"/d/{payload['date']}")
+    assert resp.status_code == 200
+    assert client(path).get("/archive").status_code == 200
+    with pytest.raises(ValueError, match="extra"):
+        ReportPayload.model_validate(payload)

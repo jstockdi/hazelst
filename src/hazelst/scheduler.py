@@ -15,6 +15,7 @@ Each slot runs its steps in order in one scheduler thread; a step waits up to
 | 9:00 PM | forecast-verify (scores yesterday's editions) |
 | 7:15 to 9:00, every 15 min | report-build rebuild: rewrites today's newest edition |
 |      | while it is `numbers_only` (no-op otherwise) |
+| 4:00 AM | backup (after the overnight jobs, before the morning ingest) |
 """
 
 from __future__ import annotations
@@ -70,6 +71,7 @@ SLOTS: tuple[Slot, ...] = (
     Slot("ingest-1430", dtime(14, 30), (Step("ingest-forecast"), Step("ingest-obs"))),
     Slot("report-refresh-1440", dtime(14, 40), (Step("report-refresh", edition="1440"),)),
     Slot("forecast-verify-2100", dtime(21, 0), (Step("forecast-verify"),)),
+    Slot("backup-0400", dtime(4, 0), (Step("backup"),)),
 )
 # A failed narrative is retried every 15 minutes until 9 AM (agent-runs.md, Failure behavior).
 REBUILD = Slot("report-rebuild", dtime(7, 15), (Step("report-build", rebuild=True),))

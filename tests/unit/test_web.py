@@ -66,3 +66,22 @@ def test_web_does_not_write(db_path: Path) -> None:
     c.get("/health")
     c.get("/metrics")
     assert db_path.stat().st_mtime_ns == before
+
+
+def test_metrics_report_and_backup_freshness(db_path: Path) -> None:
+    assert "hazelst_report_published_timestamp_seconds" not in client(db_path).get("/metrics").text
+    conn = db.connect(db_path)
+    conn.execute(
+        "INSERT INTO report (for_date, version, status, published_at)"
+        " VALUES ('2026-11-26', 1, 'numbers_only', '2026-11-26T12:00:00+00:00')"
+    )
+    conn.execute(
+        "INSERT INTO report (for_date, version, status, published_at)"
+        " VALUES ('2026-11-26', 2, 'failed', '2026-11-26T13:00:00+00:00')"
+    )
+    with db.job(conn, db_path, "backup", date(2026, 11, 26)):
+        pass
+    conn.close()
+    text = client(db_path).get("/metrics").text
+    assert "hazelst_report_published_timestamp_seconds 1.7956944e+09" in text
+    assert "hazelst_backup_last_success_timestamp_seconds " in text
