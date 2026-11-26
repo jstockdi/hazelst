@@ -44,7 +44,7 @@
     <tbody>
 {% for m in rows %}
       <tr><td class="name">{{ m.name }}{% if not m.is_open %}<small>closed</small>{% endif %}</td>
-{%- for key in ("1d", "3d", "5d") %}{% set w = m.forecast.windows[key] %}<td><b>{{ w.snow_in | num }}″</b>{% if w.range[1] > w.range[0] %}<small>{{ w.range[0] | num }}–{{ w.range[1] | num }}</small>{% endif %}{% if w.nws_in is not none %}<small>NWS {{ w.nws_in | num }}</small>{% endif %}</td>{% endfor %}</tr>
+{%- for key in ("1d", "3d", "5d") %}{% set w = m.forecast.windows[key] %}<td><b>{{ w.snow_in | num }}″</b>{% if w.range[1] > w.range[0] %}<small>{{ w.range[0] | num }}–{{ w.range[1] | num }}</small>{% endif %}{% if w.nws_in is not none %}<small>NWS {{ w.nws_in | num }}</small>{% endif %}{% if w.corrected_in is not none %}<small>Corrected {{ w.corrected_in | num }}″</small>{% endif %}</td>{% endfor %}</tr>
 {% endfor %}
     </tbody>
   </table>

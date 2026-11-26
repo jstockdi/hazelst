@@ -127,7 +127,7 @@ CREATE TABLE verification (
   PRIMARY KEY (for_date, edition, mountain, window, method)
 );
 CREATE TABLE skill (                        -- rebuilt nightly from verification + forecast_hourly
-  mountain TEXT, model TEXT, lead_bucket TEXT, tag TEXT,   -- tag '' = all
+  mountain TEXT, model TEXT, lead_bucket TEXT, tag TEXT,   -- lead_bucket 1d | 2-3d | 4-5d; tag '' = all
   n INT, bias_ratio REAL, mae_in REAL, hit_rate REAL,
   updated_at TEXT,
   PRIMARY KEY (mountain, model, lead_bucket, tag)
@@ -194,12 +194,27 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
    `forecast-verify` runs at 9 PM on X + 1 and scores the newest report
    version of each edition, for the mean and each model; rows are replaced
    when a date is re-scored.
-3. **skill-learn** (nightly) rebuilds `skill`: bias ratio and error per mountain ×
-   model × lead time × pattern tag.
-4. **Corrected forecast** — once a cell in `skill` has n ≥ 10 verified snow days,
-   `report-build` adds a `corrected` method: per-model values scaled by bias ratio,
-   blended with weights ∝ 1 / MAE. The page shows `corrected` only after it beats
-   `raw_mean` on the last 20 verified days; both stay in the DB either way.
+3. **skill-learn** (2:00 AM nightly, `learn.py`) rebuilds `skill`: bias ratio
+   (sum of forecasts / sum of observations), MAE, and hit rate per mountain ×
+   model × lead bucket × pattern tag. A sample is one model's summit snow for
+   one 6 AM → 6 AM day from one `forecast_hourly` fetch that covers the whole
+   day, at its lead day N = ⌊lead at 6 AM / 24⌋ + 1 (the API's past hours,
+   with negative lead, are skipped); fetches of the same lead day are
+   averaged. Lead days pool into the window segments `1d` (day 1), `2-3d`, and
+   `4-5d`. The observation and tags are the ones `forecast-verify` scored
+   (earliest edition's model-mean row); a day without a `verification` row
+   (a backfilled day) takes `verify.observed`. Only snow days count (observed
+   or forecast ≥ 0.5″). A run on date D learns from days up to D − 2.
+4. **Corrected forecast** (`corrected.py`) — once a cell in `skill` (tag `''`)
+   has n ≥ 10 verified snow days, `report-build` adds a `corrected` method:
+   in each segment, each model in use is divided by its cell's bias ratio
+   (clamped to 0.25–4) and the models with a cell are blended with weights
+   ∝ 1 / MAE; the 1d / 3d / 5d windows sum their segments, and a window is
+   written only when every segment it spans has a cell. The page shows
+   `corrected` (beside the mean, which stays the headline) only for a
+   mountain where it beats `raw_mean` on the mountain's last 20 verified
+   days: lower mean absolute error over the 1d rows of those days, every
+   edition where both were scored. Both stay in the DB either way.
 5. **Knowledge** — `knowledge-propose` turns patterns in `skill` and the misses
    into plain-language statements; accepted ones go into the `report-write` prompt.
 

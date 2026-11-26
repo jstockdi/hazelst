@@ -34,9 +34,13 @@ def test_each_slot_fires_at_local_time_across_dst(day: date, utc_offset_h: int) 
     start = datetime.combine(day, dtime(0, 0), ET)
     for slot in scheduler.SLOTS:
         fire = scheduler.trigger(slot).get_next_fire_time(None, start)
+        at = slot.at
+        if day == date(2027, 3, 14) and at == dtime(2, 0):
+            at = dtime(3, 0)  # 2:00 AM does not exist when DST starts; the slot runs at 3:00 EDT
+        else:
+            assert fire.astimezone(ET).time() == at
         assert fire.astimezone(ET).date() == day
-        assert fire.astimezone(ET).time() == slot.at
-        expected_utc = datetime.combine(day, slot.at) + timedelta(hours=utc_offset_h)
+        expected_utc = datetime.combine(day, at) + timedelta(hours=utc_offset_h)
         assert fire.astimezone(UTC).replace(tzinfo=None) == expected_utc
 
 
@@ -50,6 +54,7 @@ def test_slots_follow_agent_runs_schedule() -> None:
         ("14:30", ["ingest-forecast", "ingest-obs"]),
         ("14:40", ["report-refresh"]),
         ("21:00", ["forecast-verify"]),
+        ("02:00", ["skill-learn"]),
         ("04:00", ["backup"]),
     ]
     morning = scheduler.SLOTS[3].steps
