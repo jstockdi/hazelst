@@ -23,6 +23,8 @@ from hazelst.sources.base import Fetched, get
 SOURCE = "open_meteo"
 META_SOURCE = "open_meteo_meta"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+# One past model run per call (`run=`); used to rebuild a past day's inputs as fixtures.
+SINGLE_RUN_URL = "https://single-runs-api.open-meteo.com/v1/forecast"
 META_URL = "https://api.open-meteo.com/data/{meta_id}/static/meta.json"
 
 MODELS: tuple[str, ...] = ("gfs_seamless", "ecmwf_ifs025", "gem_seamless")
@@ -31,7 +33,7 @@ MODELS: tuple[str, ...] = ("gfs_seamless", "ecmwf_ifs025", "gem_seamless")
 META_IDS: dict[str, str] = {
     "gfs_seamless": "ncep_gfs013",
     "ecmwf_ifs025": "ecmwf_ifs025",
-    "gem_seamless": "cmc_gem_gdps",
+    "gem_seamless": "cmc_gem_gdps_15km",
     "hrrr": "ncep_hrrr_conus",
 }
 
@@ -97,14 +99,16 @@ class RunTime:
 # --- fetch --------------------------------------------------------------------------
 
 
-def forecast_params(mountains: Sequence[Mountain], elevation: Elevation) -> dict[str, Any]:
+def forecast_params(
+    mountains: Sequence[Mountain], elevation: Elevation, models: Sequence[str] = MODELS
+) -> dict[str, Any]:
     feet = [m.summit_ft if elevation == "summit" else m.base_ft for m in mountains]
     return {
         "latitude": ",".join(str(m.lat) for m in mountains),
         "longitude": ",".join(str(m.lon) for m in mountains),
         "elevation": ",".join(str(round(ft / FT_PER_M)) for ft in feet),
         "hourly": ",".join(VARIABLES),
-        "models": ",".join(MODELS),
+        "models": ",".join(models),
         "timezone": "GMT",
         "past_days": PAST_DAYS,
         "forecast_days": FORECAST_DAYS,
@@ -140,10 +144,45 @@ def fetch(client: httpx.Client, mountains: Sequence[Mountain]) -> list[Fetched]:
     return out
 
 
+def fetch_single_runs(
+    client: httpx.Client, mountains: Sequence[Mountain], runs: Mapping[str, datetime]
+) -> list[Fetched]:
+    """The summit and base forecast from one given run of each model (Single Runs API).
+
+    No meta.json is needed: each response records its run time in `meta.run`.
+    """
+    out: list[Fetched] = []
+    keys = [m.key for m in mountains]
+    for model, run in runs.items():
+        if model not in MODELS:
+            raise ValueError(f"unknown model {model!r}")
+        for elevation in ELEVATIONS:
+            params = forecast_params(mountains, elevation, [model])
+            del params["past_days"]
+            params["run"] = run.astimezone(UTC).strftime("%Y-%m-%dT%H:%M")
+            out.append(
+                get(
+                    client,
+                    SOURCE,
+                    SINGLE_RUN_URL,
+                    params,
+                    meta={
+                        "elevation": elevation,
+                        "mountains": keys,
+                        "model": model,
+                        "run": isoformat(run),
+                    },
+                )
+            )
+    return out
+
+
 def label(fetched: Fetched) -> str:
     """A short, stable name for a recorded response (fixture file name)."""
     if fetched.source == META_SOURCE:
         return f"meta-{fetched.meta['model']}"
+    if "model" in fetched.meta:
+        return f"forecast-{fetched.meta['elevation']}-{fetched.meta['model']}"
     return f"forecast-{fetched.meta['elevation']}"
 
 
@@ -257,7 +296,9 @@ def normalize(fetched: Fetched, runs: Mapping[str, RunTime]) -> list[HourlyRow]:
     """Rows for every mountain, model, and hour with at least one value.
 
     `fetched` is one forecast response (one elevation); `runs` maps each model
-    to its run time (a model missing from `runs` gets `issued_at` NULL).
+    to its run time (a model missing from `runs` gets `issued_at` NULL). A
+    single-run response names its model and run in `fetched.meta` and has
+    unsuffixed variable names.
     """
     data = fetched.json()
     locations: list[dict[str, Any]] = data if isinstance(data, list) else [data]
@@ -267,6 +308,11 @@ def normalize(fetched: Fetched, runs: Mapping[str, RunTime]) -> list[HourlyRow]:
         raise NormalizeError(f"unknown elevation {elevation!r}")
     if len(locations) != len(keys):
         raise NormalizeError(f"{len(locations)} locations for {len(keys)} mountains")
+    single = fetched.meta.get("model")
+    models: tuple[str, ...] = (str(single),) if single else MODELS
+    if single and "run" in fetched.meta:
+        at = datetime.fromisoformat(str(fetched.meta["run"]))
+        runs = {str(single): RunTime(str(single), at, at, at, 0)}
     rows: list[HourlyRow] = []
     for key, loc in zip(keys, locations, strict=True):
         if loc.get("utc_offset_seconds", 0) != 0:
@@ -274,10 +320,10 @@ def normalize(fetched: Fetched, runs: Mapping[str, RunTime]) -> list[HourlyRow]:
         hourly: dict[str, list[Any]] = loc["hourly"]
         units: dict[str, str] = loc.get("hourly_units", {})
         times = [_valid_at(t) for t in hourly["time"]]
-        for model in MODELS:
+        for model in models:
             columns: dict[str, list[float | None]] = {}
             for var, column in VARIABLES.items():
-                name = f"{var}_{model}"
+                name = var if single else f"{var}_{model}"
                 values = hourly.get(name)
                 convert = _converter(units.get(name, "undefined"), column)
                 if values is None or convert is None:

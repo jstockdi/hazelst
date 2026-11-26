@@ -11,14 +11,14 @@ import json
 import sqlite3
 import sys
 from collections.abc import Callable, Sequence
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from hazelst import __version__, config, db, jobs
 from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable
 from hazelst.agents.prompts import role_prompt
 from hazelst.agents.schemas import ConditionsExtract
-from hazelst.sources import base
+from hazelst.sources import base, open_meteo
 
 Handler = Callable[[argparse.Namespace], int]
 
@@ -94,6 +94,14 @@ def _cmd_healthcheck(args: argparse.Namespace) -> int:
 def _cmd_record(args: argparse.Namespace) -> int:
     cfg = config.load()
     fetch, label = jobs.RECORDERS[args.source]
+    if args.run:
+        if args.source != "open-meteo":
+            raise config.ConfigError("--run applies to open-meteo only")
+        runs = {}
+        for item in args.run:
+            model, _, at = item.partition("=")
+            runs[model] = datetime.fromisoformat(at).replace(tzinfo=UTC)
+        fetch = lambda client, mountains: open_meteo.fetch_single_runs(client, mountains, runs)  # noqa: E731
     out_dir: Path = args.out or (
         config.PROJECT_ROOT / "tests" / "fixtures" / args.source.replace("-", "_")
     )
@@ -229,6 +237,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", type=Path, help="fixture folder (default tests/fixtures/<source>)"
     )
     p_record.add_argument("--name", help="subfolder name (default: today's date)")
+    p_record.add_argument(
+        "--run",
+        action="append",
+        metavar="MODEL=YYYY-MM-DDTHH:MM",
+        help="open-meteo only: record this past model run (UTC) from the Single Runs API",
+    )
     p_record.set_defaults(handler=_cmd_record)
 
     p_run = sub.add_parser("run", help="run one job now (takes the job lock, opens a run row)")

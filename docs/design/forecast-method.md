@@ -27,7 +27,17 @@ Daily buckets (6 AM → 6 AM) feed the forecast chart.
   mean differ by more than 50% (and either is ≥ 1″), set `nws_disagrees: true`;
   the narrative must address it.
 - **Freezing level** comes from GFS only (ECMWF and GEM do not provide it in
-  Open-Meteo).
+  Open-Meteo); the day value is the GFS maximum. The 850 hPa wind direction
+  used by `nw_upslope` is GFS too (directions do not average); every other
+  hourly input is the mean of the models in use.
+- **Stale models**: a model whose run (`forecast_hourly.issued_at`) is more
+  than 18 h old when the report is built is listed in `by_model` and flagged,
+  but left out of the mean, the range, and the hourly means. If every model is
+  stale, all are used and all are flagged.
+- **Rounding**: window and daily snow to 0.1″, liquid to 0.01″, temperatures
+  and gusts to whole numbers. The 1d window equals day 1 exactly; the 3d and
+  5d windows equal the sum of the rounded days to within rounding
+  (≤ 0.05″ per day).
 - Base-elevation snowfall is computed the same way and shown when the rain/snow
   line falls between base and summit.
 
@@ -48,12 +58,25 @@ supports it.
 | `nw_upslope` | 850 hPa wind 270–340°, ≥ 20 kt, RH ≥ 75%, T ≤ -8 °C, for ≥ 6 h |
 | `mixing_base` | Precip ≥ 0.01″/h while base-elevation 2 m T > 33 °F |
 | `rain_summit` | Precip ≥ 0.01″/h while summit 2 m T > 33 °F |
-| `freezing_rain` | 850 hPa T > 32 °F while summit or base 2 m T ≤ 32 °F during precip, or NWS `iceAccumulation` > 0 |
+| `freezing_rain` | 850 hPa T > 32 °F while summit or base 2 m T ≤ 32 °F during precip, or NWS `iceAccumulation` prorated into the day ≥ 0.01″ |
 | `wind_hold_watch` / `wind_hold_likely` | Summit gust ≥ `wind_hold_mph.watch` / `.likely` |
-| `storm_type` | Track only: `clipper`, `coastal`, `inland_runner`, `none`. From discussion keywords (whitespace-normalized first). It never decides snow vs rain — a "coastal low" on 2026-11-25 brought ice and rain |
+| `storm_type` | Track only: `clipper`, `coastal`, `inland_runner`, `none`. From the keywords of the mountain's NWS office AFD (whitespace-normalized first); the first of `clipper`, `coastal`, `inland_runner` found wins. It never decides snow vs rain — a "coastal low" on 2026-11-25 brought ice and rain |
 
 Thresholds are starting points; tune them with the verification scores
 ([agent-runs.md](agent-runs.md): `knowledge-propose` → `config_change`).
+
+Implementation: `derive.py` (windows, days, NWS proration, stale models) and
+`tags.py` (tags, precip type, storm type).
+
+**Check against the 2026-11-25 sample run** (`tests/unit/test_derive.py`):
+rebuilt from the same model runs (GFS 06Z, ECMWF 06Z, GEM 00Z) through the
+Single Runs API, derive reproduces the sample's precip type and tags on 39 of
+40 mountain-days and the ECMWF window totals exactly. The differences come
+from the inputs, not the method: `gfs_seamless` from the Single Runs API
+blends the 06Z HRRR rather than the later HRRR the live API served at 10:44
+AM, which moves GFS snow totals in the first two days and turns Sugarbush on
+Fri 27 from rain to ice; GEM totals match to 0.1″ in 19 of 24 windows. NWS
+grids from that morning were not saved, so NWS values are not compared.
 
 ## Precip type (per mountain per day, at the summit)
 
