@@ -26,6 +26,29 @@ Selected design: `mockups/c-brief.html`. One page per day at
   `#c4b5fd`, dry `#eef4f8`. Mountain names never wrap in tables.
 - Reference implementation: `prototype/render.py` + `prototype/page.css`.
 
+## Numbers-only page
+
+When a report has no checked narrative (`report.status = numbers_only`), the
+page keeps every data section and replaces section 1:
+
+- Band headline from the numbers: "Most snow in the next 5 days: <mountain>,
+  <n>″ at the summit." (or "No significant snow in the next 5 days." below
+  0.5″); the issue line ends "· numbers only".
+- A notice card "The written report is delayed."
+- Cautions straight from the data: each active NWS alert with its mountains,
+  and each `wind_hold_likely` day.
+
+The issue line reads "Thu 26 Nov 2026 · 7:00 AM edition", adding "issued
+8:47 AM" when an edition publishes late (ECMWF 06Z gate).
+
+Until ground truth is connected (J14), the accumulation section shows its
+empty state: "No snowfall reports are connected yet for the last 7 days
+(<range>) …".
+
+Implementation: `render/` (Jinja templates, `charts.py` SVG, `page.css`,
+fonts under `render/static/fonts` with their OFL licenses); golden pages in
+`tests/golden/`.
+
 ## Visual system
 
 Same as the sailing report: Fraunces (display) + Inter (body); navy

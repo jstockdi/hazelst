@@ -78,3 +78,69 @@ class Forecast(_Model):
             if m.key == key:
                 return m
         raise KeyError(key)
+
+
+# --- report payload (stored in report.payload, served at /api/report/<date>.json) ---------
+
+ReportStatus = Literal["published", "numbers_only", "failed"]
+
+
+class BestBet(_Model):
+    mountain: str
+    day: str
+    why: str
+
+
+class Accumulation(_Model):
+    """Snow that has fallen (observations); filled by forecast-verify's sources."""
+
+    source: str
+    last7_in: list[float | None]
+    season_in: float | None = None
+    base_in: float | None = None
+
+
+class MountainReport(_Model):
+    key: str
+    name: str
+    state: str
+    summit_ft: int
+    base_ft: int
+    season_open: date | None
+    is_open: bool
+    forecast: MountainForecast
+    accumulation: Accumulation | None = None
+    alerts: list[str] = []
+    powder_score: int | None = None
+
+
+class Narrative(_Model):
+    """The written report: front matter plus markdown sections (narrative.md)."""
+
+    headline: str
+    best_bet: BestBet | None = None
+    body_md: str = ""
+
+
+class ReportPayload(_Model):
+    """The page JSON for one date and edition."""
+
+    date: date
+    issued: datetime
+    edition: str | None = None  # 0700 | 0815 | 1440
+    status: ReportStatus
+    anchor: datetime
+    days: list[str]  # day labels, 6 AM -> 6 AM, "Wed 25"
+    past_days: list[str]  # the 7 days before the anchor, oldest first
+    models: list[ModelRun]
+    used_models: list[str]
+    discussions: dict[str, str] = {}  # office -> summary text
+    storm_words: dict[str, list[str]] = {}
+    sources_unavailable: list[str] = []
+    mountains: list[MountainReport]
+
+    def mountain(self, key: str) -> MountainReport:
+        for m in self.mountains:
+            if m.key == key:
+                return m
+        raise KeyError(key)

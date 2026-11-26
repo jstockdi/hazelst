@@ -7,6 +7,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "claude-agent-sdk==0.2.180",
     "httpx>=0.28",
+    "jinja2>=3.1",
     "prometheus-client>=0.23",
     "pydantic>=2.12",
     "selectolax>=1.0.2",
