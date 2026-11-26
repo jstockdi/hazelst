@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -17,6 +17,8 @@ from prometheus_client import (
     Info,
     generate_latest,
 )
+from prometheus_client.core import GaugeMetricFamily
+from prometheus_client.registry import Collector
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
@@ -25,7 +27,7 @@ from starlette.staticfiles import StaticFiles
 
 from hazelst import __version__, db, verify
 from hazelst.config import TIMEZONE
-from hazelst.models import BestBet, Narrative, ReportPayload
+from hazelst.models import READ_STORED, BestBet, Narrative, ReportPayload
 from hazelst.render import page
 
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -60,6 +62,48 @@ def health_status(db_path: Path) -> tuple[bool, dict[str, object]]:
     return healthy, body
 
 
+class FreshnessCollector(Collector):
+    """Report and backup freshness, read from the database at scrape time.
+
+    frank's Prometheus alerts on these (report age > 26 h, technical-design §13).
+    A metric is omitted while its row does not exist yet.
+    """
+
+    def __init__(self, db_path: Path) -> None:
+        self.db_path = db_path
+
+    def collect(self) -> Iterator[GaugeMetricFamily]:
+        try:
+            conn = db.connect(self.db_path, readonly=True)
+        except sqlite3.Error:
+            return
+        try:
+            report = conn.execute(
+                "SELECT max(published_at) FROM report WHERE status IN (?, ?)", PAGE_STATUSES
+            ).fetchone()[0]
+            backup = conn.execute(
+                "SELECT max(finished_at) FROM run WHERE kind = 'backup' AND status = 'ok'"
+            ).fetchone()[0]
+        except sqlite3.Error:
+            return
+        finally:
+            conn.close()
+        for name, doc, value in (
+            (
+                "hazelst_report_published_timestamp_seconds",
+                "Unix time the newest page-visible report was published",
+                report,
+            ),
+            (
+                "hazelst_backup_last_success_timestamp_seconds",
+                "Unix time the newest successful database backup finished",
+                backup,
+            ),
+        ):
+            if value:
+                yield GaugeMetricFamily(name, doc, value=datetime.fromisoformat(value).timestamp())
+
+
 # --- reports -----------------------------------------------------------------------
 
 
@@ -86,13 +130,13 @@ def narrative_of(row: sqlite3.Row) -> Narrative | None:
     best = json.loads(row["best_bet"]) if row["best_bet"] else None
     return Narrative(
         headline=row["headline"] or "",
-        best_bet=BestBet.model_validate(best) if best else None,
+        best_bet=BestBet.model_validate(best, context=READ_STORED) if best else None,
         body_md=row["narrative_md"],
     )
 
 
 def render_row(row: sqlite3.Row) -> str:
-    payload = ReportPayload.model_validate_json(row["payload"])
+    payload = ReportPayload.model_validate_json(row["payload"], context=READ_STORED)
     return page.render_report(payload, narrative_of(row))
 
 
@@ -110,7 +154,9 @@ def archive_entries(conn: sqlite3.Connection) -> list[page.ArchiveEntry]:
     for r in rows:
         headline = r["headline"]
         if not headline:
-            headline = page.numbers_only_headline(ReportPayload.model_validate_json(r["payload"]))
+            headline = page.numbers_only_headline(
+                ReportPayload.model_validate_json(r["payload"], context=READ_STORED)
+            )
         day = date.fromisoformat(r["for_date"])
         summary = verify.summary_for(conn, day)
         entries.append(
@@ -150,6 +196,7 @@ class PageCache:
 def create_app(db_path: Path, registry: CollectorRegistry = REGISTRY) -> Starlette:
     build = Info("hazelst_build", "Running hazelst build", registry=registry)
     build.info({"version": __version__, "code_version": db.code_version()})
+    registry.register(FreshnessCollector(db_path))
 
     async def health(request: Request) -> Response:
         healthy, body = health_status(db_path)

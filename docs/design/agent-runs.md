@@ -88,6 +88,7 @@ job lock, and a failed step does not stop the next one.
 | `forecast-verify` | 9:00 PM | read the NOHRSC grid ending 12Z today (published ~7:30 PM), then score yesterday's 1d forecast from each edition (7:00, 8:15, 2:40) against observations → `verification`; re-score the date a week before that (NOHRSC re-read) | — |
 | `skill-learn` | 2:00 AM nightly | rebuild `skill` from `verification` + `forecast_hourly` | — |
 | `knowledge-review` | Monday 3:00 AM | gather the week's evidence → `knowledge-propose` → proposed rows | `knowledge-propose` |
+| `backup` | 4:00 AM nightly | online copy of the database to `backups/hazelst-<date>.db`; keeps 14 | — |
 | `season-backfill` | manual | historical forecasts and reports into the same tables | — |
 
 ## Claude roles

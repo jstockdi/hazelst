@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationInfo, model_validator
 
 WindowKey = Literal["1d", "3d", "5d"]
 Confidence = Literal["high", "medium", "low"]
@@ -13,8 +13,20 @@ PrecipType = Literal["snow", "ice", "rain", "mix", "dry"]
 StormType = Literal["clipper", "coastal", "inland_runner", "none"]
 
 
+# Validation context for reading stored payloads: fields a newer release added
+# are dropped instead of rejected, so a rolled-back image still renders them.
+READ_STORED = {"ignore_unknown_fields": True}
+
+
 class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_unknown_when_reading(cls, data: Any, info: ValidationInfo) -> Any:
+        if isinstance(data, dict) and (info.context or {}).get("ignore_unknown_fields"):
+            return {k: v for k, v in data.items() if k in cls.model_fields}
+        return data
 
 
 class ForecastWindow(_Model):

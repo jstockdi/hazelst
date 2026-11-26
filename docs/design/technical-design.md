@@ -241,7 +241,8 @@ Summarized from [agent-runs.md](agent-runs.md):
 - Metrics: job duration and status, source failures by source, rows ingested,
   Claude calls, tokens, and estimated cost, report age, verification hit rate.
 - Health: `/health` drives the Docker healthcheck; report age > 26 h is an alert
-  condition for frank monitoring.
+  condition for frank monitoring (`hazelst_report_published_timestamp_seconds`,
+  alert `HazelstReportStale` in frank's Prometheus).
 
 ## 14. Security
 

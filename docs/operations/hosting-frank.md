@@ -24,6 +24,12 @@ follows the same contract as `mixtape` and `bcl`.
 | `platform/Caddyfile` | `http://hazelst.thmxtp.com { reverse_proxy hazelst:8080 }` |
 | `platform/cloudflared/config.yml` | Ingress rule `hostname: hazelst.thmxtp.com` → `http://caddy:80`, above the catch-all |
 | `systemd/frank-hazelst.service` | Boot supervision, same shape as the other stacks |
+| `scripts/hazelst-storage.sh` | Idempotent `lv-hazelst` carve, fstab mount, owner and mode |
+| `projects/monitoring/prometheus/prometheus.yml` | Scrape job `hazelst` → `hazelst:8080/metrics` over `edge` |
+| `projects/monitoring/prometheus/rules/hazelst.rules.yml` | Report-age, backup-age, and scrape-down alerts |
+
+Merged as frank !68 (stack), !69 (ingress), and !70 (monitoring and the
+J20 digest).
 
 ## Compose sketch
 
@@ -46,6 +52,7 @@ services:
       NWS_USER_AGENT: hazelst-forecast (github.com/jstockdi/hazelst)
       HOME: /tmp/home         # writable HOME on the tmpfs for the Claude CLI
       HAZELST_SCHEDULER: "true"  # run the job schedule in the serving process
+      HAZELST_ENABLE_AGENTS: "true"  # Claude calls, bounded by the daily cap (10)
     volumes:
       - /srv/hazelst:/data:rw # SQLite; host dir pre-chowned 65532:65532, 0750
     user: "65532:65532"
@@ -81,8 +88,21 @@ today; if one is added, this is the allowlist.
 - **Logs:** stdout, one line per job step with source timings and failures
   (picked up by the Phase 5 log pipeline when it lands).
 - **Backups:** `/srv/hazelst/hazelst.db` is the product's memory (all raw data,
-  verification, learned skill, knowledge). Nightly `sqlite3 .backup` into the
-  frank backup set. Size < 1 GB per season.
+  verification, learned skill, knowledge). The `backup` job runs at 4:00 AM in the
+  in-process schedule: Python's `sqlite3` online backup API (frank has no
+  `sqlite3` CLI) writes `/srv/hazelst/backups/hazelst-<date>.db` through a
+  `.partial` file and a rename, and keeps the newest 14. Run one by hand with
+  `docker exec hazelst hazelst run backup`. The copies share the LV with the live
+  database; an off-host copy belongs to the frank backup set (frank doc 03 §7),
+  not yet built. Size < 1 GB per season.
+- **Alerts:** `/metrics` exports `hazelst_report_published_timestamp_seconds`
+  and `hazelst_backup_last_success_timestamp_seconds`, read from the database at
+  scrape time. frank's Prometheus (frank-monitoring, on `edge`) scrapes
+  `hazelst:8080` and evaluates `rules/hazelst.rules.yml`:
+  `HazelstReportStale` (newest report older than 26 h for 15 min),
+  `HazelstBackupStale` (newest backup older than 26 h for 30 min), and
+  `HazelstScrapeDown` (`up == 0` for 10 min). Like frank's other rules they
+  surface in Prometheus `/alerts` and Grafana; no Alertmanager pages yet.
 - **Failure behavior:** a failed source degrades that section (noted in the page
   footer); a failed Claude call publishes the numbers-only page with "report
   delayed" and retries every 15 minutes until 9 AM.
@@ -92,3 +112,61 @@ today; if one is added, this is the allowlist.
 Repo, image, hostname, exposure, storage (`lv-hazelst`, 10 GB at
 `/srv/hazelst`), and the host-action bundle are in
 [technical-design.md §17](../design/technical-design.md).
+
+## Runbook
+
+All commands run on frank in `/opt/frank` (branch `main`).
+
+**First deploy** (done 2026-11-26, J18):
+
+```bash
+sudo scripts/hazelst-storage.sh                    # lv-hazelst 10 GB at /srv/hazelst, 65532:65532, 0750
+(umask 077; sops -d projects/hazelst/secrets.enc.env > projects/hazelst/hazelst.env)
+make deploy STACK=hazelst
+sudo cp systemd/frank-hazelst.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now frank-hazelst.service
+docker exec frank-caddy wget -qO- http://hazelst:8080/health   # {"status":"ok",...}
+```
+
+**Ingress** (frank !69): after `git pull`, `docker compose -f platform/compose.yml
+restart caddy cloudflared` re-reads the Caddyfile and tunnel config (single-file
+mounts; Caddy's admin API is off). `play.` and `bcl.` blip for a few seconds.
+The DNS record is a proxied CNAME `hazelst` →
+`a2ee0885-c89b-457e-a27b-2f80d3348eba.cfargotunnel.com` in the `thmxtp.com`
+zone. Neither frank nor the Mac holds a Cloudflare login, so the record is
+added in the Cloudflare dashboard (as for `bcl.`). Until it exists, Cloudflare
+answers the hostname with 530.
+
+**Prometheus config change** without restarting the monitoring stack:
+`prometheus.yml` is a single-file bind mount, and `git pull` replaces the file
+with a new inode that the running container never sees. Write the new content
+into the existing file first, stage it, then pull and hot-reload:
+
+```bash
+git fetch
+git show origin/main:projects/monitoring/prometheus/prometheus.yml > projects/monitoring/prometheus/prometheus.yml
+git add projects/monitoring/prometheus/prometheus.yml
+git pull --ff-only
+curl -s -X POST http://127.0.0.1:9090/-/reload
+```
+
+New rule files appear through the `rules/` directory mount, so the reload
+picks them up.
+
+**Upgrade:** a frank PR bumps the digest in `projects/hazelst/compose.yml`
+(the trailing comment names the git SHA and the rollback digest); merge,
+`git pull`, `make deploy STACK=hazelst`. The scheduler catches up at startup:
+when the container starts after an edition time and that edition is missing,
+it ingests and publishes it.
+
+**Rollback:** pin the previous digest and deploy. In an incident, edit the
+digest on frank, `make deploy STACK=hazelst`, and follow with a frank PR (or
+`git restore` the file once fixed forward).
+
+Rehearsed 2026-11-26 from `a4e825c` to the previous digest `f5e5dd8` and back:
+each deploy reached `healthy` in about 20 s and `/health` returned 200. The
+rolled-back page returned 500, because `f5e5dd8` rejects the payload fields
+that `a4e825c` added (`extra_forbidden`). Since J20 the page reads stored
+payloads with unknown fields dropped, so a rollback to a J20-or-later image
+renders rows written by a newer one. The database needs nothing: migrations
+are additive.

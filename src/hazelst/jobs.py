@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from hazelst import backup as db_backup
 from hazelst import config, db, derive, digest, narrative, verify
 from hazelst.agents import conditions_extract
 from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable
@@ -676,12 +677,31 @@ def forecast_verify(ctx: JobContext) -> None:
     log_event(run_id=ctx.run_id, step="forecast-verify", scored=scored)
 
 
+# --- backup ------------------------------------------------------------------------------
+
+
+def backup(ctx: JobContext) -> None:
+    """Online copy of the database to `backups/hazelst-<date>.db`; keeps the newest 14."""
+    dest = db_backup.backup_dir(ctx.cfg.settings.db_path)
+    started = time.monotonic()
+    result = db_backup.snapshot(ctx.conn, dest, ctx.for_date)
+    ms = int((time.monotonic() - started) * 1000)
+    ctx.summary["backup"] = {
+        "path": str(result.path),
+        "bytes": result.bytes,
+        "pruned": result.pruned,
+        "ms": ms,
+    }
+    log_event(run_id=ctx.run_id, step="backup", status="ok", **ctx.summary["backup"])
+
+
 JOBS: dict[str, Callable[[JobContext], None]] = {
     "ingest-forecast": ingest_forecast,
     "ingest-obs": ingest_obs,
     "report-build": report_build,
     "report-refresh": report_refresh,
     "forecast-verify": forecast_verify,
+    "backup": backup,
 }
 
 

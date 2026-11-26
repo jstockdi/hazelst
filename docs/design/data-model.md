@@ -47,7 +47,7 @@ CREATE TABLE mountain (
 
 -- Raw ---------------------------------------------------------------------
 CREATE TABLE run (
-  id INTEGER PRIMARY KEY, kind TEXT,        -- ingest-forecast | ingest-obs | report-build | report-refresh | forecast-verify | skill-learn | knowledge-review | season-backfill
+  id INTEGER PRIMARY KEY, kind TEXT,        -- ingest-forecast | ingest-obs | report-build | report-refresh | forecast-verify | skill-learn | knowledge-review | season-backfill | backup
   for_date DATE, started_at TEXT, finished_at TEXT,
   status TEXT, error TEXT,                  -- running | ok | failed
   code_version TEXT                          -- image git SHA
@@ -222,5 +222,6 @@ season — trivial on frank. No pruning; the history is the point.
 
 ## Backup
 
-The DB is the product's memory: include `/srv/hazelst/hazelst.db` in the frank
-backup set, using `sqlite3 .backup` (online-safe) nightly.
+The DB is the product's memory. The nightly `backup` job copies it with
+Python's `sqlite3` online backup API to `/srv/hazelst/backups/hazelst-<date>.db`
+and keeps the newest 14 ([hosting-frank.md](../operations/hosting-frank.md#operations)).

@@ -37,6 +37,7 @@ JOB_KINDS = frozenset(
         "skill-learn",
         "knowledge-review",
         "season-backfill",
+        "backup",
     }
 )
 RunStatus = Literal["running", "ok", "failed"]
