@@ -10,8 +10,11 @@ import argparse
 import json
 import sys
 from collections.abc import Callable, Sequence
+from datetime import date
+from pathlib import Path
 
-from hazelst import __version__, config, db
+from hazelst import __version__, config, db, jobs
+from hazelst.sources import base
 
 Handler = Callable[[argparse.Namespace], int]
 
@@ -84,6 +87,30 @@ def _cmd_healthcheck(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def _cmd_record(args: argparse.Namespace) -> int:
+    cfg = config.load()
+    fetch, label = jobs.RECORDERS[args.source]
+    out_dir: Path = args.out or (
+        config.PROJECT_ROOT / "tests" / "fixtures" / args.source.replace("-", "_")
+    )
+    out_dir = out_dir / (args.name or jobs.today(cfg).isoformat())
+    written = []
+    with base.make_client(cfg.settings.nws_user_agent) as client:
+        for fetched in fetch(client, cfg.mountains):
+            path = out_dir / f"{label(fetched)}.json.gz"
+            base.write_fixture(path, fetched)
+            written.append({"path": str(path), "http_status": fetched.http_status})
+    print(json.dumps({"source": args.source, "fixtures": written}, indent=2))
+    return 0
+
+
+def _cmd_run(args: argparse.Namespace) -> int:
+    cfg = config.load()
+    summary = jobs.run_job(cfg, args.job, args.date)
+    print(json.dumps(summary, indent=2, default=str))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hazelst",
@@ -112,6 +139,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_health.add_argument("--port", type=int, default=8080)
     p_health.add_argument("--timeout", type=float, default=3.0)
     p_health.set_defaults(handler=_cmd_healthcheck)
+    p_record = sub.add_parser(
+        "record", help="fetch a source live and save its raw responses as test fixtures"
+    )
+    p_record.add_argument("source", choices=sorted(jobs.RECORDERS))
+    p_record.add_argument(
+        "--out", type=Path, help="fixture folder (default tests/fixtures/<source>)"
+    )
+    p_record.add_argument("--name", help="subfolder name (default: today's date)")
+    p_record.set_defaults(handler=_cmd_record)
+
+    p_run = sub.add_parser("run", help="run one job now (takes the job lock, opens a run row)")
+    p_run.add_argument("job", choices=sorted(jobs.JOBS))
+    p_run.add_argument(
+        "--date", type=date.fromisoformat, help="report date (default: today, America/New_York)"
+    )
+    p_run.set_defaults(handler=_cmd_run)
 
     return parser
 
