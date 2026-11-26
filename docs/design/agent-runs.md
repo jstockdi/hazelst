@@ -66,7 +66,9 @@ for its date.
 All roles use `claude-opus-5-5` (the current default model), called through the
 Claude Agent SDK (see [Call conventions](#call-conventions-all-roles)). Thinking
 is adaptive on this model; depth is set with the SDK's `effort` option, so every
-role sets it explicitly. Model and effort are per-role config, so a role can
+role sets it explicitly. Model and effort are per-role config
+(`HAZELST_AGENT_MODEL_<ROLE>` / `HAZELST_AGENT_EFFORT_<ROLE>`, e.g.
+`HAZELST_AGENT_EFFORT_REPORT_WRITE=max`), so a role can
 move to a cheaper model (e.g. `claude-haiku-5-5` for `conditions-extract`)
 without code changes — that is an owner decision, not a default.
 
@@ -124,9 +126,23 @@ Verified by the J01 spike ([spikes/agent_sdk/](../../spikes/agent_sdk/README.md)
   `API_TIMEOUT_MS`, default 600000). The client sets a 10-minute wall-clock
   timeout per call; the job adds no extra retry loop beyond the 15-minute
   rebuild.
-- The CLI needs a writable `HOME` for its config files (~32 KB per call). In
-  the read-only container `HOME=/tmp/home` on the `/tmp` tmpfs; nothing
-  persists between calls.
+- The CLI needs a writable `HOME` for its config files (~32 KB per call). The
+  client gives every call a fresh, empty directory under the temp dir (the
+  `/tmp` tmpfs in the container; `HOME=/tmp/home` stays set for the process)
+  as the CLI's `HOME` and working directory, and removes it afterwards, so
+  nothing persists between calls and no user settings or credentials leak into
+  a local run.
+- The client (`agents/client.py`) refuses to start a call when
+  `ANTHROPIC_API_KEY` is set or the token is missing. A call it does not start
+  (agents disabled, cap reached, bad environment) writes no `agent_call` row;
+  every started call writes one: `status` is `ok`, `error` (exception, timeout,
+  `is_error`, or a non-`success` subtype), or `invalid` (schema validation
+  failed; the validation errors go in `check_errors`, which `report-check`
+  otherwise fills). Errors are scrubbed of the token before they are stored.
+- `hazelst agents smoke` makes one live `conditions-extract` call on a
+  synthetic page and prints its `agent_call` row; `hazelst agents calls` lists
+  recent rows and today's count against the cap. CI uses `StubBackend`
+  (`agents/stub.py`) and never calls Claude.
 
 ### `report-check` rules (code)
 
