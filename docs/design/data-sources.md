@@ -290,6 +290,52 @@ Fetch budget per run: one data URL per resort; `mtnpowder` adds one widget
 config fetch per resort per day. No adapter fetches the Boyne or Alterra report
 pages.
 
+### Implementation (J13, verified 2026-11-26)
+
+Code: `src/hazelst/sources/resorts/` — `presets.json`, `adapter.py` (the
+three parsers and the value parsers; pure), `source.py` (fetch, budget,
+normalize, store). Contract tests: `tests/contract/test_resort_adapters.py`
+on the J00 pages.
+
+- Raw rows: the data response is a `fetch` row with `source = 'resort'` and
+  `params.meta = {mountain, preset, params, prefetch_fetch_id}`; the
+  `mtnpowder` widget config is a `fetch` row with `source = 'resort_config'`.
+  The feed token is replaced by `[from prefetch]` in the stored query (the
+  config row holds it), so recorded fixtures carry no token in their params.
+- Budget: before fetching, `ingest-obs` counts today's (America/New_York)
+  `resort` fetch rows for the mountain and skips it once there are 3
+  (`skipped_budget`). The widget config is reused from the newest `200`
+  config row younger than `cache_hours` (24), so it is fetched at most once a
+  day per resort.
+- Normalize: one `observation` row per report, `source = 'resort'`.
+  `reported_at` is stored in UTC; `obs_date` is its America/New_York date
+  (obs_date D means the 24 h ending the morning of D, as for NOHRSC). A row
+  for the same `(mountain, source, reported_at)` is not inserted twice, so
+  reruns and the three daily fetches of an unchanged report add nothing.
+  `lifts_total`, the raw text of every field, the preset, and `stale` are in
+  `observation.raw`. `stale` compares `reported_at` with the fetch time, so a
+  rerun over history gives the same answer.
+- A report parses only if it yields a `reported_at` and at least one value;
+  anything else (non-JSON body, missing `scope`, unparseable value) is an
+  adapter failure. An unparseable value (for example `"Trace"`) fails the
+  whole report rather than being read as zero.
+- Live check: `ingest-obs` reports each resort as `ok`, `failed` (with the
+  reason), `skipped_budget`, or `disabled` in the job summary, and logs one
+  JSON line `{"event": "resort_adapter_failed", "mountain", "preset",
+  "fetch_id", "reason"}` per failure. The `resorts` step fails only when
+  no adapter succeeds.
+- `conditions-extract` runs only for a failed non-Boyne page with HTTP 200 and
+  at least 200 characters of visible text (a bot challenge is not sent), at
+  most once per resort per day. Its result is a separate `observation` row
+  with `source = 'resort_llm'` and `reported_at` = the fetch time; readers
+  prefer a `resort` row for the same mountain and date.
+- `hazelst record resorts` saves each live response as a fixture
+  (`tests/fixtures/resorts/<date>/<mountain>-{report,config}.json.gz`).
+
+First live ingest (2026-11-26 14:49Z): all eight adapters `ok`. Killington,
+Pico, and Cranmore reports were flagged `stale` (snow grid dated 2026-11-15;
+Cranmore's report dated 2026-11-24, pre-season).
+
 ### Gaps and fallbacks
 
 | Gap | Resorts | Handling |

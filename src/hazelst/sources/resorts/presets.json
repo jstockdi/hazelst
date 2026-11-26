@@ -1,0 +1,85 @@
+{
+  "boyne_reportpal": {
+    "kind": "json",
+    "url": "https://{host}/api/reportpal?resortName={code}&useReportPal=true",
+    "fields": {
+      "new_24h_in": "currentConditions.resortLocations.location[0].snow24Hours.inches",
+      "new_48h_in": "currentConditions.resortLocations.location[0].snow48Hours.inches",
+      "new_7d_in": "currentConditions.resortLocations.location[0].snow7Days.inches",
+      "base_in": "currentConditions.resortLocations.location[0].base.inches",
+      "season_in": "currentConditions.resortLocations.location[0].snowSeasonTotal.inches",
+      "trails_open": "currentConditions.resortwide.numTrailsOpen",
+      "trails_total": "currentConditions.resortwide.numTrailsTotal",
+      "lifts_open": "currentConditions.resortwide.numLiftsOpen",
+      "lifts_total": "currentConditions.resortwide.numLiftsTotal",
+      "lifts_hold": "currentConditions.resortwide.numLiftsOnHold",
+      "reported_at": { "path": "updated", "parse": "datetime" }
+    }
+  },
+  "mtnpowder": {
+    "kind": "json",
+    "prefetch": {
+      "url": "https://v4.mtnfeed.com/resorts/{feed_key}.json",
+      "vars": { "token": "bearerToken" },
+      "cache_hours": 24
+    },
+    "url": "https://mtnpowder.com/feed/v3.json?bearer_token={token}&resortId[]={resort_id}",
+    "fields": {
+      "new_24h_in": "Resorts[0].SnowReport.AllMountain.Last24HoursIn",
+      "new_48h_in": "Resorts[0].SnowReport.AllMountain.Last48HoursIn",
+      "new_7d_in": "Resorts[0].SnowReport.AllMountain.Last7DaysIn",
+      "base_in": {
+        "path": ["Resorts[0].SnowReport.SnowBaseRangeIn", "Resorts[0].SnowReport.BaseArea.BaseIn"],
+        "parse": "range_max"
+      },
+      "season_in": "Resorts[0].SnowReport.SeasonTotalIn",
+      "trails_open": "Resorts[0].SnowReport.TotalOpenTrails",
+      "trails_total": "Resorts[0].SnowReport.TotalTrails",
+      "lifts_open": "Resorts[0].SnowReport.TotalOpenLifts",
+      "lifts_total": "Resorts[0].SnowReport.TotalLifts",
+      "reported_at": { "path": "Resorts[0].SnowReport.LastUpdate", "parse": "datetime" }
+    }
+  },
+  "dor_html": {
+    "kind": "html",
+    "url": "https://{host}/mountain-report",
+    "scope": "main#page",
+    "labels": { "label": ".dor-snow-label", "value": ".dor-snow-val" },
+    "fields": {
+      "new_24h_in": { "label": "24 Hour" },
+      "new_48h_in": { "label": "48 Hour" },
+      "new_7d_in": { "label": "7 Day" },
+      "season_in": { "label": "Season" },
+      "trails": { "select": "a.dor-bar-row[aria-label='Open Trails'] .dor-bar-count", "parse": "ratio" },
+      "lifts": { "select": "a.dor-bar-row[aria-label='Open Lifts'] .dor-bar-count", "parse": "ratio" },
+      "reported_at": {
+        "select": ".dor-snow-report > .condition-report-date",
+        "parse": "datetime",
+        "regex": "Updated (.+)",
+        "format": "%B %d, %Y %I:%M %p",
+        "tz": "America/New_York"
+      }
+    }
+  },
+  "cranmore_html": {
+    "kind": "html",
+    "url": "https://cranmore.com/snow-report",
+    "scope": "section.margin",
+    "labels": { "label": ".datapoint h3", "value": "span.value" },
+    "fields": {
+      "new_24h_in": { "label": "Overnight" },
+      "new_7d_in": { "label": "7 Day Total" },
+      "base_in": { "label": "Base Depth", "parse": "range_max" },
+      "season_in": { "label": "Season Total" },
+      "trails": { "label": "Open Trails", "parse": "ratio" },
+      "lifts": { "label": "Open Lifts", "parse": "ratio" },
+      "reported_at": {
+        "select": "section.margin",
+        "parse": "datetime",
+        "regex": "Last Updated:\\s*(\\w{3} \\d{1,2}, \\d{4})",
+        "format": "%b %d, %Y",
+        "tz": "America/New_York"
+      }
+    }
+  }
+}

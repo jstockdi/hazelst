@@ -21,7 +21,10 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from hazelst import config, db
+from hazelst.agents import conditions_extract
+from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable
 from hazelst.sources import base, discussions, iem, nohrsc, nws, open_meteo, pns, snow_report
+from hazelst.sources.resorts import source as resorts
 
 
 class JobError(RuntimeError):
@@ -272,10 +275,81 @@ def ingest_nohrsc(ctx: JobContext) -> dict[str, Any]:
     return {"latest": latest.isoformat(), "ends": out or "up to date"}
 
 
+def ingest_resorts(ctx: JobContext, agents: AgentClient | None = None) -> dict[str, Any]:
+    """Resort report adapters: fetch within the daily budget, store `observation` rows.
+
+    Each resort's status (ok, failed with a reason, skipped_budget, disabled)
+    goes in the summary, and the step fails when no adapter succeeds. A
+    failed parse also logs a `resort_adapter_failed` line, the live contract
+    check. A failed non-Boyne page goes to `conditions-extract` (at most once
+    per resort per day); its values are stored as `resort_llm` rows.
+    """
+    now = datetime.now(UTC)
+    statuses: dict[str, dict[str, Any]] = {}
+    for mountain in ctx.cfg.mountains:
+        outcome = resorts.ingest_one(ctx.conn, ctx.client, ctx.run_id, mountain, now)
+        statuses[mountain.key] = outcome.summary()
+        if outcome.status != "failed":
+            continue
+        log_event(
+            run_id=ctx.run_id,
+            step="resorts",
+            event="resort_adapter_failed",
+            mountain=mountain.key,
+            preset=outcome.preset,
+            fetch_id=outcome.fetch_id,
+            reason=outcome.reason,
+        )
+        if resorts.extraction_allowed(mountain) and outcome.fetched is not None:
+            agents = agents or AgentClient(ctx.conn, ctx.cfg.settings)
+            statuses[mountain.key]["extract"] = extract_failed_page(
+                ctx, agents, mountain, outcome, now
+            )
+    counts = {
+        status: sum(1 for s in statuses.values() if s["status"] == status)
+        for status in ("ok", "failed", "skipped_budget", "disabled")
+    }
+    if counts["failed"] and not counts["ok"]:
+        reasons = "; ".join(
+            f"{key}: {s.get('reason')}" for key, s in statuses.items() if s["status"] == "failed"
+        )
+        raise JobError(f"resorts: every adapter failed ({reasons})")
+    return {**counts, "resorts": statuses}
+
+
+def extract_failed_page(
+    ctx: JobContext,
+    agents: AgentClient,
+    mountain: config.Mountain,
+    outcome: resorts.ResortOutcome,
+    now: datetime,
+) -> dict[str, Any]:
+    """Run `conditions-extract` on one failed page and store a `resort_llm` row."""
+    assert outcome.fetched is not None
+    if conditions_extract.called_today(ctx.conn, mountain.key, now):
+        return {"status": "skipped", "reason": "already called today"}
+    try:
+        result = conditions_extract.extract(agents, mountain, outcome.fetched, run_id=ctx.run_id)
+    except conditions_extract.ExtractionNotAllowed as exc:
+        return {"status": "skipped", "reason": str(exc)}
+    except AgentUnavailable as exc:
+        return {"status": "unavailable", "reason": str(exc)}
+    except AgentCallFailed as exc:
+        return {"status": "failed", "call_id": exc.call_id, "reason": str(exc)}
+    values = result.output.model_dump()
+    if all(values[k] is None for k in values if k != "confidence"):
+        return {"status": "no_values", "call_id": result.call_id}
+    row = resorts.llm_observation(outcome.fetched, values, call_id=result.call_id)
+    with db.transaction(ctx.conn):
+        observation_id = resorts.store(ctx.conn, outcome.fetch_id, row)
+    return {"status": "ok", "call_id": result.call_id, "observation_id": observation_id}
+
+
 OBS_SOURCES: dict[str, SourceStep] = {
     "pns": ingest_pns,
     "lsr": ingest_lsr,
     "nohrsc": ingest_nohrsc,
+    "resorts": ingest_resorts,
 }
 
 
@@ -324,4 +398,5 @@ RECORDERS: dict[str, tuple[Recorder, Callable[[base.Fetched], str]]] = {
     "open-meteo": (open_meteo.fetch, open_meteo.label),
     "nws": (nws.fetch, nws.label),
     "discussions": (lambda client, _mountains: discussions.fetch(client), discussions.label),
+    "resorts": (resorts.record, resorts.label),
 }

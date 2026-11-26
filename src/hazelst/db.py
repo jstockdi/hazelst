@@ -161,7 +161,7 @@ def sync_mountains(conn: sqlite3.Connection, mountains: Iterable[Mountain]) -> i
                 {
                     "wind_hold_mph": m.wind_hold_mph.model_dump(),
                     "favored_by": list(m.favored_by),
-                    "adapter": m.report_adapter,
+                    "adapter": m.report_adapter.model_dump() if m.report_adapter else None,
                 }
             ),
         )
