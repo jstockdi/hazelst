@@ -1,0 +1,10 @@
+[
+  {"key": "killington",   "name": "Killington",   "state": "VT", "lat": 43.604, "lon": -72.820, "summit_ft": 4241, "base_ft": 1165, "office": "BTV", "wind_hold_mph": [40, 55], "favored_by": ["nw_upslope", "clipper"]},
+  {"key": "pico",         "name": "Pico",         "state": "VT", "lat": 43.662, "lon": -72.842, "summit_ft": 3967, "base_ft": 2000, "office": "BTV", "wind_hold_mph": [40, 55], "favored_by": ["nw_upslope", "clipper"]},
+  {"key": "sugarbush",    "name": "Sugarbush",    "state": "VT", "lat": 44.136, "lon": -72.903, "summit_ft": 3975, "base_ft": 1483, "office": "BTV", "wind_hold_mph": [40, 55], "favored_by": ["nw_upslope", "clipper"]},
+  {"key": "stratton",     "name": "Stratton",     "state": "VT", "lat": 43.113, "lon": -72.908, "summit_ft": 3875, "base_ft": 1872, "office": "ALY", "wind_hold_mph": [40, 55], "favored_by": ["coastal"]},
+  {"key": "loon",         "name": "Loon",         "state": "NH", "lat": 44.036, "lon": -71.621, "summit_ft": 3065, "base_ft": 950,  "office": "GYX", "wind_hold_mph": [35, 50], "favored_by": ["coastal"]},
+  {"key": "cranmore",     "name": "Cranmore",     "state": "NH", "lat": 44.056, "lon": -71.112, "summit_ft": 2000, "base_ft": 500,  "office": "GYX", "wind_hold_mph": [40, 55], "favored_by": ["coastal"]},
+  {"key": "sunday_river", "name": "Sunday River", "state": "ME", "lat": 44.473, "lon": -70.857, "summit_ft": 3140, "base_ft": 800,  "office": "GYX", "wind_hold_mph": [40, 55], "favored_by": ["coastal"]},
+  {"key": "sugarloaf",    "name": "Sugarloaf",    "state": "ME", "lat": 45.031, "lon": -70.313, "summit_ft": 4237, "base_ft": 1417, "office": "GYX", "wind_hold_mph": [35, 50], "favored_by": ["coastal", "clipper"]}
+]

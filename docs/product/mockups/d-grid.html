@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D · Snow Grid</title>
+<style>
+:root{--ink:#1c2530;--mist:#6b7785;--line:#e6e9ee;--paper:#fbfbfa;--card:#fff;--warn:#d97706;--mix:#db2777}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif}
+.wrap{max-width:440px;margin:0 auto;padding:16px 16px 32px}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mist);font-size:12px;margin:2px 0 14px}
+.grid{display:grid;grid-template-columns:minmax(84px,1.6fr) repeat(5,1fr) 1.1fr;gap:3px;align-items:stretch}
+.hd{font-size:10px;color:var(--mist);text-align:center;font-weight:600;padding:2px 0}
+.win{grid-column:span 1;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#fff;font-weight:700;text-align:center;border-radius:4px;padding:2px 0}
+.st{grid-column:1/-1;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mist);font-weight:700;margin:10px 0 2px}
+.nm{font-weight:600;font-size:13px;display:flex;align-items:center;cursor:pointer;padding-right:4px}
+.c{height:40px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-variant-numeric:tabular-nums;position:relative;font-size:13px}
+.c .w{position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--warn);box-shadow:0 0 0 1.5px #fff}
+.c.mx{background-image:repeating-linear-gradient(135deg,transparent 0 5px,rgba(219,39,119,.35) 5px 7px)!important}
+.tot{background:var(--card);border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;color:var(--mist);line-height:1.15}
+.tot b{color:var(--ink);font-size:14px}
+.detail{grid-column:1/-1;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--mist);display:none}
+.detail.open{display:block}
+.detail table{width:100%;border-collapse:collapse;margin-top:6px;font-variant-numeric:tabular-nums}
+.detail td{text-align:center;padding:2px 0}
+.detail td:first-child{text-align:left;font-weight:600;color:var(--ink)}
+.hot{color:var(--warn);font-weight:700}
+.legend{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--mist);margin-top:16px}
+.ramp{display:flex;align-items:center;gap:4px}
+.ramp i{width:16px;height:12px;border-radius:3px;display:inline-block}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--warn);display:inline-block}
+.hatch{width:16px;height:12px;border-radius:3px;display:inline-block;background:repeating-linear-gradient(135deg,#eef2f6 0 4px,rgba(219,39,119,.45) 4px 6px)}
+.toggle{display:inline-flex;gap:2px;background:#eceff3;border-radius:8px;padding:3px;margin-bottom:12px}
+.toggle button{border:0;background:transparent;font:600 12px/1 inherit;padding:7px 10px;border-radius:6px;color:var(--mist);cursor:pointer}
+.toggle button.on{background:#fff;color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Snow grid</h1>
+  <div class="sub" id="issued"></div>
+  <div class="toggle"><button class="on" data-t="1d">1-day total</button><button data-t="3d">3-day</button><button data-t="5d">5-day</button></div>
+  <div class="grid" id="grid"></div>
+  <div class="legend">
+    <span class="ramp" id="ramp"></span>
+    <span><span class="dot"></span> gusts ≥ 40 mph</span>
+    <span><span class="hatch"></span> mixed at base</span>
+  </div>
+  <div class="sub" style="margin-top:8px">Tap a mountain for temps and wind.</div>
+</div>
+<script src="data.js"></script>
+<script>
+const S = window.SKI;
+document.getElementById("issued").textContent = "Issued " + S.issued + " · summit snowfall, inches";
+const ramp = ["#f1f5f9", "#dbeafe", "#bfdbfe", "#93c5fd", "#60a5fa", "#3b82f6", "#1d4ed8"];
+const col = v => ramp[Math.min(ramp.length - 1, Math.ceil(v / 1.2))];
+const fg = v => v >= 5 ? "#fff" : "#1c2530";
+document.getElementById("ramp").innerHTML = [0, 2, 4, 6].map(v => `<i style="background:${col(v)}"></i>`).join("") + " 0 → 6″+";
+let tot = "1d";
+function render() {
+  const n = { "1d": 1, "3d": 3, "5d": 5 }[tot];
+  const span = (k, c) => `<div class="win" style="grid-column:2/span ${k};background:${c}">${k}-day</div>`;
+  let h = `<div></div>${S.days.map(d => `<div class="hd">${d.replace(" ", "<br>")}</div>`).join("")}<div class="hd">Total</div>`;
+  h += `<div></div><div class="win" style="grid-column:2/span ${n};background:#1d4ed8">${tot} window</div><div style="grid-column:${2 + n}/8"></div>`;
+  ["VT", "NH", "ME"].forEach(st => {
+    h += `<div class="st">${{ VT: "Vermont", NH: "New Hampshire", ME: "Maine" }[st]}</div>`;
+    S.mountains.filter(m => m.st === st).sort((a, b) => S.sum(b, 5) - S.sum(a, 5)).forEach(m => {
+      h += `<div class="nm" data-k="${m.key}">${m.name}</div>`;
+      h += m.snow.map((s, i) => `<div class="c ${m.mix[i] ? "mx" : ""}" style="background:${col(s)};color:${fg(s)};opacity:${i < n ? 1 : .45}">${s}${m.gust[i] >= 40 ? '<span class="w"></span>' : ""}</div>`).join("");
+      h += `<div class="tot"><b>${S.sum(m, n)}″</b>${m.range[tot][0]}–${m.range[tot][1]}</div>`;
+      h += `<div class="detail" id="d-${m.key}"><b style="color:#1c2530">${m.name}</b> · ${m.summit.toLocaleString()} ft summit · ${m.note}
+        <table><tr><td></td>${S.days.map(d => `<td>${d.split(" ")[0]}</td>`).join("")}</tr>
+        <tr><td>Hi/Lo °F</td>${m.hi.map((x, i) => `<td>${x}/${m.lo[i]}</td>`).join("")}</tr>
+        <tr><td>Gust mph</td>${m.gust.map(g => `<td class="${g >= 40 ? "hot" : ""}">${g}</td>`).join("")}</tr></table></div>`;
+    });
+  });
+  document.getElementById("grid").innerHTML = h;
+  document.querySelectorAll(".nm").forEach(e => e.onclick = () => document.getElementById("d-" + e.dataset.k).classList.toggle("open"));
+}
+document.querySelectorAll(".toggle button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".toggle button").forEach(x => x.classList.toggle("on", x === b));
+  tot = b.dataset.t; render();
+});
+render();
+</script>
+</body>
+</html>

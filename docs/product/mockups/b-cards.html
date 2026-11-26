@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B · Mountain Cards</title>
+<style>
+:root{--bg:#0b1622;--card:#132333;--card-2:#1a2e42;--ink:#eaf2f8;--mist:#8aa2b6;--line:#22384d;--snow:#9fd3ff;--snow-d:#4ea8e8;--warn:#fbbf24;--mix:#f472b6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif}
+.wrap{max-width:440px;margin:0 auto;padding:16px 16px 32px}
+h1{font-size:22px;margin:0}
+.sub{color:var(--mist);font-size:13px;margin:2px 0 14px}
+.chips{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;scrollbar-width:none}
+.chips button{flex:none;border:1px solid var(--line);background:transparent;color:var(--mist);font:600 13px/1 inherit;padding:8px 14px;border-radius:999px;cursor:pointer}
+.chips button.on{background:var(--snow);color:#06223a;border-color:var(--snow)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px}
+.top{display:flex;justify-content:space-between;align-items:baseline}
+.top h2{margin:0;font-size:19px}
+.top span{color:var(--mist);font-size:12px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.tile{background:var(--card-2);border-radius:12px;padding:10px;text-align:center}
+.tile small{display:block;color:var(--mist);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.tile b{font-size:26px;font-variant-numeric:tabular-nums;color:var(--snow)}
+.tile em{display:block;font-style:normal;font-size:11px;color:var(--mist)}
+.strip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;align-items:end}
+.day{text-align:center;font-size:11px;color:var(--mist)}
+.col{height:56px;display:flex;align-items:flex-end;justify-content:center}
+.col i{display:block;width:70%;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,var(--snow),var(--snow-d));min-height:2px}
+.day .in{color:var(--ink);font-weight:700;font-size:13px;margin:4px 0 0}
+.day .t{font-variant-numeric:tabular-nums}
+.day .w{color:var(--mist)}
+.day .w.hot{color:var(--warn);font-weight:700}
+.day .mx{color:var(--mix);font-weight:700}
+.note{font-size:13px;color:#c6d6e3;margin:12px 0 0;padding-top:10px;border-top:1px solid var(--line)}
+.meta{display:flex;gap:14px;font-size:12px;color:var(--mist);margin-top:8px;flex-wrap:wrap}
+.meta b{color:var(--ink)}
+.meta .hold{color:var(--warn)}
+.closed .tiles b{color:var(--mist)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mountain report</h1>
+  <div class="sub" id="issued"></div>
+  <div class="chips" id="chips">
+    <button class="on" data-st="">All</button><button data-st="VT">Vermont</button><button data-st="NH">New Hampshire</button><button data-st="ME">Maine</button>
+  </div>
+  <div id="cards"></div>
+</div>
+<script src="data.js"></script>
+<script>
+const S = window.SKI;
+document.getElementById("issued").textContent = "Issued " + S.issued + " · summit snowfall";
+const max = Math.max(...S.mountains.flatMap(m => m.snow));
+function card(m) {
+  const tiles = [["1d", 1, 0], ["3d", 3, 1], ["5d", 5, 2]].map(([k, n, c]) =>
+    `<div class="tile"><small>${n} day</small><b>${S.sum(m, n)}″</b><em>${m.range[k][0]}–${m.range[k][1]}″ · ${m.conf[c]}</em></div>`).join("");
+  const strip = m.snow.map((s, i) => `<div class="day">
+      <div class="col"><i style="height:${s / max * 100}%"></i></div>
+      <div class="in">${s}″</div><div>${S.days[i]}</div>
+      <div class="t">${m.hi[i]}°/${m.lo[i]}°</div>
+      <div class="w ${m.gust[i] >= 40 ? "hot" : ""}">💨 ${m.gust[i]}</div>
+      ${m.mix[i] ? '<div class="mx">mix</div>' : ""}</div>`).join("");
+  const r = m.reported, open = m.score === 0
+    ? `<span>Opens <b>Dec 11</b></span>`
+    : `<span>Base <b>${r.base}″</b></span><span>New 24h <b>${r.new24}″</b></span><span>Trails <b>${r.trails[0]}/${r.trails[1]}</b></span><span>Lifts <b>${m.lifts[0]}</b> open${m.lifts[1] ? ` · <span class="hold">${m.lifts[1]} hold</span>` : ""}</span>`;
+  return `<div class="card ${m.score === 0 ? "closed" : ""}" data-st="${m.st}">
+    <div class="top"><h2>${m.name}</h2><span>${m.st} · ${m.summit.toLocaleString()} ft</span></div>
+    <div class="tiles">${tiles}</div><div class="strip">${strip}</div>
+    <p class="note">${m.note}</p><div class="meta">${open}</div></div>`;
+}
+document.getElementById("cards").innerHTML = S.mountains.map(card).join("");
+document.querySelectorAll("#chips button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#chips button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".card").forEach(c => c.style.display = !b.dataset.st || c.dataset.st === b.dataset.st ? "" : "none");
+});
+</script>
+</body>
+</html>

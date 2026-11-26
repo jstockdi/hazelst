@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A · Leaderboard</title>
+<style>
+:root{--ink:#0e1f2e;--mist:#5d7385;--line:#e3ebf1;--paper:#f4f8fb;--card:#fff;--ice:#2b7fc0;--ice-2:#cfe5f6;--warn:#c2410c;--warn-bg:#fff1e6;--ok:#0f766e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif}
+.wrap{max-width:440px;margin:0 auto;padding:16px 16px 32px}
+header .eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mist);font-weight:600}
+header h1{margin:4px 0 2px;font-size:24px;letter-spacing:-.01em}
+header p{margin:0;color:var(--mist);font-size:13px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);background:#e6eef4;border-radius:12px;padding:4px;margin:16px 0 12px}
+.seg button{border:0;background:transparent;font:600 14px/1 inherit;padding:10px 0;border-radius:9px;color:var(--mist);cursor:pointer}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(14,31,46,.15)}
+.best{background:linear-gradient(135deg,#0e3a5c,#2b7fc0);color:#fff;border-radius:16px;padding:14px 16px;margin-bottom:12px}
+.best small{opacity:.75;text-transform:uppercase;letter-spacing:.1em;font-size:10px;font-weight:700}
+.best b{display:block;font-size:18px;margin:2px 0}
+.best span{font-size:13px;opacity:.9}
+ol{list-style:none;margin:0;padding:0;background:var(--card);border-radius:16px;border:1px solid var(--line);overflow:hidden}
+li{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
+li:first-child{border-top:0}
+.rk{font-weight:700;color:var(--mist);font-size:13px;text-align:center}
+.nm{font-weight:600}
+.nm em{font-style:normal;font-size:11px;color:var(--mist);font-weight:500;margin-left:4px}
+.bar{height:6px;border-radius:3px;background:var(--ice-2);margin-top:6px;position:relative}
+.bar i{position:absolute;top:0;bottom:0;border-radius:3px;background:var(--ice);opacity:.35}
+.bar b{position:absolute;top:-3px;width:3px;height:12px;border-radius:2px;background:var(--ice)}
+.flags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.flag{font-size:11px;padding:2px 7px;border-radius:999px;background:var(--warn-bg);color:var(--warn);font-weight:600}
+.flag.cf{background:#eef4f8;color:var(--mist)}
+.amt{text-align:right}
+.amt b{font-size:24px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.amt small{display:block;font-size:11px;color:var(--mist)}
+.closed{opacity:.5}
+footer{color:var(--mist);font-size:12px;margin-top:14px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Ikon · VT · NH · ME</div>
+    <h1>Where's the snow?</h1>
+    <p id="issued"></p>
+  </header>
+  <div class="seg" role="tablist">
+    <button data-n="1" class="on">1 day</button>
+    <button data-n="3">3 days</button>
+    <button data-n="5">5 days</button>
+  </div>
+  <div class="best" id="best"></div>
+  <ol id="list"></ol>
+  <footer>Summit snowfall · median of GFS/HRRR, ECMWF, GEM · bar shows model range</footer>
+</div>
+<script src="data.js"></script>
+<script>
+const S = window.SKI, key = { 1: "1d", 3: "3d", 5: "5d" };
+document.getElementById("issued").textContent = "Issued " + S.issued;
+const bb = S.mountains.find(m => m.key === S.bestBet.key);
+document.getElementById("best").innerHTML =
+  `<small>Best bet</small><b>${bb.name} · ${S.bestBet.day}</b><span>${S.bestBet.why}</span>`;
+function render(n) {
+  const k = key[n], ci = { 1: 0, 3: 1, 5: 2 }[n];
+  const max = Math.max(...S.mountains.map(m => m.range[k][1]));
+  const rows = [...S.mountains].sort((a, b) => S.sum(b, n) - S.sum(a, n));
+  document.getElementById("list").innerHTML = rows.map((m, i) => {
+    const v = S.sum(m, n), [lo, hi] = m.range[k];
+    const days = m.snow.slice(0, n), gusts = m.gust.slice(0, n), mix = m.mix.slice(0, n);
+    const flags = [];
+    if (m.score === 0) flags.push(`<span class="flag cf">Opens Dec 11</span>`);
+    if (Math.max(...gusts) >= 55) flags.push(`<span class="flag">Wind holds likely</span>`);
+    else if (Math.max(...gusts) >= 40) flags.push(`<span class="flag">Wind-hold watch</span>`);
+    if (mix.some(Boolean)) flags.push(`<span class="flag">Mixed at base</span>`);
+    flags.push(`<span class="flag cf">${m.conf[ci]} confidence</span>`);
+    return `<li class="${m.score === 0 ? "closed" : ""}">
+      <div class="rk">${i + 1}</div>
+      <div><div class="nm">${m.name}<em>${m.st}</em></div>
+        <div class="bar"><i style="left:${lo / max * 100}%;width:${(hi - lo) / max * 100}%"></i><b style="left:${v / max * 100}%"></b></div>
+        <div class="flags">${flags.join("")}</div></div>
+      <div class="amt"><b>${v}″</b><small>${lo}–${hi}″</small></div></li>`;
+  }).join("");
+}
+document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".seg button").forEach(x => x.classList.toggle("on", x === b));
+  render(+b.dataset.n);
+});
+render(1);
+</script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hazel St Forecast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#132534;--deep:#0f3a5a;--sea:#1a5c88;--green:#12806a;--paper:#f5f9fb;--card:#fff;--line:#dce7ee;--line-2:#eef4f8;--mist:#5b7183;--warn:#b45309;--warn-bg:#fdf3e4;
+  --band:linear-gradient(152deg,#0f3a5a 0%,#164f77 46%,#12806a 100%)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15.5px/1.6 Inter,-apple-system,sans-serif}
+.band{background:var(--band);color:#fff;padding:18px 16px 26px}
+.band .k{font:600 13px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;opacity:.85}
+.band h1{font:500 18px/1.35 Fraunces,Georgia,serif;margin:10px 0 6px}
+.band .when{font-size:12px;opacity:.7}
+main{max-width:42rem;margin:0 auto;padding:0 16px 32px}
+.call{background:var(--card);border-radius:16px;margin-top:-14px;padding:14px 16px;box-shadow:0 14px 34px -22px rgba(15,58,90,.55);border-left:4px solid var(--green)}
+.call small{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);font-weight:700}
+.call b{display:block;font:600 18px/1.3 Fraunces,Georgia,serif;color:var(--deep);margin:2px 0}
+.call span{font-size:14px;color:var(--mist)}
+h2{font:600 19px/1.3 Fraunces,Georgia,serif;color:var(--deep);margin:26px 0 8px}
+.part{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mist);font-weight:700;margin:34px 0 -18px;padding-top:14px;border-top:1px solid var(--line)}
+p{margin:0 0 12px}
+.mtn b{color:var(--sea)}
+.caution{background:var(--warn-bg);color:#5a3410;border-radius:12px;padding:12px 14px;font-size:14px}
+.caution b{color:var(--warn)}
+figure{margin:0 0 12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+figcaption{font-size:12px;color:var(--mist);margin-top:6px}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden;border:1px solid var(--line);font-size:14px}
+th,td{padding:8px 10px;text-align:right;font-variant-numeric:tabular-nums}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mist);background:var(--line-2);font-weight:600;line-height:1.25}
+th:first-child,td:first-child{text-align:left}
+tr+tr td{border-top:1px solid var(--line-2)}
+td b{color:var(--deep)}
+td small{color:var(--mist);font-size:11px;display:block;line-height:1.1}
+.lead{font-size:13px;color:var(--mist);margin:-4px 0 10px}
+.foot{font-size:12px;color:var(--mist);border-top:1px solid var(--line);margin-top:26px;padding-top:12px}
+</style>
+</head>
+<body>
+<div class="band">
+  <div class="k">Hazel St Forecast</div>
+  <h1 id="headline"></h1>
+  <div class="when" id="issued"></div>
+</div>
+<main>
+  <!-- 1. The report -->
+  <div class="call" id="best"></div>
+
+  <h2>The storm</h2>
+  <p>A fast Alberta clipper crosses Thursday morning with a quick 3–6″ for the Greens and western Maine. Behind it, northwest flow sets up Friday and Saturday — classic upslope that piles snow on the northern spine (Sugarbush, Killington, Sugarloaf) well past what the models print. The southern mountains sit south of the best forcing and start Thursday mixed at the base.</p>
+  <p>Sunday dries out; a weaker system brings 2–4″ Monday. Models agree on Thursday, split on how long the upslope lasts — treat the 5-day totals as low confidence.</p>
+
+  <h2>Mountain by mountain</h2>
+  <div id="mtns"></div>
+
+  <h2>Cautions</h2>
+  <div class="caution"><b>Wind.</b> Friday gusts reach 58 mph on the Sugarloaf summit and 46 mph at Loon — expect summit-lift holds through midday. <b>Mixing.</b> Stratton and Cranmore bases see rain/snow Thursday morning before cooling.</div>
+
+  <!-- 2. Forecast -->
+  <div class="part">Forecast · new snow expected</div>
+  <h2>Next 5 days</h2>
+  <p class="lead">Snow forecast to fall from 6 AM today, at summit elevation. Range is the spread across three weather models.</p>
+  <figure>
+    <svg id="fc" viewBox="0 0 340 210" width="100%" role="img" aria-label="Forecast snowfall by mountain, next five days"></svg>
+    <figcaption>Forecast new snow, stacked by day (Thu → Mon).</figcaption>
+  </figure>
+  <table id="fct"><thead><tr><th>Mountain</th><th>Next<br>24 h</th><th>Next<br>3 days</th><th>Next<br>5 days</th></tr></thead><tbody></tbody></table>
+
+  <!-- 3. Accumulation -->
+  <div class="part">Accumulation · snow that has fallen</div>
+  <h2>Season so far</h2>
+  <p class="lead">Resort-reported snowfall to date; the dark segment is the last 7 days.</p>
+  <figure>
+    <svg id="acc" viewBox="0 0 340 236" width="100%" role="img" aria-label="Observed season snowfall by mountain"></svg>
+    <figcaption>Season total (in) · last 7 days highlighted · base depth at right.</figcaption>
+  </figure>
+
+  <div class="foot">Forecast: Open-Meteo (GFS/HRRR, ECMWF, GEM) at summit elevation; NWS gridpoints and discussions (BTV, ALY, GYX). Accumulation: resort mountain reports, NWS snowfall reports. Yesterday's 24-hour forecast: <b>HIT</b> (forecast 3″, reported 2–4″).</div>
+</main>
+<script src="data.js"></script>
+<script>
+const S = window.SKI, O = S.observed;
+document.getElementById("issued").textContent = S.issued;
+document.getElementById("headline").textContent = S.headline;
+const bb = S.mountains.find(m => m.key === S.bestBet.key);
+document.getElementById("best").innerHTML = `<small>Best bet</small><b>${bb.name}, ${S.bestBet.day}</b><span>${S.bestBet.why}</span>`;
+const rows = [...S.mountains].sort((a, b) => S.sum(b, 5) - S.sum(a, 5));
+document.getElementById("mtns").innerHTML = rows.map(m => `<p class="mtn"><b>${m.name}.</b> ${m.note}</p>`).join("");
+
+// Forecast table
+document.querySelector("#fct tbody").innerHTML = rows.map(m =>
+  `<tr><td>${m.name}</td>` + [["1d", 1], ["3d", 3], ["5d", 5]].map(([k, n]) =>
+    `<td><b>${S.sum(m, n)}″</b><small>${m.range[k][0]}–${m.range[k][1]}</small></td>`).join("") + `</tr>`).join("");
+
+// Forecast chart: stacked bars by day
+(function () {
+  const W = 340, H = 210, pl = 26, pb = 66, pt = 12, bw = (W - pl) / rows.length;
+  const mx = Math.max(...rows.map(m => S.sum(m, 5))), sc = (H - pb - pt) / mx;
+  const shades = ["#0f3a5a", "#1a5c88", "#2f86b4", "#7fb7d6", "#12806a"];
+  let s = "";
+  [0, 10, 20].forEach(v => { const y = H - pb - v * sc;
+    s += `<line x1="${pl}" x2="${W}" y1="${y}" y2="${y}" stroke="#eef4f8"/><text x="${pl - 4}" y="${y + 3}" font-size="9" text-anchor="end" fill="#5b7183">${v}″</text>`; });
+  rows.forEach((m, i) => { let y = H - pb; const x = pl + i * bw + bw * .18;
+    m.snow.forEach((v, d) => { const h = v * sc; y -= h; s += `<rect x="${x}" y="${y}" width="${bw * .64}" height="${h}" fill="${shades[d]}"/>`; });
+    s += `<text transform="translate(${x + bw * .32 + 3},${H - pb + 8}) rotate(-40)" font-size="9" text-anchor="end" fill="#132534">${m.name}</text>`;
+    s += `<text x="${x + bw * .32}" y="${y - 3}" font-size="9" text-anchor="middle" font-weight="600" fill="#0f3a5a">${S.sum(m, 5)}</text>`; });
+  S.days.forEach((d, j) => s += `<rect x="${pl + j * 62}" y="${H - 12}" width="8" height="8" fill="${shades[j]}"/><text x="${pl + j * 62 + 11}" y="${H - 5}" font-size="9" fill="#5b7183">${d}</text>`);
+  document.getElementById("fc").innerHTML = s;
+})();
+
+// Accumulation chart: horizontal season bars, last 7 days highlighted
+(function () {
+  const acc = [...S.mountains].sort((a, b) => O[b.key].season - O[a.key].season);
+  const W = 340, pl = 84, pr = 92, rh = 26, top = 6, mx = Math.max(...acc.map(m => O[m.key].season));
+  const sc = (W - pl - pr) / mx;
+  let s = "";
+  acc.forEach((m, i) => { const o = O[m.key], l7 = o.last7.reduce((a, b) => a + b, 0), y = top + i * rh;
+    s += `<text x="${pl - 8}" y="${y + 14}" font-size="11" text-anchor="end" fill="#132534">${m.name}</text>`;
+    s += `<rect x="${pl}" y="${y + 4}" width="${(o.season - l7) * sc}" height="14" rx="2" fill="#cfe2ef"/>`;
+    s += `<rect x="${pl + (o.season - l7) * sc}" y="${y + 4}" width="${l7 * sc}" height="14" rx="2" fill="#1a5c88"/>`;
+    s += `<text x="${pl + o.season * sc + 4}" y="${y + 15}" font-size="10" font-weight="600" fill="#0f3a5a">${o.season}″</text>`;
+    s += `<text x="${W}" y="${y + 15}" font-size="10" text-anchor="end" fill="#5b7183">${o.base == null ? "closed" : o.base + "″ base"}</text>`; });
+  const ly = top + acc.length * rh + 10;
+  s += `<rect x="${pl}" y="${ly}" width="10" height="8" fill="#cfe2ef"/><text x="${pl + 14}" y="${ly + 8}" font-size="9" fill="#5b7183">Earlier this season</text>`;
+  s += `<rect x="${pl + 110}" y="${ly}" width="10" height="8" fill="#1a5c88"/><text x="${pl + 124}" y="${ly + 8}" font-size="9" fill="#5b7183">Last 7 days</text>`;
+  document.getElementById("acc").innerHTML = s;
+})();
+</script>
+</body>
+</html>
