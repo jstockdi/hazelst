@@ -12,6 +12,7 @@ import sqlite3
 import sys
 import time
 from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, cast
@@ -20,7 +21,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from hazelst import config, db
-from hazelst.sources import base, iem, nohrsc, open_meteo, pns, snow_report
+from hazelst.sources import base, discussions, iem, nohrsc, nws, open_meteo, pns, snow_report
 
 
 class JobError(RuntimeError):
@@ -76,9 +77,71 @@ def ingest_open_meteo(ctx: JobContext) -> dict[str, Any]:
     }
 
 
+def ingest_nws(ctx: JobContext) -> dict[str, Any]:
+    """Gridpoint snow / ice / gust and active alerts per mountain; resolves grids once."""
+    grids = nws.cached_grids(ctx.conn)
+
+    def one(m: config.Mountain) -> list[base.Fetched] | str:
+        try:
+            return nws.fetch(ctx.client, [m], grids)
+        except base.SourceError as exc:
+            return str(exc)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = dict(zip(ctx.cfg.mountains, pool.map(one, ctx.cfg.mountains), strict=True))
+    errors = {m.key: r for m, r in results.items() if isinstance(r, str)}
+    counts = {"nws_grid": 0, "alert": 0}
+    with db.transaction(ctx.conn):
+        for m, result in results.items():
+            if isinstance(result, str):
+                continue
+            for f in result:
+                fetch_id = base.store_fetch(ctx.conn, ctx.run_id, f)
+                if f.http_status != 200:
+                    errors[m.key] = f"{f.source}: HTTP {f.http_status}"
+                    continue
+                if f.source == nws.POINTS_SOURCE:
+                    nws.cache_grid(ctx.conn, m.key, nws.parse_points(f))
+                elif f.source == nws.GRID_SOURCE:
+                    counts["nws_grid"] += nws.store_grid(ctx.conn, fetch_id, nws.normalize_grid(f))
+                elif f.source == nws.ALERTS_SOURCE:
+                    counts["alert"] += nws.store_alerts(
+                        ctx.conn, ctx.run_id, nws.normalize_alerts(f)
+                    )
+    if len(errors) == len(ctx.cfg.mountains):
+        raise JobError(f"nws failed for every mountain: {errors}")
+    return {**counts, "errors": errors}
+
+
+def ingest_discussions(ctx: JobContext) -> dict[str, Any]:
+    """The latest AFD from each office."""
+    stored: dict[str, str] = {}
+    errors: dict[str, str] = {}
+    for office in discussions.OFFICES:
+        try:
+            fetched = discussions.fetch(ctx.client, [office])
+        except (base.SourceError, discussions.NormalizeError) as exc:
+            errors[office] = str(exc)
+            continue
+        with db.transaction(ctx.conn):
+            for f in fetched:
+                base.store_fetch(ctx.conn, ctx.run_id, f)
+                if f.http_status != 200:
+                    errors[office] = f"{f.source}: HTTP {f.http_status}"
+                elif f.source == discussions.PRODUCT_SOURCE:
+                    row = discussions.normalize(f)
+                    discussions.store(ctx.conn, [row])
+                    stored[office] = row.issued_at
+    if not stored:
+        raise JobError(f"no discussion stored: {errors}")
+    return {"discussion": stored, "errors": errors}
+
+
 SourceStep = Callable[[JobContext], dict[str, Any]]
 FORECAST_SOURCES: dict[str, SourceStep] = {
     "open_meteo": ingest_open_meteo,
+    "nws": ingest_nws,
+    "discussions": ingest_discussions,
 }
 
 
@@ -259,4 +322,6 @@ def run_job(
 Recorder = Callable[[httpx.Client, Sequence[config.Mountain]], list[base.Fetched]]
 RECORDERS: dict[str, tuple[Recorder, Callable[[base.Fetched], str]]] = {
     "open-meteo": (open_meteo.fetch, open_meteo.label),
+    "nws": (nws.fetch, nws.label),
+    "discussions": (lambda client, _mountains: discussions.fetch(client), discussions.label),
 }
