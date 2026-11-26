@@ -280,7 +280,8 @@ def snow_values(mountain: DigestMountain) -> tuple[list[float], list[tuple[float
         for j in range(i + 2, len(daily) + 1):
             values.append(sum(daily[i:j]))
     for w in mountain.windows.values():
-        values += [w.snow_in, w.lo_in, w.hi_in, *w.by_model.values()]
+        values += [w.snow_in, w.lo_in, w.hi_in]
+        values += [v for v in w.by_model.values() if v is not None]
         values += [v for v in (w.base_snow_in, w.nws_in) if v is not None]
         ranges.append((w.lo_in, w.hi_in))
     acc = mountain.accumulation

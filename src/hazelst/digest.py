@@ -27,7 +27,7 @@ class DigestWindow(_Model):
     lo_in: float
     hi_in: float
     confidence: Literal["high", "medium", "low"]
-    by_model: dict[str, float] = Field(default_factory=dict)
+    by_model: dict[str, float | None] = Field(default_factory=dict)
     base_snow_in: float | None = None
     nws_in: float | None = None
     nws_ice_in: float | None = None
