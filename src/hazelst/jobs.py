@@ -13,14 +13,14 @@ import sys
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import date, datetime
-from typing import Any
+from datetime import UTC, date, datetime, timedelta
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import httpx
 
 from hazelst import config, db
-from hazelst.sources import base, open_meteo
+from hazelst.sources import base, iem, nohrsc, open_meteo, pns, snow_report
 
 
 class JobError(RuntimeError):
@@ -104,8 +104,125 @@ def ingest_forecast(ctx: JobContext) -> None:
     run_sources(ctx, FORECAST_SOURCES)
 
 
+# --- ingest-obs -------------------------------------------------------------------------
+
+
+def local_day_start(cfg: config.Config, day: date) -> datetime:
+    return datetime.combine(day, datetime.min.time(), ZoneInfo(cfg.timezone))
+
+
+def obs_window(ctx: JobContext) -> tuple[datetime, datetime]:
+    """Reports from the start of the day before `for_date` to the end of it (or now)."""
+    start = local_day_start(ctx.cfg, ctx.for_date - timedelta(days=1))
+    end = min(local_day_start(ctx.cfg, ctx.for_date + timedelta(days=1)), datetime.now(UTC))
+    return start, end
+
+
+def ingest_pns(ctx: JobContext) -> dict[str, Any]:
+    """New PNS products from api.weather.gov (IEM archive when that fails) → `snow_report`."""
+    start, end = obs_window(ctx)
+    known = pns.known_ids(ctx.conn)
+    fetched: list[base.Fetched] = []
+    wanted: list[pns.ListedProduct] = []
+    listing: dict[str, str] = {}
+    # api.weather.gov keeps PNS products for a short time; past dates use the IEM archive.
+    live = ctx.for_date >= today(ctx.cfg) - timedelta(days=1)
+    for office in pns.OFFICES:
+        products: list[pns.ListedProduct] | None = None
+        if live:
+            try:
+                listed = pns.fetch_list(ctx.client, office)
+                fetched.append(listed)
+                if listed.http_status != 200:
+                    raise base.SourceError(f"HTTP {listed.http_status}")
+                products = pns.parse_list(listed)
+                listing[office] = "api.weather.gov"
+            except (base.SourceError, pns.NormalizeError) as exc:
+                listing[office] = f"iem archive (api.weather.gov: {exc})"
+        if products is None:
+            archive = [
+                pns.fetch_archive_list(ctx.client, office, day)
+                for day in (ctx.for_date - timedelta(days=1), ctx.for_date)
+            ]
+            fetched.extend(archive)
+            ok = [f for f in archive if f.http_status == 200]
+            products = [p for f in ok for p in pns.parse_list(f)]
+            if ok:
+                listing.setdefault(office, "iem archive")
+            else:
+                listing[office] = "unavailable"
+        for p in products:
+            issued = datetime.fromisoformat(p.issued_at)
+            if p.product_id not in known and start <= issued <= end:
+                known.add(p.product_id)
+                wanted.append(p)
+    if all(v == "unavailable" for v in listing.values()):
+        raise JobError("pns: no office listing could be read")
+    texts = [pns.fetch_product(ctx.client, p) for p in wanted]
+    products_ok = [f for f in texts if f.http_status == 200]
+    reports = 0
+    with db.transaction(ctx.conn):
+        for f in [*fetched, *texts]:
+            base.store_fetch(ctx.conn, ctx.run_id, f)
+        for f in products_ok:
+            reports += pns.store(ctx.conn, pns.normalize(f, ctx.cfg.mountains))
+    return {
+        "listing": listing,
+        "products": len(products_ok),
+        "product_errors": len(texts) - len(products_ok),
+        "snow_report": reports,
+    }
+
+
+def ingest_lsr(ctx: JobContext) -> dict[str, Any]:
+    """IEM Local Storm Reports for the window → `snow_report` (a PNS copy wins)."""
+    start, end = obs_window(ctx)
+    fetched = iem.fetch_lsr(ctx.client, start, end)
+    if fetched.http_status != 200:
+        raise JobError(f"iem_lsr: HTTP {fetched.http_status}")
+    rows = iem.normalize_lsr(fetched, ctx.cfg.mountains)
+    with db.transaction(ctx.conn):
+        base.store_fetch(ctx.conn, ctx.run_id, fetched)
+        written = snow_report.store(ctx.conn, rows, "lsr")
+    return {"reports": len(rows), "snow_report": written}
+
+
+def ingest_nohrsc(ctx: JobContext) -> dict[str, Any]:
+    """NOHRSC 24 h / 48 h / season grids at each mountain → `observation` (source nohrsc)."""
+    now = datetime.now(UTC)
+    ends = nohrsc.ends_to_fetch(ctx.conn, ctx.for_date, now)
+    out: dict[str, Any] = {}
+    for end in ends:
+        fetched = nohrsc.fetch(ctx.client, end)
+        grids = {cast(nohrsc.Product, f.meta["product"]): f for f in fetched}
+        rows = nohrsc.normalize(grids, ctx.cfg.mountains)
+        with db.transaction(ctx.conn):
+            ids = {p: base.store_fetch(ctx.conn, ctx.run_id, f) for p, f in grids.items()}
+            written = nohrsc.store(ctx.conn, rows, ids)
+        out[end.isoformat()] = {
+            "http": {p: f.http_status for p, f in grids.items()},
+            "observation": written,
+        }
+    latest = nohrsc.latest_end(ctx.for_date, now)
+    if not nohrsc.stored_fetch_times(ctx.conn, latest):
+        raise JobError(f"nohrsc: the grid ending {latest.isoformat()} 12Z is unavailable")
+    return {"latest": latest.isoformat(), "ends": out or "up to date"}
+
+
+OBS_SOURCES: dict[str, SourceStep] = {
+    "pns": ingest_pns,
+    "lsr": ingest_lsr,
+    "nohrsc": ingest_nohrsc,
+}
+
+
+def ingest_obs(ctx: JobContext) -> None:
+    run_sources(ctx, OBS_SOURCES)
+
+
 JOBS: dict[str, Callable[[JobContext], None]] = {
     "ingest-forecast": ingest_forecast,
+    "ingest-obs": ingest_obs,
 }
 
 

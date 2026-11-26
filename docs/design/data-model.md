@@ -89,15 +89,15 @@ CREATE TABLE alert (
 -- Normalized: ground truth ------------------------------------------------
 CREATE TABLE observation (                  -- one row per source per mountain per report
   id INTEGER PRIMARY KEY, mountain TEXT, fetch_id INT,
-  source TEXT,                              -- resort | nohrsc | pns | lsr | model_analysis
-  obs_date DATE, reported_at TEXT,
+  source TEXT,                              -- resort | resort_llm | nohrsc | model_analysis
+  obs_date DATE, reported_at TEXT,          -- obs_date D = the 24 h ending the morning of D
   new_24h_in REAL, new_48h_in REAL, new_7d_in REAL,
   base_in REAL, season_in REAL,
   trails_open INT, trails_total INT, lifts_open INT, lifts_hold INT,
   surface TEXT, raw JSON
 );
 CREATE TABLE snow_report (                  -- point reports from NWS PNS / LSR
-  id TEXT PRIMARY KEY, product_id TEXT, place TEXT,
+  id TEXT PRIMARY KEY, product_id TEXT, place TEXT, -- id: "lat,lon,ending_at,snow_in" (lat/lon to 2 dp)
   lat REAL, lon REAL, elev_ft INT, ending_at TEXT,
   snow_in REAL, hours INT,
   nearest_mountain TEXT, distance_mi REAL
@@ -183,7 +183,9 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
 2. **forecast-verify** scores each mountain's 1d forecast from each edition
    (7:00, 8:15, 2:40; raw mean and each model)
    against the best available observation: resort 24 h > PNS/LSR within 5 mi >
-   NOHRSC > none.
+   NOHRSC > none. Resort and NOHRSC values are `observation` rows; PNS and LSR
+   points stay in `snow_report` (with `nearest_mountain` and `distance_mi`) and
+   are not copied into `observation`.
 3. **skill-learn** (nightly) rebuilds `skill`: bias ratio and error per mountain ×
    model × lead time × pattern tag.
 4. **Corrected forecast** — once a cell in `skill` has n ≥ 10 verified snow days,

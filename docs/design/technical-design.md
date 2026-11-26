@@ -83,7 +83,8 @@ hazelst/
     migrations/0001_init.sql ...
     models.py            # Pydantic: ReportPayload, ForecastWindow, ForecastDay, ...
     sources/             # one module per source: fetch() -> raw, normalize() -> rows
-      open_meteo.py  nws.py  discussions.py  iem.py  nohrsc.py
+      open_meteo.py  nws.py  discussions.py  pns.py  iem.py  nohrsc.py
+      snow_report.py (PNS / LSR rows, nearest mountain)  geotiff.py (NOHRSC pixel reader)
       resorts/  adapter.py (json / embedded_json / html parsers)  presets.json
     derive.py            # forecast_hourly -> forecast_window, forecast_day (+ tags, precip_type)
     tags.py              # pattern tag rules
