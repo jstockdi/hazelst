@@ -23,7 +23,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from hazelst import __version__, db
+from hazelst import __version__, db, verify
 from hazelst.config import TIMEZONE
 from hazelst.models import BestBet, Narrative, ReportPayload
 from hazelst.render import page
@@ -111,9 +111,14 @@ def archive_entries(conn: sqlite3.Connection) -> list[page.ArchiveEntry]:
         headline = r["headline"]
         if not headline:
             headline = page.numbers_only_headline(ReportPayload.model_validate_json(r["payload"]))
+        day = date.fromisoformat(r["for_date"])
+        summary = verify.summary_for(conn, day)
         entries.append(
             page.ArchiveEntry(
-                date=date.fromisoformat(r["for_date"]), headline=headline, status=r["status"]
+                date=day,
+                headline=headline,
+                status=r["status"],
+                verification=page.verification_counts(summary) if summary else None,
             )
         )
     return entries
@@ -129,7 +134,12 @@ class PageCache:
     def get(
         self, conn: sqlite3.Connection, key: str, build: Callable[[], tuple[int, str, str]]
     ) -> tuple[int, str, str]:
-        stamp = tuple(conn.execute("SELECT count(*), max(published_at) FROM report").fetchone())
+        stamp = tuple(
+            conn.execute(
+                "SELECT count(*), max(published_at), (SELECT max(rowid) FROM verification)"
+                " FROM report"
+            ).fetchone()
+        )
         if stamp != self._stamp:
             self._stamp, self._items = stamp, {}
         if key not in self._items:

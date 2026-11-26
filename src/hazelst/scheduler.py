@@ -12,6 +12,7 @@ Each slot runs its steps in order in one scheduler thread; a step waits up to
 |      | report-refresh (0815 edition, not before 8:15) |
 | 2:30 PM | ingest-forecast, ingest-obs |
 | 2:40 PM | report-refresh (1440) |
+| 9:00 PM | forecast-verify (scores yesterday's editions) |
 """
 
 from __future__ import annotations
@@ -64,6 +65,7 @@ SLOTS: tuple[Slot, ...] = (
     ),
     Slot("ingest-1430", dtime(14, 30), (Step("ingest-forecast"), Step("ingest-obs"))),
     Slot("report-refresh-1440", dtime(14, 40), (Step("report-refresh", edition="1440"),)),
+    Slot("forecast-verify-2100", dtime(21, 0), (Step("forecast-verify"),)),
 )
 # Edition -> the slot whose last step publishes it (for catch-up).
 EDITION_SLOTS = {"0700": "report-build-0700", "0815": "refresh-0815", "1440": "report-refresh-1440"}

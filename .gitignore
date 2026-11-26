@@ -10,3 +10,4 @@ __pycache__/
 *.env
 !*.enc.env
 .DS_Store
+*.db.lock
