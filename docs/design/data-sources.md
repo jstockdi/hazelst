@@ -36,13 +36,14 @@ All sources below are free and keyless (NWS requires a `User-Agent` header).
   | `gfs_seamless` | `ncep_gfs013` (GFS run; HRRR blends into the first hours) |
   | — | `ncep_hrrr_conus` (recorded, not used for `issued_at`) |
   | `ecmwf_ifs025` | `ecmwf_ifs025` |
-  | `gem_seamless` | `cmc_gem_gdps` |
+  | `gem_seamless` | `cmc_gem_gdps_15km` |
 
-- `cmc_gem_gdps/static/meta.json` stopped updating on 2026-05-26 (its
-  `data_end_time` is 2026-06-05) while GEM data in the forecast response stays
-  current. When a meta.json's `data_end_time` is before the fetch, its run time
-  cannot describe the data served, so the run is **estimated** from the
-  model's own cycle: the latest initialisation on `update_interval_seconds`
+- GEM global moved to `cmc_gem_gdps_15km` (the Single Runs API names it);
+  the old `cmc_gem_gdps/static/meta.json` stopped updating on 2026-05-26 (its
+  `data_end_time` is 2026-06-05) while GEM data kept flowing. As a guard
+  against the next rename: when a meta.json's `data_end_time` is before the
+  fetch, its run time cannot describe the data served, so the run is
+  **estimated** from the model's own cycle: the latest initialisation on `update_interval_seconds`
   that is available by the fetch time given the file's last observed delay
   (`last_run_availability_time − last_run_initialisation_time`). The ingest
   summary marks such run times `estimated: true`.
@@ -50,7 +51,13 @@ All sources below are free and keyless (NWS requires a `User-Agent` header).
   `meta` holds the elevation and the mountain keys in request order (the
   response list follows that order).
 - Fixtures: `hazelst record open-meteo` writes each raw response to
-  `tests/fixtures/open_meteo/<date>/<label>.json.gz`.
+  `tests/fixtures/open_meteo/<date>/<label>.json.gz`. With
+  `--run MODEL=YYYY-MM-DDTHH:MM` (repeatable) it records one past run per
+  model from the Single Runs API (`single-runs-api.open-meteo.com/v1/forecast`,
+  `run=`), each response carrying its run time; `tests/fixtures/open_meteo/2026-11-25`
+  holds GFS 06Z, ECMWF 06Z, and GEM 00Z, the runs behind the sample run.
+  `gfs_seamless` from that API blends its own-cycle HRRR, not the latest HRRR
+  the live API served that morning.
 
 ### NWS request details (verified 2026-11-26)
 
