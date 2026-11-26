@@ -45,6 +45,7 @@ services:
       TZ: America/New_York
       NWS_USER_AGENT: hazelst-forecast (github.com/jstockdi/hazelst)
       HOME: /tmp/home         # writable HOME on the tmpfs for the Claude CLI
+      HAZELST_SCHEDULER: "true"  # run the job schedule in the serving process
     volumes:
       - /srv/hazelst:/data:rw # SQLite; host dir pre-chowned 65532:65532, 0750
     user: "65532:65532"

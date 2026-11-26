@@ -151,7 +151,7 @@ Mon 03:00 knowledge-review ─▶ knowledge / config_change (proposed)
 
 | Source | Holds | Changes by |
 |--------|-------|-----------|
-| Environment | `CLAUDE_CODE_OAUTH_TOKEN` (secret), `HOME` (`/tmp/home`, writable for the Claude CLI), `NWS_USER_AGENT`, `TZ`, `HAZELST_DB`, `HAZELST_AGENT_DAILY_CALLS` (default 10), `HAZELST_ENABLE_AGENTS`, `HAZELST_AGENT_MODEL_<ROLE>` / `HAZELST_AGENT_EFFORT_<ROLE>` (optional per-role overrides) | frank compose / SOPS |
+| Environment | `CLAUDE_CODE_OAUTH_TOKEN` (secret), `HOME` (`/tmp/home`, writable for the Claude CLI), `NWS_USER_AGENT`, `TZ`, `HAZELST_DB`, `HAZELST_AGENT_DAILY_CALLS` (default 10), `HAZELST_ENABLE_AGENTS`, `HAZELST_SCHEDULER` (run the job schedule inside `hazelst serve`; default false, `true` on frank), `HAZELST_AGENT_MODEL_<ROLE>` / `HAZELST_AGENT_EFFORT_<ROLE>` (optional per-role overrides) | frank compose / SOPS |
 | `config/mountains.json` (in image) | Roster, coordinates, elevations, thresholds, adapters, `season_open` | PR + release |
 | `config_change` (accepted rows) | Threshold and weight overrides learned in season | `hazelst config accept <id>` |
 | `agents/prompts/*` + `SKILL.md` (in image) | Role prompts, regional knowledge | PR + release |

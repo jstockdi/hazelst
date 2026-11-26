@@ -117,6 +117,7 @@ class Settings(BaseModel):
     mountains_path: Path = DEFAULT_MOUNTAINS
     nws_user_agent: str = DEFAULT_USER_AGENT
     enable_agents: bool = False
+    scheduler: bool = False  # run the job schedule inside `hazelst serve` (on in production)
     agent_daily_calls: int = Field(default=10, ge=0)
     agent_roles: dict[str, AgentRole] = Field(default_factory=lambda: dict(DEFAULT_AGENT_ROLES))
     claude_token: SecretStr | None = None
@@ -187,6 +188,8 @@ def settings_from_env(env: Mapping[str, str] | None = None) -> Settings:
         values["mountains_path"] = Path(env["HAZELST_MOUNTAINS"])
     if "NWS_USER_AGENT" in env:
         values["nws_user_agent"] = env["NWS_USER_AGENT"]
+    if "HAZELST_SCHEDULER" in env:
+        values["scheduler"] = _parse_bool("HAZELST_SCHEDULER", env["HAZELST_SCHEDULER"])
     if "HAZELST_ENABLE_AGENTS" in env:
         values["enable_agents"] = _parse_bool("HAZELST_ENABLE_AGENTS", env["HAZELST_ENABLE_AGENTS"])
     if "HAZELST_AGENT_DAILY_CALLS" in env:

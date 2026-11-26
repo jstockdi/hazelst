@@ -72,7 +72,31 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     finally:
         conn.close()
     app = web.create_app(cfg.settings.db_path)
-    uvicorn.run(app, host=args.host, port=args.port, workers=1, access_log=False)
+    background = None
+    if cfg.settings.scheduler:
+        from hazelst import scheduler
+
+        background = scheduler.build(cfg)
+        background.start()
+    try:
+        uvicorn.run(app, host=args.host, port=args.port, workers=1, access_log=False)
+    finally:
+        if background is not None:
+            background.shutdown(wait=False)
+    return 0
+
+
+def _cmd_schedule(args: argparse.Namespace) -> int:
+    from hazelst import scheduler
+
+    cfg = config.load()
+    now = datetime.now(UTC)
+    steps = {slot.id: [step.kind for step in slot.steps] for slot in scheduler.SLOTS}
+    out = [
+        {"slot": slot_id, "next": fire.isoformat(), "steps": steps[slot_id]}
+        for slot_id, fire in scheduler.next_runs(cfg, now)
+    ]
+    print(json.dumps({"enabled_in_serve": cfg.settings.scheduler, "slots": out}, indent=2))
     return 0
 
 
@@ -118,7 +142,10 @@ def _cmd_record(args: argparse.Namespace) -> int:
 
 def _cmd_run(args: argparse.Namespace) -> int:
     cfg = config.load()
-    summary = jobs.run_job(cfg, args.job, args.date)
+    options: dict[str, object] = {"force": args.now}
+    if args.edition:
+        options["edition"] = args.edition
+    summary = jobs.run_job(cfg, args.job, args.date, options=options)
     print(json.dumps(summary, indent=2, default=str))
     return 0
 
@@ -248,9 +275,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_run = sub.add_parser("run", help="run one job now (takes the job lock, opens a run row)")
     p_run.add_argument("job", choices=sorted(jobs.JOBS))
     p_run.add_argument(
+        "--now",
+        action="store_true",
+        help="run even if this edition is already published (a new report version)",
+    )
+    p_run.add_argument(
+        "--edition",
+        choices=sorted(jobs.EDITIONS),
+        help="report jobs: edition to publish (default: 0700 for report-build,"
+        " the next unpublished refresh for report-refresh)",
+    )
+    p_run.add_argument(
         "--date", type=date.fromisoformat, help="report date (default: today, America/New_York)"
     )
     p_run.set_defaults(handler=_cmd_run)
+
+    p_schedule = sub.add_parser("schedule", help="print the job schedule and each slot's next run")
+    p_schedule.set_defaults(handler=_cmd_schedule)
 
     p_agents = sub.add_parser("agents", help="Claude calls: smoke test and the agent_call log")
     agents_sub = p_agents.add_subparsers(dest="agents_command", metavar="<agents-command>")

@@ -11,24 +11,40 @@ import json
 import sqlite3
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
+from datetime import time as dtime
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import httpx
 
-from hazelst import config, db
+from hazelst import config, db, derive
 from hazelst.agents import conditions_extract
 from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable
+from hazelst.models import BestBet, Narrative, ReportPayload, ReportStatus
+from hazelst.render import page
+from hazelst.render.payload import build_payload
 from hazelst.sources import base, discussions, iem, nohrsc, nws, open_meteo, pns, snow_report
 from hazelst.sources.resorts import source as resorts
 
 
 class JobError(RuntimeError):
     """A job could not complete."""
+
+
+ECMWF_POLL = timedelta(minutes=5)
+
+
+def clock() -> datetime:
+    """Now, in UTC (patched in tests)."""
+    return datetime.now(UTC)
+
+
+def sleep(seconds: float) -> None:
+    time.sleep(seconds)
 
 
 @dataclass
@@ -39,6 +55,7 @@ class JobContext:
     for_date: date
     client: httpx.Client
     summary: dict[str, Any] = field(default_factory=dict)
+    options: dict[str, Any] = field(default_factory=dict)
 
 
 def log_event(**fields: Any) -> None:
@@ -166,7 +183,48 @@ def run_sources(ctx: JobContext, steps: dict[str, SourceStep]) -> None:
         raise JobError("every source failed")
 
 
+def ecmwf_06z(day: date) -> datetime:
+    return datetime.combine(day, dtime(6), UTC)
+
+
+def ecmwf_run(client: httpx.Client) -> datetime | None:
+    """ECMWF's latest run from its meta.json, or None when the file cannot be read."""
+    meta_id = open_meteo.META_IDS["ecmwf_ifs025"]
+    try:
+        fetched = base.get(
+            client,
+            open_meteo.META_SOURCE,
+            open_meteo.META_URL.format(meta_id=meta_id),
+            meta={"model": "ecmwf_ifs025", "meta_id": meta_id},
+            retries=0,
+        )
+        if fetched.http_status != 200:
+            return None
+        return open_meteo.parse_meta(fetched).initialised_at
+    except (base.SourceError, open_meteo.NormalizeError):
+        return None
+
+
+def wait_for_ecmwf_06z(ctx: JobContext, until: datetime) -> bool:
+    """Poll ECMWF's meta.json every 5 minutes until the 06Z run is out or `until` passes."""
+    target = ecmwf_06z(ctx.for_date)
+    while True:
+        run = ecmwf_run(ctx.client)
+        if run is not None and run >= target:
+            return True
+        if clock() + ECMWF_POLL >= until:
+            return False
+        log_event(run_id=ctx.run_id, step="ecmwf_gate", waiting_for=target, latest=run)
+        sleep(ECMWF_POLL.total_seconds())
+
+
 def ingest_forecast(ctx: JobContext) -> None:
+    """Fetch every forecast source. With option `ecmwf_gate_until` (the 8:10 ingest), wait
+    for the ECMWF 06Z run first, polling every 5 minutes until that time."""
+    until = ctx.options.get("ecmwf_gate_until")
+    if until is not None:
+        ready = wait_for_ecmwf_06z(ctx, until)
+        ctx.summary["ecmwf_06z"] = "available" if ready else "not available by the gate"
     run_sources(ctx, FORECAST_SOURCES)
 
 
@@ -357,9 +415,182 @@ def ingest_obs(ctx: JobContext) -> None:
     run_sources(ctx, OBS_SOURCES)
 
 
+# --- report-build / report-refresh ---------------------------------------------------
+
+EDITIONS: dict[str, dtime] = {"0700": dtime(7, 0), "0815": dtime(8, 15), "1440": dtime(14, 40)}
+REFRESH_EDITIONS = ("0815", "1440")
+STALE_INGEST = timedelta(hours=18)
+SOURCE_NAMES = {
+    open_meteo.SOURCE: "Open-Meteo",
+    nws.GRID_SOURCE: "NWS gridpoints",
+    nws.ALERTS_SOURCE: "NWS alerts",
+    discussions.PRODUCT_SOURCE: "NWS forecast discussions",
+}
+
+
+def edition_rows(conn: sqlite3.Connection, for_date: date) -> dict[str, int]:
+    """Edition -> newest report version for the date."""
+    rows = conn.execute(
+        "SELECT json_extract(payload, '$.edition'), max(version) FROM report"
+        " WHERE for_date = ? AND status IN ('published', 'numbers_only') GROUP BY 1",
+        (for_date.isoformat(),),
+    )
+    return {r[0]: r[1] for r in rows if r[0]}
+
+
+def pick_edition(ctx: JobContext, kind: str) -> str:
+    """The `edition` option, else 0700 for report-build and the next unpublished refresh."""
+    chosen = ctx.options.get("edition")
+    if chosen:
+        if chosen not in EDITIONS:
+            raise JobError(f"unknown edition {chosen!r}; known: {sorted(EDITIONS)}")
+        return str(chosen)
+    if kind == "report-build":
+        return "0700"
+    done = edition_rows(ctx.conn, ctx.for_date)
+    return next((e for e in REFRESH_EDITIONS if e not in done), REFRESH_EDITIONS[-1])
+
+
+def active_alerts(conn: sqlite3.Connection, as_of: datetime) -> dict[str, list[str]]:
+    """Mountain -> events of alerts not yet expired at `as_of`."""
+    out: dict[str, list[str]] = {}
+    for mountain, event, expires in conn.execute("SELECT mountain, event, expires FROM alert"):
+        if expires is None or datetime.fromisoformat(expires) > as_of:
+            out.setdefault(mountain, []).append(event)
+    return out
+
+
+def unavailable_sources(conn: sqlite3.Connection, ingest_run_id: int) -> list[str]:
+    ok = {
+        r[0]
+        for r in conn.execute(
+            "SELECT DISTINCT source FROM fetch WHERE run_id = ? AND http_status = 200",
+            (ingest_run_id,),
+        )
+    }
+    return [name for source, name in SOURCE_NAMES.items() if source not in ok]
+
+
+def write_narrative(ctx: JobContext, payload: ReportPayload) -> Narrative | None:
+    """The written report for a payload; None publishes the page as `numbers_only`.
+
+    Numbers only until `report-write` lands (J11).
+    """
+    return None
+
+
+def build_report(ctx: JobContext, kind: str) -> None:
+    """Derive from the latest ingest and publish a new report version for one edition."""
+    now = clock()
+    edition = pick_edition(ctx, kind)
+    if not ctx.options.get("force") and edition in edition_rows(ctx.conn, ctx.for_date):
+        ctx.summary.update({"edition": edition, "status": "skipped (already published)"})
+        return
+    ingest_run = derive.latest_ingest_run(ctx.conn)
+    if ingest_run is None:
+        raise JobError("no successful ingest-forecast run to build from")
+    started = ctx.conn.execute("SELECT started_at FROM run WHERE id = ?", (ingest_run,)).fetchone()
+    inputs = derive.load_inputs(ctx.conn, ingest_run, now)
+    if not inputs.hourly:
+        raise JobError(f"ingest run {ingest_run} has no forecast rows")
+    forecast = derive.derive(ctx.cfg.mountains, inputs, for_date=ctx.for_date, as_of=now)
+    notes: list[str] = []
+    ingested = datetime.fromisoformat(started[0])
+    if now - ingested > STALE_INGEST:
+        local = ingested.astimezone(ZoneInfo(ctx.cfg.timezone))
+        notes.append(f"Forecast data is from {local:%a %d %b %-I:%M %p}; later ingests failed.")
+    ecmwf = next((r for r in forecast.models if r.model == "ecmwf_ifs025"), None)
+    if (
+        edition == "0815"
+        and ecmwf
+        and ecmwf.issued_at
+        and ecmwf.issued_at < ecmwf_06z(ctx.for_date)
+    ):
+        notes.append(
+            f"ECMWF 06Z was not available by 8:45 AM; this edition uses the"
+            f" {ecmwf.issued_at:%HZ} run."
+        )
+    payload = build_payload(
+        forecast,
+        ctx.cfg.mountains,
+        issued=now,
+        status="numbers_only",
+        edition=edition,
+        alerts=active_alerts(ctx.conn, now),
+        discussion_texts=inputs.discussions,
+        sources_unavailable=unavailable_sources(ctx.conn, ingest_run),
+        notes=notes,
+    )
+    narrative = write_narrative(ctx, payload)
+    if narrative is None and kind == "report-refresh":
+        narrative = morning_narrative(ctx.conn, ctx.for_date)
+    status: ReportStatus = "published" if narrative else "numbers_only"
+    payload = payload.model_copy(update={"status": status})
+    with db.transaction(ctx.conn):
+        derive.store(ctx.conn, ctx.run_id, forecast)
+        version = ctx.conn.execute(
+            "SELECT coalesce(max(version), 0) + 1 FROM report WHERE for_date = ?",
+            (ctx.for_date.isoformat(),),
+        ).fetchone()[0]
+        ctx.conn.execute(
+            "INSERT INTO report (for_date, version, run_id, headline, best_bet, narrative_md,"
+            " payload, status, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                ctx.for_date.isoformat(),
+                version,
+                ctx.run_id,
+                narrative.headline if narrative else page.numbers_only_headline(payload),
+                narrative.best_bet.model_dump_json() if narrative and narrative.best_bet else None,
+                narrative.body_md if narrative else None,
+                payload.model_dump_json(),
+                status,
+                now.isoformat(timespec="seconds"),
+            ),
+        )
+    ctx.summary.update(
+        {
+            "edition": edition,
+            "version": version,
+            "status": status,
+            "ingest_run": ingest_run,
+            "models": {
+                r.model: {"issued_at": r.issued_at, "stale": r.stale} for r in forecast.models
+            },
+            "notes": notes,
+        }
+    )
+    log_event(run_id=ctx.run_id, step=kind, edition=edition, version=version, status=status)
+
+
+def morning_narrative(conn: sqlite3.Connection, for_date: date) -> Narrative | None:
+    """The newest written report for the date, carried into a refresh (report-check re-runs
+    against it once `report-write` exists)."""
+    row = conn.execute(
+        "SELECT headline, best_bet, narrative_md FROM report WHERE for_date = ?"
+        " AND status = 'published' AND narrative_md IS NOT NULL ORDER BY version DESC LIMIT 1",
+        (for_date.isoformat(),),
+    ).fetchone()
+    if row is None:
+        return None
+    best = json.loads(row[1]) if row[1] else None
+    return Narrative(
+        headline=row[0], best_bet=BestBet.model_validate(best) if best else None, body_md=row[2]
+    )
+
+
+def report_build(ctx: JobContext) -> None:
+    build_report(ctx, "report-build")
+
+
+def report_refresh(ctx: JobContext) -> None:
+    build_report(ctx, "report-refresh")
+
+
 JOBS: dict[str, Callable[[JobContext], None]] = {
     "ingest-forecast": ingest_forecast,
     "ingest-obs": ingest_obs,
+    "report-build": report_build,
+    "report-refresh": report_refresh,
 }
 
 
@@ -369,6 +600,8 @@ def run_job(
     for_date: date | None = None,
     *,
     client: httpx.Client | None = None,
+    options: Mapping[str, Any] | None = None,
+    lock_timeout_s: float = 0.0,
 ) -> dict[str, Any]:
     """Migrate, take the job lock, open a `run` row, and run `kind`; returns the summary."""
     if kind not in JOBS:
@@ -380,8 +613,17 @@ def run_job(
     try:
         db.migrate(conn)
         db.sync_mountains(conn, cfg.mountains)
-        with db.job(conn, cfg.settings.db_path, kind, for_date) as run_id:
-            ctx = JobContext(cfg=cfg, conn=conn, run_id=run_id, for_date=for_date, client=http)
+        with db.job(
+            conn, cfg.settings.db_path, kind, for_date, lock_timeout_s=lock_timeout_s
+        ) as run_id:
+            ctx = JobContext(
+                cfg=cfg,
+                conn=conn,
+                run_id=run_id,
+                for_date=for_date,
+                client=http,
+                options=dict(options or {}),
+            )
             JOBS[kind](ctx)
         return {"run_id": run_id, "kind": kind, "for_date": for_date.isoformat(), **ctx.summary}
     finally:

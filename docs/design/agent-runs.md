@@ -50,6 +50,35 @@ more than 18 h old is flagged stale in the footer and excluded from the mean. Ev
 opens a `run` row, holds the job lock (one job at a time), and is idempotent
 for its date.
 
+**Scheduler** (`scheduler.py`; on when `HAZELST_SCHEDULER=true`). Each slot
+runs its steps in order in one thread; a step waits up to 20 minutes for the
+job lock, and a failed step does not stop the next one.
+
+| Slot (local) | Steps |
+|--------------|-------|
+| 6:45 AM | `ingest-forecast` |
+| 6:50 AM | `ingest-obs` |
+| 7:00 AM | `report-build` (edition 0700) |
+| 8:10 AM | `ingest-forecast` (polls ECMWF `meta.json` every 5 min until the 06Z run or 8:45), `ingest-obs`, `report-refresh` (edition 0815, not before 8:15) |
+| 2:30 PM | `ingest-forecast`, `ingest-obs` |
+| 2:40 PM | `report-refresh` (edition 1440) |
+
+- **Editions**: each report version records its edition in `payload.edition`.
+  A scheduled report job for an edition already published that day is skipped
+  (idempotent); `hazelst run <job> --now` always publishes a new version. Without
+  `--edition`, `report-build` publishes 0700 and `report-refresh` the next
+  unpublished of 0815 and 1440.
+- **ECMWF gate**: an 0815 edition built on an ECMWF run older than that day's
+  06Z says so in the footer ("ECMWF 06Z was not available by 8:45 AM; this
+  edition uses the 00Z run.").
+- **Startup catch-up**: when the container starts, the latest edition due
+  today (by its publish time) is run if it has no report: ingest-forecast,
+  ingest-obs, then the report job.
+- A refresh carries the latest written report for the day forward
+  (`report-check` re-runs against it once J11 lands); without one it is
+  `numbers_only`. Until `report-write` exists every edition is `numbers_only`.
+- `hazelst schedule` prints each slot's next run.
+
 | Job | When | Steps | Claude roles |
 |-----|------|-------|--------------|
 | `ingest-forecast` | 6:45 AM, 8:10 AM, 2:30 PM | Open-Meteo (summit, base), NWS grids, alerts, discussions → `fetch` → normalize | — |

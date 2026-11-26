@@ -32,6 +32,7 @@ def build_payload(
     discussion_texts: Mapping[str, str] | None = None,
     accumulation: Mapping[str, Accumulation] | None = None,
     sources_unavailable: Sequence[str] = (),
+    notes: Sequence[str] = (),
 ) -> ReportPayload:
     alerts = alerts or {}
     accumulation = accumulation or {}
@@ -70,5 +71,6 @@ def build_payload(
         },
         storm_words=forecast.storm_words,
         sources_unavailable=list(sources_unavailable),
+        notes=list(notes),
         mountains=reports,
     )
