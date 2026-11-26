@@ -76,7 +76,7 @@ without code changes — that is an owner decision, not a default.
 |------|--------|-------|--------------------------|-------|
 | **`report-write`** | `high` | Digest: windows, days with `precip_type` and tags, discussions (Key Messages + Discussion), alerts, accepted `knowledge`, yesterday's verification | `ReportDraft {headline, best_bet{mountain, day, why}, storm, mountains{key: text}, cautions}` | `report-check` |
 | **`report-revise`** | `medium` | The draft + digest + the `report-check` error list | `ReportDraft` | `report-check` again; on a second failure publish `numbers_only` ("report delayed") and retry the build every 15 min until 9 AM |
-| **`conditions-extract`** | `low` | Text of one resort report page whose adapter failed (never for Loon, Sunday River, Sugarloaf — see data-sources.md) | `ConditionsExtract {new_24h_in, base_in, trails_open, trails_total, lifts_open, confidence}` | Stored with `source=resort_llm`; never overrides an adapter value |
+| **`conditions-extract`** | `low` | Text of one resort report page whose adapter failed (never for Loon, Sunday River, Sugarloaf — see data-sources.md) | `ConditionsExtract {new_24h_in, base_in, trails_open, trails_total, lifts_open, confidence}` | Stored with `source=resort_llm` (`reported_at` = fetch time); never overrides an adapter value. Skipped for a non-200 or near-empty page (a bot challenge); at most once per resort per day |
 | **`knowledge-propose`** | `high` | `skill` changes, the week's MISSes with tags and discussions, current `knowledge` | `KnowledgeProposals {knowledge[], config_changes[]}` with evidence keys | Owner approval required; nothing proposed takes effect on its own |
 
 ### Call conventions (all roles)

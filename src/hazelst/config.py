@@ -48,6 +48,18 @@ class WindHold(BaseModel):
         return self
 
 
+class ReportAdapter(BaseModel):
+    """A resort report adapter: a preset name and its URL parameters (data-sources.md)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    preset: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+    params: dict[str, str | int] = Field(default_factory=dict)
+
+    def __hash__(self) -> int:  # params is a dict; keep Mountain hashable
+        return hash((self.preset, tuple(sorted(self.params.items()))))
+
+
 class Mountain(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -59,7 +71,7 @@ class Mountain(BaseModel):
     summit_ft: int = Field(gt=0)
     base_ft: int = Field(gt=0)
     nws: NwsRef
-    report_adapter: str | None = None
+    report_adapter: ReportAdapter | None = None  # null disables the adapter
     wind_hold_mph: WindHold
     season_open: date | None = None
     favored_by: tuple[str, ...] = ()

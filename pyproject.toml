@@ -9,6 +9,7 @@ dependencies = [
     "httpx>=0.28",
     "prometheus-client>=0.23",
     "pydantic>=2.12",
+    "selectolax>=1.0.2",
     "starlette>=0.48",
     "uvicorn>=0.37",
 ]
