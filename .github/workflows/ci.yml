@@ -47,3 +47,20 @@ jobs:
       - run: uv sync --locked
       - run: uv run pytest
       - run: uv run hazelst --help
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: docker/setup-buildx-action@v4.4.1
+      - uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          provenance: false
+          tags: hazelst:ci
+          build-args: GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: scripts/smoke.sh hazelst:ci

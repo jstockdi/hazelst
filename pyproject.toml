@@ -5,7 +5,10 @@ description = "Hazel St Forecast: a daily ski forecast for the Ikon mountains of
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "prometheus-client>=0.23",
     "pydantic>=2.12",
+    "starlette>=0.48",
+    "uvicorn>=0.37",
 ]
 
 [project.scripts]
@@ -13,6 +16,7 @@ hazelst = "hazelst.cli:main"
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.16.0",
     "mypy>=1.18",
     "pytest>=8.4",
     "ruff>=0.14",

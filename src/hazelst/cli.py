@@ -52,6 +52,38 @@ def _cmd_migrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from hazelst import web
+
+    cfg = config.load()
+    conn = db.connect(cfg.settings.db_path)
+    try:
+        db.migrate(conn)
+        db.sync_mountains(conn, cfg.mountains)
+    finally:
+        conn.close()
+    app = web.create_app(cfg.settings.db_path)
+    uvicorn.run(app, host=args.host, port=args.port, workers=1, access_log=False)
+    return 0
+
+
+def _cmd_healthcheck(args: argparse.Namespace) -> int:
+    """Exit 0 when GET /health returns 200 (the image HEALTHCHECK; no curl in the image)."""
+    import urllib.error
+    import urllib.request
+
+    url = f"http://127.0.0.1:{args.port}/health"
+    try:
+        with urllib.request.urlopen(url, timeout=args.timeout) as resp:
+            ok = resp.status == 200
+    except (urllib.error.URLError, OSError) as exc:
+        print(f"hazelst: healthcheck failed: {exc}", file=sys.stderr)
+        return 1
+    return 0 if ok else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hazelst",
@@ -70,6 +102,16 @@ def build_parser() -> argparse.ArgumentParser:
         "migrate", help="apply pending database migrations and sync the mountain roster"
     )
     p_migrate.set_defaults(handler=_cmd_migrate)
+
+    p_serve = sub.add_parser("serve", help="migrate, then serve the web app")
+    p_serve.add_argument("--host", default="0.0.0.0")
+    p_serve.add_argument("--port", type=int, default=8080)
+    p_serve.set_defaults(handler=_cmd_serve)
+
+    p_health = sub.add_parser("healthcheck", help="exit 0 if the local /health returns 200")
+    p_health.add_argument("--port", type=int, default=8080)
+    p_health.add_argument("--timeout", type=float, default=3.0)
+    p_health.set_defaults(handler=_cmd_healthcheck)
 
     return parser
 
