@@ -136,10 +136,16 @@ CREATE TABLE report (
 );
 CREATE TABLE agent_call (
   id INTEGER PRIMARY KEY, run_id INT, role TEXT,   -- report-write | report-revise | conditions-extract | knowledge-propose
-  model TEXT, prompt_sha TEXT, input_sha TEXT,
+  model TEXT, effort TEXT, sdk_version TEXT,
+  prompt_sha TEXT, input_sha TEXT,
   input JSON, output TEXT,
-  input_tokens INT, output_tokens INT, ms INT,
-  status TEXT, check_errors JSON
+  input_tokens INT, output_tokens INT,
+  cache_read_tokens INT, cache_write_tokens INT,
+  cost_usd_est REAL,                        -- SDK's client-side list-price estimate; not billed
+  ms INT, created_at TEXT,                  -- created_at drives the daily call cap
+  status TEXT,                              -- ok | error | invalid
+  result_subtype TEXT,                      -- ResultMessage.subtype (success | error_max_turns | ...)
+  check_errors JSON
 );
 
 -- Knowledge ----------------------------------------------------------------

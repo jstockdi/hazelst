@@ -67,7 +67,7 @@ the `edge` network.
 | Scheduler | APScheduler 3 `BackgroundScheduler`, `CronTrigger(timezone=America/New_York)` | In-process, DST-aware |
 | HTML parsing (resort adapters) | `selectolax` | Fast, small |
 | Charts | Hand-built inline SVG (ported from `prototype/render.py`) | No plotting stack in the image |
-| Claude | `anthropic` SDK; `claude-opus-5-5`; structured outputs | See [agent-runs.md](agent-runs.md) |
+| Claude | Claude Agent SDK (`claude-agent-sdk`, bundles the Claude Code CLI) with a `claude setup-token` token; `claude-opus-5-5`; structured outputs | See [agent-runs.md](agent-runs.md) |
 | Metrics | `prometheus_client` at `/metrics` | frank Phase 5 monitoring can scrape it |
 | Fonts | Fraunces + Inter (OFL), self-hosted in the image | No third-party requests from the page |
 | Lint / types / tests | `ruff`, `mypy`, `pytest` | |
@@ -92,7 +92,7 @@ hazelst/
     corrected.py         # corrected forecast method
     digest.py            # DB -> report-write input
     agents/
-      client.py          # one place for model, effort, fallbacks, logging, spend cap
+      client.py          # one place for SDK options, model, effort, logging, daily call cap
       prompts/           # role prompts (versioned by SHA)
       report_write.py  report_revise.py  conditions_extract.py  knowledge_propose.py
     report_check.py      # deterministic claim checks
@@ -150,7 +150,7 @@ Mon 03:00 knowledge-review ─▶ knowledge / config_change (proposed)
 
 | Source | Holds | Changes by |
 |--------|-------|-----------|
-| Environment | `ANTHROPIC_API_KEY`, `NWS_USER_AGENT`, `TZ`, `HAZELST_DB`, spend cap, `HAZELST_ENABLE_AGENTS` | frank compose / SOPS |
+| Environment | `CLAUDE_CODE_OAUTH_TOKEN` (secret), `HOME` (`/tmp/home`, writable for the Claude CLI), `NWS_USER_AGENT`, `TZ`, `HAZELST_DB`, `HAZELST_AGENT_DAILY_CALLS` (default 10), `HAZELST_ENABLE_AGENTS` | frank compose / SOPS |
 | `config/mountains.json` (in image) | Roster, coordinates, elevations, thresholds, adapters, `season_open` | PR + release |
 | `config_change` (accepted rows) | Threshold and weight overrides learned in season | `hazelst config accept <id>` |
 | `agents/prompts/*` + `SKILL.md` (in image) | Role prompts, regional knowledge | PR + release |
@@ -178,16 +178,23 @@ Summarized from [agent-runs.md](agent-runs.md):
 - Roles: `report-write`, `report-revise`, `conditions-extract`,
   `knowledge-propose`. `report-check` is code.
 - `claude-opus-5-5` for every role, effort set per role
-  (`high` / `medium` / `low` / `high`). Model per role is config.
-- Structured outputs via `output_config.format` from Pydantic models; validate
-  on return; treat `refusal` / `max_tokens` as failures.
-- Server-side refusal fallback on (`fallbacks: "default"`, beta
-  `server-side-fallback-2026-07-01`).
-- Stable system prompt (role prompt + `SKILL.md` + accepted knowledge) cached;
-  digest after it.
-- Every call logged in `agent_call` with prompt SHA, input, output, tokens.
+  (`high` / `medium` / `low` / `high`). Model and effort per role are config.
+- Claude Agent SDK (`claude-agent-sdk`): each call runs the bundled Claude Code
+  CLI as a subprocess, authenticated with `CLAUDE_CODE_OAUTH_TOKEN` from
+  `claude setup-token`; usage counts against the owner's subscription.
+- No tools (`tools=[]`), no filesystem settings (`setting_sources=[]`), no
+  skills or MCP servers, no session persistence; `max_turns=5`.
+- Structured output via `output_format` (`json_schema` from the role's Pydantic
+  model); validate `ResultMessage.structured_output` on return; a non-`success`
+  `subtype`, `is_error`, or a validation error is a failed call.
+- Stable system prompt (role prompt + `SKILL.md` + accepted knowledge) passed as
+  one string and cached by the CLI; digest after it.
+- Every call logged in `agent_call` with prompt SHA, input, output, tokens,
+  and the SDK's cost estimate.
+- Daily call cap (`HAZELST_AGENT_DAILY_CALLS`, default 10); at the cap the page
+  is `numbers_only`.
 - `HAZELST_ENABLE_AGENTS=false` produces `numbers_only` pages (used in CI and
-  local runs without a key).
+  local runs without a token).
 
 ## 10. Testing
 
@@ -214,9 +221,11 @@ Summarized from [agent-runs.md](agent-runs.md):
 ## 12. Container
 
 - `python:3.13-slim` multi-stage; final image has the venv, `src`, config,
-  fonts; no compilers.
+  fonts; no compilers. The `claude-agent-sdk` wheel adds the Claude Code CLI
+  binary (~320 MB) to the venv.
 - User `65532:65532`, `read_only: true`, `tmpfs: /tmp`, `cap_drop: ALL`,
-  `no-new-privileges`. Writes only to `/data`.
+  `no-new-privileges`. Writes only to `/data` and `/tmp`; `HOME=/tmp/home` so
+  the Claude CLI can write its config files on the tmpfs.
 - `HEALTHCHECK` calls `/health` with the bundled Python (no curl in the image).
 - Limits: 1 CPU, 512 MB.
 
@@ -225,14 +234,18 @@ Summarized from [agent-runs.md](agent-runs.md):
 - Logs: JSON lines to stdout — one per job step with run id, source, duration,
   rows, errors; one per Claude call with role, tokens, latency.
 - Metrics: job duration and status, source failures by source, rows ingested,
-  Claude tokens and spend, report age, verification hit rate.
+  Claude calls, tokens, and estimated cost, report age, verification hit rate.
 - Health: `/health` drives the Docker healthcheck; report age > 26 h is an alert
   condition for frank monitoring.
 
 ## 14. Security
 
-- Secrets: only `ANTHROPIC_API_KEY`, SOPS-encrypted in the frank repo,
-  decrypted to a 600 env file at deploy.
+- Secrets: only `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`; one-year
+  lifetime, model requests only), SOPS-encrypted in the frank repo, decrypted
+  to a 600 env file at deploy. Rotation: run `claude setup-token` again,
+  re-encrypt, redeploy. The token is never logged.
+- Claude calls run with no tools and no filesystem settings, so model output
+  cannot run commands or read files in the container.
 - No user input reaches Claude or SQL: routes take only a date (validated) — no
   query strings are used.
 - Resort pages and discussion text are untrusted data: passed to Claude as
@@ -253,7 +266,7 @@ Summarized from [agent-runs.md](agent-runs.md):
 |---|-----------|-----------|
 | M1 | Skeleton | Repo, `pyproject`, DB + migrations, CLI, `/health`, Dockerfile, CI green, image in GHCR |
 | M2 | Forecast + numbers-only page | `ingest-forecast`, `derive`, render ported from the prototype; golden + unit tests; page matches the sample run |
-| M3 | Claude report | `report-write`, `report-check`, `report-revise`, `agent_call`, spend cap; numbers-only fallback tested |
+| M3 | Claude report | `report-write`, `report-check`, `report-revise`, `agent_call`, daily call cap; numbers-only fallback tested |
 | M4 | Ground truth | PNS + IEM LSR + NOHRSC; resort adapters (the five that return 200 first, then the three that redirect); `conditions-extract`; `forecast-verify`; accumulation section live |
 | M5 | Learning | `skill-learn`, corrected method behind its gate, `knowledge-review`, CLI approvals |
 | M6 | Production on frank | frank PR (compose, Caddy, tunnel, systemd, SOPS secret), deploy, smoke, nightly backup, rollback rehearsed |
@@ -272,8 +285,8 @@ backup exists, and a rollback to the previous digest has been rehearsed.
 | 1 | Repo and image | `jstockdi/hazelst`, **public** repo; image `ghcr.io/jstockdi/hazelst`, public | Personal project, like `jstockdi/bristol-harbor-sailing-report` (public). No secrets in the repo. A public image needs no registry login on frank (the existing `~/.docker-bcl` login is for `battle-creek-llc`) |
 | 2 | Hostname | `hazelst.thmxtp.com` | frank's tunnel and Cloudflare zone already serve `play.thmxtp.com` and `bcl.thmxtp.com`; a subdomain is one ingress rule + one DNS route. A separate domain would need a new Cloudflare zone |
 | 3 | Exposure | **Public** | Read-only page, no accounts or personal data; visitors never trigger Claude calls; Cloudflare in front |
-| 4 | API key and spend | Dedicated Anthropic workspace `hazelst` with its own key and a **$20/month** workspace spend limit; in-app daily cap **$1** | Estimated $5–10/month: `report-write` at high effort ≈ $0.20/day including thinking, occasional `report-revise`, weekly `knowledge-propose`. A separate workspace makes the key revocable on its own |
-| 5 | Models | `claude-opus-5-5` for every role | `conditions-extract` is rare (adapter failures only) and disabled for Boyne sites, so a cheaper model would save pennies |
+| 4 | Claude auth and limits | Claude Agent SDK with a `claude setup-token` token on the owner's subscription (decisions row 15); in-app daily cap **10 calls** | A normal day uses 1–2 calls; the subscription has no per-token bill, so a call cap (not a dollar cap) bounds usage. The token is revocable on its own and lasts a year |
+| 5 | Models | `claude-opus-5-5` for every role, effort per role through the SDK's `effort` option | `conditions-extract` is rare (adapter failures only) and disabled for Boyne sites, so a cheaper model would save little subscription usage |
 | 6 | Storage | New LV **`lv-hazelst`, 10 GB**, at `/srv/hazelst` | frank gives each stack its own LV (`lv-terra-pg`, `lv-homestead-pg`, `lv-bcl-*`); `ubuntu-vg` has ~450 GB free. < 1 GB per season plus backfill fits with room |
 | 7 | Host actions on frank | Approve the M6 runbook as one bundle: create and mount `lv-hazelst`, create `/srv/hazelst` (65532, 0750), decrypt the secret, `make deploy STACK=hazelst`, install `frank-hazelst.service`. I pause for a separate go-ahead before the ingress change (Caddyfile, tunnel config, DNS route), since it restarts the shared platform stack | frank is permission-gated; ingress is shared with mixtape and bcl |
 | 8 | Resort sites | Code adapters only, 3 fetches per resort per day, identifying `User-Agent`. **No `conditions-extract` on Loon, Sunday River, or Sugarloaf** | robots.txt (2026-11-25): Killington, Pico, Sugarbush, Cranmore allow general crawling; Stratton has no rules. Boyne sites (Loon, Sunday River, Sugarloaf) publish Cloudflare content signals `search=yes, ai-train=no, use=reference` and set no `ai-input` signal, so their page text is not sent to Claude |

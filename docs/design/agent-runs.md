@@ -63,10 +63,11 @@ for its date.
 
 ## Claude roles
 
-All roles use `claude-opus-5-5` (the current default model). Thinking is always
-on for this model; depth is set with `effort`, which defaults to `medium`, so
-every role sets it explicitly. Model and effort are per-role config, so a role
-can move to a cheaper model (e.g. `claude-haiku-5-5` for `conditions-extract`)
+All roles use `claude-opus-5-5` (the current default model), called through the
+Claude Agent SDK (see [Call conventions](#call-conventions-all-roles)). Thinking
+is adaptive on this model; depth is set with the SDK's `effort` option, so every
+role sets it explicitly. Model and effort are per-role config, so a role can
+move to a cheaper model (e.g. `claude-haiku-5-5` for `conditions-extract`)
 without code changes — that is an owner decision, not a default.
 
 | Role | Effort | Input | Output (Pydantic schema) | Guard |
@@ -78,20 +79,54 @@ without code changes — that is an owner decision, not a default.
 
 ### Call conventions (all roles)
 
-- SDK: `anthropic` (Python). Structured output through `output_config.format`
-  (`json_schema` generated from the role's Pydantic model); the response is
-  validated with the same model before use.
-- Refusal fallback: `fallbacks: "default"` with the
-  `server-side-fallback-2026-07-01` beta, so a policy decline is retried on a
-  fallback model inside the same call. `stop_reason` is checked before reading
-  content: `refusal` or `max_tokens` counts as a failed call.
-- `max_tokens`: 16,000 (non-streaming); no `temperature` / `top_p` (rejected).
-- Prompt caching: the system prompt (role prompt + `SKILL.md` + accepted
-  `knowledge`) is the stable, cached prefix; the digest follows it. The cache
-  pays off between `report-write` and `report-revise` in the same run (seconds
-  apart), not across days.
-- SDK retries (default 2) cover 429/5xx; the job adds no extra retry loop beyond
-  the 15-minute rebuild.
+Verified by the J01 spike ([spikes/agent_sdk/](../../spikes/agent_sdk/README.md)).
+
+- SDK: `claude-agent-sdk` (Python), pinned; its wheel bundles the Claude Code
+  CLI, which the SDK runs as a subprocess per call. One call is one
+  `query(prompt, options)`; the app reads the final `ResultMessage`.
+- Auth: `CLAUDE_CODE_OAUTH_TOKEN` (a one-year token from `claude setup-token`)
+  in the environment. Usage counts against the owner's Claude subscription.
+  `ANTHROPIC_API_KEY` must not be set in the container: the CLI prefers it over
+  the token.
+- `ClaudeAgentOptions` for every role:
+
+  | Option | Value | Why |
+  |--------|-------|-----|
+  | `model` | role config (`claude-opus-5-5`) | |
+  | `effort` | role config (`low` … `max`) | Per-role depth (decisions row 11) |
+  | `system_prompt` | the role prompt + `SKILL.md` + accepted `knowledge`, as one string | A string replaces the Claude Code system prompt |
+  | `output_format` | `{"type": "json_schema", "schema": Model.model_json_schema()}` | Structured output |
+  | `tools` | `[]` | No built-in tools; only the SDK's internal `StructuredOutput` tool remains |
+  | `setting_sources` | `[]` | Load no user, project, or local settings, CLAUDE.md, or hooks |
+  | `skills` | `[]`; `strict_mcp_config=True` | No skills or MCP servers from the environment |
+  | `permission_mode` | `"dontAsk"` | Nothing can prompt; anything not pre-approved is denied |
+  | `verbatim_prompts` | `True` | Digest text (resort pages, discussions) is delivered as written: no `@path` or slash-command expansion |
+  | `max_turns` | `5` | The answer arrives through a `StructuredOutput` tool turn (2 turns typical, up to 4 observed) |
+  | `extra_args` | `{"no-session-persistence": None}` | No transcripts written under `HOME` |
+  | `env` | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, `DISABLE_AUTOUPDATER=1`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, `CLAUDE_AGENT_SDK_CLIENT_APP=hazelst/<version>` | No telemetry, updates, or memory files |
+
+- Output: `ResultMessage.structured_output` is validated with the role's
+  Pydantic model before use. A call fails when `is_error` is true, `subtype` is
+  not `success` (`error_max_turns`, `error_max_structured_output_retries`,
+  `error_during_execution`, …), or validation fails. `query()` raises after an
+  error result, so the client wraps the loop.
+- The CLI checks the tool input against the schema and lets the model retry
+  inside the same call (`MAX_STRUCTURED_OUTPUT_RETRIES`, default 5). If the
+  installed SDK ever lacks `output_format`, the fallback is the schema in the
+  prompt, Pydantic validation, and one retry with the validation error.
+- Not exposed by the SDK, so not used: `max_tokens`, `temperature` / `top_p`,
+  and the Messages API server-side refusal fallback. `fallback_model` exists
+  but stays unset (one model per role; a refusal is a failed call).
+- Prompt caching is automatic in the CLI (the stable system prompt is written
+  to the 1-hour cache); the cache pays off between `report-write` and
+  `report-revise` in the same run.
+- The CLI retries 429/5xx itself (`CLAUDE_CODE_MAX_RETRIES`, default 10;
+  `API_TIMEOUT_MS`, default 600000). The client sets a 10-minute wall-clock
+  timeout per call; the job adds no extra retry loop beyond the 15-minute
+  rebuild.
+- The CLI needs a writable `HOME` for its config files (~32 KB per call). In
+  the read-only container `HOME=/tmp/home` on the `/tmp` tmpfs; nothing
+  persists between calls.
 
 ### `report-check` rules (code)
 
@@ -130,18 +165,29 @@ of error this catches.
 
 ## Reproducibility
 
-Each `agent_call` stores the role, model id, effort, the SHA of the system
-prompt, the SHA and full JSON of the input, the output, token counts, and
-latency. `hazelst replay <date>` regenerates a report with the current prompt
-for comparison.
+Each `agent_call` stores the role, model id, effort, SDK version, the SHA of the
+system prompt, the SHA and full JSON of the input, the output, token counts
+(input, output, cache read, cache write), the SDK's cost estimate, the result
+`subtype`, and latency. `hazelst replay <date>` regenerates a report with the
+current prompt for comparison.
 
 ## Cost and limits
 
-At Opus 5.5 rates ($4 / $20 per MTok), one `report-write` (~15K input, ~2K
-output plus thinking at high effort) is about $0.20; with occasional revisions
-and the weekly `knowledge-propose`, about $5–10 a month.
-`knowledge-propose` runs weekly; `conditions-extract` only on adapter failure. A
-daily spend cap (config) stops Claude calls and falls back to `numbers_only`.
+Calls run on the owner's Claude subscription, not a metered API key, so there is
+no per-token bill and no workspace spend limit; usage counts against the
+subscription's limits. A rate-limited call fails like any other failed call and
+the page falls back to `numbers_only`.
+
+The in-app limit is a **daily call cap** (`HAZELST_AGENT_DAILY_CALLS`, default
+10): `agents/client.py` counts today's `agent_call` rows (America/New_York)
+before each call and, at the cap, skips the call and falls back to
+`numbers_only`. A normal day uses 1–2 calls (`report-write`, an occasional
+`report-revise`, and a `report-revise` per refresh only when its check fails);
+`knowledge-propose` runs weekly; `conditions-extract` only on adapter failure.
+
+`ResultMessage.total_cost_usd` is the SDK's client-side estimate at list price.
+It is logged and exported as a metric to track usage, never billed. The spike's
+small structured-output call measured $0.005–0.034 per call at that price.
 
 ## Failure behavior
 
