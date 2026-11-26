@@ -12,7 +12,7 @@ verified day.
 | Folder | For | Documents |
 |--------|-----|-----------|
 | `product/` | What it is and what it shows | [mountains.md](product/mountains.md) · [report-page.md](product/report-page.md) · [mockups/](product/mockups/index.html) (C is selected) |
-| `design/` | How it is built | [technical-design.md](design/technical-design.md) · [data-sources.md](design/data-sources.md) · [forecast-method.md](design/forecast-method.md) · [narrative.md](design/narrative.md) · [agent-runs.md](design/agent-runs.md) · [data-model.md](design/data-model.md) · [decisions.md](design/decisions.md) |
+| `design/` | How it is built | [technical-design.md](design/technical-design.md) · [build-plan.md](design/build-plan.md) · [data-sources.md](design/data-sources.md) · [forecast-method.md](design/forecast-method.md) · [narrative.md](design/narrative.md) · [agent-runs.md](design/agent-runs.md) · [data-model.md](design/data-model.md) · [decisions.md](design/decisions.md) |
 | `operations/` | How it runs | [hosting-frank.md](operations/hosting-frank.md) |
 | `experiments/` | Dated runs and what they changed | [2026-11-25-sample-run.md](experiments/2026-11-25-sample-run.md) |
 

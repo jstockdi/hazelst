@@ -259,6 +259,8 @@ Summarized from [agent-runs.md](agent-runs.md):
 | M6 | Production on frank | frank PR (compose, Caddy, tunnel, systemd, SOPS secret), deploy, smoke, nightly backup, rollback rehearsed |
 | M7 | Backfill | Prior-season forecasts and reports loaded; `skill` seeded |
 
+The jobs that deliver each milestone are in [build-plan.md](build-plan.md).
+
 **Production means:** the public hostname serves today's report by 7:15 AM ET
 on 3 consecutive mornings, `forecast-verify` has run each night, the nightly
 backup exists, and a rollback to the previous digest has been rehearsed.
