@@ -17,6 +17,7 @@ Each slot runs its steps in order in one scheduler thread; a step waits up to
 |      | while it is `numbers_only` (no-op otherwise) |
 | 2:00 AM | skill-learn (rebuilds `skill`) |
 | 4:00 AM | backup (after the overnight jobs, before the morning ingest) |
+| Monday 3:00 AM | knowledge-review (after skill-learn, before the backup) |
 """
 
 from __future__ import annotations
@@ -54,6 +55,7 @@ class Slot:
     id: str
     at: dtime
     steps: tuple[Step, ...] = field(default_factory=tuple)
+    day_of_week: str | None = None  # cron day_of_week ("mon"); None = every day
 
 
 SLOTS: tuple[Slot, ...] = (
@@ -74,6 +76,7 @@ SLOTS: tuple[Slot, ...] = (
     Slot("forecast-verify-2100", dtime(21, 0), (Step("forecast-verify"),)),
     Slot("skill-learn-0200", dtime(2, 0), (Step("skill-learn"),)),
     Slot("backup-0400", dtime(4, 0), (Step("backup"),)),
+    Slot("knowledge-review-mon-0300", dtime(3, 0), (Step("knowledge-review"),), day_of_week="mon"),
 )
 # A failed narrative is retried every 15 minutes until 9 AM (agent-runs.md, Failure behavior).
 REBUILD = Slot("report-rebuild", dtime(7, 15), (Step("report-build", rebuild=True),))
@@ -85,7 +88,12 @@ Runner = Callable[..., dict[str, Any]]
 
 
 def trigger(slot: Slot, tz: str = config.TIMEZONE) -> CronTrigger:
-    return CronTrigger(hour=slot.at.hour, minute=slot.at.minute, timezone=ZoneInfo(tz))
+    return CronTrigger(
+        day_of_week=slot.day_of_week,
+        hour=slot.at.hour,
+        minute=slot.at.minute,
+        timezone=ZoneInfo(tz),
+    )
 
 
 def rebuild_trigger(tz: str = config.TIMEZONE) -> OrTrigger:

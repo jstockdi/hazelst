@@ -1,14 +1,18 @@
 """Effective configuration: environment variables plus the mountain roster.
 
-Accepted `config_change` rows overlay these values once the database exists
-(see technical-design.md §7).
+Accepted `config_change` rows overlay the roster's numeric thresholds once the
+database exists (technical-design.md §7). A row names a dotted path, for
+example `mountain.loon.wind_hold_mph.watch`; `THRESHOLD_FIELDS` lists the
+fields a path may name.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import os
-from collections.abc import Mapping
+import sqlite3
+from collections.abc import Iterable, Mapping
 from datetime import date
 from pathlib import Path
 from typing import Any, Literal
@@ -16,6 +20,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+log = logging.getLogger("hazelst.config")
+
 DEFAULT_MOUNTAINS = PROJECT_ROOT / "config" / "mountains.json"
 DEFAULT_USER_AGENT = "hazelst-forecast (github.com/jstockdi/hazelst)"
 TIMEZONE = "America/New_York"
@@ -155,6 +161,7 @@ class Config(BaseModel):
     settings: Settings
     mountains: tuple[Mountain, ...]
     timezone: str = TIMEZONE
+    config_changes: tuple[int, ...] = ()  # accepted config_change ids overlaid on the roster
 
     def mountain(self, key: str) -> Mountain:
         for mountain in self.mountains:
@@ -240,5 +247,102 @@ def load_mountains(path: Path) -> tuple[Mountain, ...]:
 
 
 def load(env: Mapping[str, str] | None = None) -> Config:
+    """The effective config: environment, roster, and accepted `config_change` rows."""
     settings = settings_from_env(env)
-    return Config(settings=settings, mountains=load_mountains(settings.mountains_path))
+    cfg = Config(settings=settings, mountains=load_mountains(settings.mountains_path))
+    return with_changes(cfg, _db_changes(settings.db_path))
+
+
+# --- config_change overlay ------------------------------------------------------
+
+# Roster fields a `config_change` path may name: `mountain.<key>.<field>`.
+THRESHOLD_FIELDS = ("wind_hold_mph.watch", "wind_hold_mph.likely")
+
+
+def thresholds(mountains: Iterable[Mountain]) -> dict[str, float]:
+    """Every path a `config_change` may set, with its current value."""
+    out: dict[str, float] = {}
+    for m in mountains:
+        for name in THRESHOLD_FIELDS:
+            group, field = name.split(".")
+            out[f"mountain.{m.key}.{name}"] = getattr(getattr(m, group), field)
+    return out
+
+
+def apply_change(mountains: tuple[Mountain, ...], path: str, new: object) -> tuple[Mountain, ...]:
+    """The roster with one threshold set; ConfigError when the path or value is invalid."""
+    parts = path.split(".")
+    if len(parts) != 4 or parts[0] != "mountain" or ".".join(parts[2:]) not in THRESHOLD_FIELDS:
+        raise ConfigError(
+            f"{path!r} is not a threshold path (mountain.<key>.{'|'.join(THRESHOLD_FIELDS)})"
+        )
+    key, group, field = parts[1], parts[2], parts[3]
+    if not any(m.key == key for m in mountains):
+        raise ConfigError(f"{path!r}: unknown mountain {key!r}")
+    if isinstance(new, bool) or not isinstance(new, int | float) or float(new) != int(new):
+        raise ConfigError(f"{path!r}: {new!r} is not a whole number")
+    out = []
+    for m in mountains:
+        if m.key == key:
+            data = m.model_dump()
+            data[group][field] = int(new)
+            try:
+                m = Mountain.model_validate(data)
+            except ValueError as exc:
+                raise ConfigError(f"{path!r} = {new!r}: {exc}") from exc
+        out.append(m)
+    return tuple(out)
+
+
+def with_changes(cfg: Config, changes: Iterable[tuple[int, str, object]]) -> Config:
+    """`cfg` overlaid by accepted changes `(id, path, new)`, applied in order.
+
+    Each change sets an absolute value, so applying the same rows again is a
+    no-op. A row that no longer fits the roster (a removed mountain) is
+    skipped and logged rather than stopping every job.
+    """
+    mountains = cfg.mountains
+    applied = []
+    for change_id, path, new in changes:
+        try:
+            mountains = apply_change(mountains, path, new)
+        except ConfigError as exc:
+            log.warning("config_change %s skipped: %s", change_id, exc)
+            continue
+        applied.append(change_id)
+    return cfg.model_copy(update={"mountains": mountains, "config_changes": tuple(applied)})
+
+
+def json_value(raw: object) -> object:
+    """A JSON column's value. Columns typed `JSON` have numeric affinity in SQLite, so a
+    stored number comes back as a number and only text needs decoding."""
+    return json.loads(raw) if isinstance(raw, str | bytes) else raw
+
+
+def accepted_changes(conn: sqlite3.Connection) -> list[tuple[int, str, object]]:
+    """Accepted `config_change` rows, in the order they were accepted."""
+    try:
+        rows = conn.execute(
+            "SELECT id, path, new FROM config_change WHERE status = 'accepted'"
+            " ORDER BY decided_at, id"
+        ).fetchall()
+    except sqlite3.OperationalError:  # not migrated yet
+        return []
+    return [(int(r[0]), str(r[1]), json_value(r[2])) for r in rows]
+
+
+def effective(cfg: Config, conn: sqlite3.Connection) -> Config:
+    """`cfg` with the accepted `config_change` rows in `conn` overlaid."""
+    return with_changes(cfg, accepted_changes(conn))
+
+
+def _db_changes(path: Path) -> list[tuple[int, str, object]]:
+    if not path.is_file():
+        return []
+    conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
+    try:
+        return accepted_changes(conn)
+    except sqlite3.DatabaseError:
+        return []
+    finally:
+        conn.close()

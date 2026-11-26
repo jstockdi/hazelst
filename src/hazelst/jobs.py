@@ -21,9 +21,20 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from hazelst import backfill, config, corrected, db, derive, digest, learn, narrative, verify
+from hazelst import (
+    backfill,
+    config,
+    corrected,
+    db,
+    derive,
+    digest,
+    knowledge,
+    learn,
+    narrative,
+    verify,
+)
 from hazelst import backup as db_backup
-from hazelst.agents import conditions_extract
+from hazelst.agents import conditions_extract, knowledge_propose
 from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable
 from hazelst.agents.schemas import ReportDraft
 from hazelst.models import Narrative, ReportPayload, ReportStatus
@@ -739,6 +750,46 @@ def season_backfill(ctx: JobContext) -> None:
         raise JobError(f"season-backfill {start}..{end}: every step failed")
 
 
+# --- knowledge-review ----------------------------------------------------------------------
+
+
+def knowledge_review(ctx: JobContext) -> None:
+    """Weekly: the week's evidence -> `knowledge-propose` -> proposed `knowledge` and
+    `config_change` rows. Nothing proposed takes effect until the owner accepts it."""
+    data = knowledge_propose.gather(ctx.conn, ctx.cfg, ctx.for_date)
+    ctx.summary.update(
+        {
+            "week": [data.week_start.isoformat(), data.week_end.isoformat()],
+            "skill_cells": len(data.skill_changes),
+            "misses": len(data.misses),
+        }
+    )
+    if not data.skill_changes and not data.misses:
+        ctx.summary["status"] = "skipped (no skill cells or misses to review)"
+        return
+    try:
+        result = knowledge_propose.propose(make_agents(ctx), data, run_id=ctx.run_id)
+    except AgentUnavailable as exc:
+        ctx.summary["status"] = f"skipped ({exc})"
+        return
+    except AgentCallFailed as exc:
+        raise JobError(str(exc)) from exc
+    valid = knowledge.validate(result.output, data, ctx.cfg, ctx.conn)
+    with db.transaction(ctx.conn):
+        ids = knowledge.store(
+            ctx.conn, valid, call_id=result.call_id, run_id=ctx.run_id, now=db.utc_now()
+        )
+    ctx.summary.update(
+        {
+            "status": "proposed",
+            "agent_call": result.call_id,
+            "proposed": ids,
+            "dropped": valid.dropped,
+        }
+    )
+    log_event(run_id=ctx.run_id, step="knowledge-review", proposed=ids, dropped=valid.dropped)
+
+
 JOBS: dict[str, Callable[[JobContext], None]] = {
     "ingest-forecast": ingest_forecast,
     "ingest-obs": ingest_obs,
@@ -748,6 +799,7 @@ JOBS: dict[str, Callable[[JobContext], None]] = {
     "backup": backup,
     "skill-learn": skill_learn,
     "season-backfill": season_backfill,
+    "knowledge-review": knowledge_review,
 }
 
 
@@ -769,6 +821,8 @@ def run_job(
     http = client or base.make_client(cfg.settings.nws_user_agent)
     try:
         db.migrate(conn)
+        # Re-read accepted config_change rows: a long-running scheduler holds its cfg.
+        cfg = config.effective(cfg, conn)
         db.sync_mountains(conn, cfg.mountains)
         with db.job(
             conn, cfg.settings.db_path, kind, for_date, lock_timeout_s=lock_timeout_s
@@ -781,6 +835,7 @@ def run_job(
                 client=http,
                 options=dict(options or {}),
             )
+            log_event(run_id=run_id, step="config", config_changes=list(cfg.config_changes))
             JOBS[kind](ctx)
         return {"run_id": run_id, "kind": kind, "for_date": for_date.isoformat(), **ctx.summary}
     finally:

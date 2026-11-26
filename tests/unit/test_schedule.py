@@ -33,6 +33,8 @@ DAY = date(2026, 11, 26)
 def test_each_slot_fires_at_local_time_across_dst(day: date, utc_offset_h: int) -> None:
     start = datetime.combine(day, dtime(0, 0), ET)
     for slot in scheduler.SLOTS:
+        if slot.day_of_week is not None:
+            continue  # weekly slots: test_weekly_slot_fires_monday_across_dst
         fire = scheduler.trigger(slot).get_next_fire_time(None, start)
         at = slot.at
         if day == date(2027, 3, 14) and at == dtime(2, 0):
@@ -42,6 +44,24 @@ def test_each_slot_fires_at_local_time_across_dst(day: date, utc_offset_h: int) 
         assert fire.astimezone(ET).date() == day
         expected_utc = datetime.combine(day, at) + timedelta(hours=utc_offset_h)
         assert fire.astimezone(UTC).replace(tzinfo=None) == expected_utc
+
+
+@pytest.mark.parametrize(
+    ("after", "monday", "utc_offset_h"),
+    [
+        (date(2026, 10, 27), date(2026, 11, 2), 5),  # EDT Tuesday -> the first EST Monday
+        (date(2026, 10, 26), date(2026, 10, 26), 4),  # an EDT Monday fires the same day
+        (date(2027, 3, 9), date(2027, 3, 15), 4),  # EST Tuesday -> the first EDT Monday
+        (date(2027, 3, 8), date(2027, 3, 8), 5),  # an EST Monday fires the same day
+    ],
+)
+def test_weekly_slot_fires_monday_across_dst(after: date, monday: date, utc_offset_h: int) -> None:
+    (slot,) = [s for s in scheduler.SLOTS if s.id == "knowledge-review-mon-0300"]
+    fire = scheduler.trigger(slot).get_next_fire_time(None, datetime.combine(after, dtime(0), ET))
+    assert fire.astimezone(ET).date() == monday
+    assert fire.astimezone(ET).time() == dtime(3, 0)
+    expected_utc = datetime.combine(monday, dtime(3, 0)) + timedelta(hours=utc_offset_h)
+    assert fire.astimezone(UTC).replace(tzinfo=None) == expected_utc
 
 
 def test_slots_follow_agent_runs_schedule() -> None:
@@ -56,7 +76,9 @@ def test_slots_follow_agent_runs_schedule() -> None:
         ("21:00", ["forecast-verify"]),
         ("02:00", ["skill-learn"]),
         ("04:00", ["backup"]),
+        ("03:00", ["knowledge-review"]),
     ]
+    assert [s.day_of_week for s in scheduler.SLOTS if s.day_of_week] == ["mon"]
     morning = scheduler.SLOTS[3].steps
     assert morning[0].ecmwf_gate_until == dtime(8, 45)
     assert (morning[2].edition, morning[2].not_before) == ("0815", dtime(8, 15))

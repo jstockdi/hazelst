@@ -64,6 +64,7 @@ job lock, and a failed step does not stop the next one.
 | 2:40 PM | `report-refresh` (edition 1440) |
 | 9:00 PM | `forecast-verify` |
 | 2:00 AM | `skill-learn` (on the day DST starts, 2:00 AM does not exist and the slot runs at 3:00 AM EDT) |
+| Monday 3:00 AM | `knowledge-review` (a slot's optional `day_of_week`; DST changes fall on Sundays, so the slot always exists) |
 | 4:00 AM | `backup` |
 
 - **Editions**: each report version records its edition in `payload.edition`.
@@ -90,7 +91,7 @@ job lock, and a failed step does not stop the next one.
 | `report-refresh` | 8:15 AM, 2:40 PM | re-derive from the latest ingest; update numbers, alerts, conditions; re-run `report-check` against the newest checked draft of the day (the `agent_call` output that passed); with no checked draft the edition is `numbers_only` | `report-revise` only if the check now fails |
 | `forecast-verify` | 9:00 PM | read the NOHRSC grid ending 12Z today (published ~7:30 PM), then score yesterday's 1d forecast from each edition (7:00, 8:15, 2:40) against observations → `verification`; re-score the date a week before that (NOHRSC re-read) | — |
 | `skill-learn` | 2:00 AM nightly | rebuild `skill` from `verification` + `forecast_hourly` | — |
-| `knowledge-review` | Monday 3:00 AM | gather the week's evidence → `knowledge-propose` → proposed rows | `knowledge-propose` |
+| `knowledge-review` | Monday 3:00 AM | gather the week's evidence (days D − 8 … D − 2, the days scored since the last review) → `knowledge-propose` → validate → proposed `knowledge` / `config_change` rows; skipped without skill cells or misses, or when agents are off | `knowledge-propose` |
 | `backup` | 4:00 AM nightly | online copy of the database to `backups/hazelst-<date>.db`; keeps 14 | — |
 | `season-backfill` | manual (`hazelst season-backfill --from D --to D`) | Open-Meteo Previous Runs (GFS, GEM, lead days 1–5), IEM LSR and PNS, NOHRSC 24 h grids into the same tables, one job per month; then `skill-learn` ([data-sources.md](data-sources.md#season-backfill-j22)) | — |
 
@@ -110,7 +111,7 @@ without code changes — that is an owner decision, not a default.
 | **`report-write`** | `high` | Digest: windows, days with `precip_type` and tags, discussions (Key Messages + Discussion), alerts, accepted `knowledge`, yesterday's verification | `ReportDraft {headline, best_bet{mountain, day, why}, storm, mountains{key: text}, cautions}` | `report-check` |
 | **`report-revise`** | `medium` | The draft + digest + the `report-check` error list | `ReportDraft` | `report-check` again; on a second failure publish `numbers_only` ("report delayed") and retry the build every 15 min until 9 AM |
 | **`conditions-extract`** | `low` | Text of one resort report page whose adapter failed (never for Loon, Sunday River, Sugarloaf — see data-sources.md) | `ConditionsExtract {new_24h_in, base_in, trails_open, trails_total, lifts_open, confidence}` | Stored with `source=resort_llm` (`reported_at` = fetch time); never overrides an adapter value. Skipped for a non-200 or near-empty page (a bot challenge); at most once per resort per day |
-| **`knowledge-propose`** | `high` | `skill` changes, the week's MISSes with tags and discussions, current `knowledge` | `KnowledgeProposals {knowledge[], config_changes[]}` with evidence keys | Owner approval required; nothing proposed takes effect on its own |
+| **`knowledge-propose`** | `high` | `skill` cells with n ≥ 3 and each cell's values at the previous call, the week's 1d raw-mean MISSes with tags and the discussion the 7:00 report used, current `knowledge`, the threshold paths and values | `KnowledgeProposals {knowledge[], config_changes[]}` with evidence keys | Owner approval required; nothing proposed takes effect on its own. The job drops an item that cites no input key, names an unknown mountain, repeats a current statement, or (config) names a non-threshold path, keeps the value, or breaks the roster |
 
 ### Call conventions (all roles)
 
@@ -232,16 +233,27 @@ of error this catches.
 - **Numbers improve automatically** through `skill` (bias and weights), behind
   the "beats raw mean on the last 20 verified days" gate.
 - **Words and thresholds improve with approval**: `knowledge-propose` proposes,
-  the owner accepts with `hazelst knowledge accept <id>` (CLI via
-  `docker exec`), and the change is versioned in the DB.
+  the owner reviews with `hazelst knowledge list` and accepts or rejects with
+  `hazelst knowledge accept|reject <id>` and `hazelst config accept|reject <id>`
+  (CLI via `docker exec`); each decision records `decided_by = 'owner'` and
+  `decided_at`, and only `proposed` rows can be decided. Accepted statements
+  join the `report-write` / `report-revise` system prompt; accepted config
+  changes overlay `mountains.json` from the next run (`config.effective`).
+- **How a skill cell moved** is measured against the previous
+  `knowledge-propose` call: its `agent_call.input` holds that week's cells, so
+  no separate snapshot table is kept.
 
 ## Reproducibility
 
 Each `agent_call` stores the role, model id, effort, SDK version, the SHA of the
 system prompt, the SHA and full JSON of the input, the output, token counts
 (input, output, cache read, cache write), the SDK's cost estimate, the result
-`subtype`, and latency. `hazelst replay <date>` regenerates a report with the
-current prompt for comparison.
+`subtype`, and latency. `hazelst replay <date> [--version N]` rebuilds the
+digest from that date's stored report payload (newest version by default),
+runs `report-write` → `report-check` → (`report-revise`) with the current
+prompts and accepted knowledge, and prints the stored and regenerated
+headline and best bet plus a diff of the body. It publishes nothing; its
+calls are logged in `agent_call` with no `run_id`.
 
 ## Cost and limits
 
