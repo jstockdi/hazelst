@@ -60,7 +60,20 @@ def test_scheduler_registers_every_slot() -> None:
     cfg = config.load({})
     sched = scheduler.build(cfg)
     ids = {j.id for j in sched.get_jobs()}
-    assert ids == {s.id for s in scheduler.SLOTS} | {"catch-up"}
+    assert ids == {s.id for s in scheduler.SLOTS} | {"catch-up", "report-rebuild"}
+
+
+@pytest.mark.parametrize("day", [date(2026, 11, 1), date(2027, 3, 14)])
+def test_rebuild_fires_every_15_minutes_until_9(day: date) -> None:
+    trig = scheduler.rebuild_trigger()
+    fire = datetime.combine(day, dtime(0, 0), ET)
+    times = []
+    for _ in range(8):
+        fire = trig.get_next_fire_time(None, fire + timedelta(seconds=1))
+        times.append(fire.astimezone(ET).strftime("%H:%M"))
+    assert times == ["07:15", "07:30", "07:45", "08:00", "08:15", "08:30", "08:45", "09:00"]
+    after = trig.get_next_fire_time(None, fire + timedelta(seconds=1))
+    assert after.astimezone(ET).date() == day + timedelta(days=1)
 
 
 # --- run_slot ------------------------------------------------------------------------------

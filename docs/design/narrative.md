@@ -51,9 +51,12 @@ week's weather. The full sample run is in [the sample run](../experiments/2026-1
 
 ## Output structure
 
-Front matter (`title`, `headline`, `best_bet`) then sections in order: Best bet
-→ The storm → Mountain by mountain → Cautions. Charts and tables are added by
-the page templates, not written by Claude.
+Claude returns a `ReportDraft` (agent-runs.md). The page shows, in order: the
+headline (band), Best bet (card), then The storm → Mountain by mountain →
+Cautions. `report.headline` and `report.best_bet` hold the first two;
+`report.narrative_md` holds the three sections as markdown (`## ` headings,
+paragraphs, `**bold**`). Charts and tables are added by the page templates,
+not written by Claude.
 
 ## Quality loop
 

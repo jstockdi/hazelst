@@ -13,6 +13,8 @@ Each slot runs its steps in order in one scheduler thread; a step waits up to
 | 2:30 PM | ingest-forecast, ingest-obs |
 | 2:40 PM | report-refresh (1440) |
 | 9:00 PM | forecast-verify (scores yesterday's editions) |
+| 7:15 to 9:00, every 15 min | report-build rebuild: rewrites today's newest edition |
+|      | while it is `numbers_only` (no-op otherwise) |
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ from zoneinfo import ZoneInfo
 from apscheduler.schedulers.background import (  # type: ignore[import-untyped]
     BackgroundScheduler,
 )
+from apscheduler.triggers.combining import OrTrigger  # type: ignore[import-untyped]
 from apscheduler.triggers.cron import CronTrigger  # type: ignore[import-untyped]
 
 from hazelst import config, db, jobs
@@ -41,6 +44,7 @@ class Step:
     edition: str | None = None
     ecmwf_gate_until: dtime | None = None  # local time; ingest waits for ECMWF 06Z until then
     not_before: dtime | None = None  # local time; the step starts no earlier
+    rebuild: bool = False  # report-build: rewrite the newest edition if it is numbers_only
 
 
 @dataclass(frozen=True)
@@ -67,6 +71,9 @@ SLOTS: tuple[Slot, ...] = (
     Slot("report-refresh-1440", dtime(14, 40), (Step("report-refresh", edition="1440"),)),
     Slot("forecast-verify-2100", dtime(21, 0), (Step("forecast-verify"),)),
 )
+# A failed narrative is retried every 15 minutes until 9 AM (agent-runs.md, Failure behavior).
+REBUILD = Slot("report-rebuild", dtime(7, 15), (Step("report-build", rebuild=True),))
+
 # Edition -> the slot whose last step publishes it (for catch-up).
 EDITION_SLOTS = {"0700": "report-build-0700", "0815": "refresh-0815", "1440": "report-refresh-1440"}
 
@@ -75,6 +82,18 @@ Runner = Callable[..., dict[str, Any]]
 
 def trigger(slot: Slot, tz: str = config.TIMEZONE) -> CronTrigger:
     return CronTrigger(hour=slot.at.hour, minute=slot.at.minute, timezone=ZoneInfo(tz))
+
+
+def rebuild_trigger(tz: str = config.TIMEZONE) -> OrTrigger:
+    """7:15, 7:30, 7:45, 8:00, …, 8:45, 9:00 local."""
+    zone = ZoneInfo(tz)
+    return OrTrigger(
+        [
+            CronTrigger(hour=7, minute="15,30,45", timezone=zone),
+            CronTrigger(hour=8, minute="0,15,30,45", timezone=zone),
+            CronTrigger(hour=9, minute=0, timezone=zone),
+        ]
+    )
 
 
 def _local(day: date, at: dtime, tz: str) -> datetime:
@@ -99,6 +118,8 @@ def run_slot(
         options: dict[str, Any] = {}
         if step.edition:
             options["edition"] = step.edition
+        if step.rebuild:
+            options["rebuild"] = True
         if step.ecmwf_gate_until is not None:
             options["ecmwf_gate_until"] = _local(day, step.ecmwf_gate_until, cfg.timezone)
         try:
@@ -153,6 +174,16 @@ def build(cfg: config.Config, runner: Runner = jobs.run_job) -> BackgroundSchedu
             coalesce=True,
             misfire_grace_time=MISFIRE_GRACE_S,
         )
+    scheduler.add_job(
+        run_slot,
+        rebuild_trigger(cfg.timezone),
+        args=(cfg, REBUILD),
+        kwargs={"runner": runner},
+        id=REBUILD.id,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=10 * 60,
+    )
     scheduler.add_job(catch_up, args=(cfg,), kwargs={"runner": runner}, id="catch-up")
     return scheduler
 
@@ -164,4 +195,7 @@ def next_runs(cfg: config.Config, after: datetime) -> list[tuple[str, datetime]]
         fire = trigger(slot, cfg.timezone).get_next_fire_time(None, after)
         if fire is not None:
             out.append((slot.id, fire))
+    fire = rebuild_trigger(cfg.timezone).get_next_fire_time(None, after)
+    if fire is not None:
+        out.append((REBUILD.id, fire))
     return sorted(out, key=lambda item: item[1])

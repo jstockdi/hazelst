@@ -1,0 +1,1078 @@
+{
+ "date": "2026-11-25",
+ "edition": "0700",
+ "issued": "2026-11-25T10:44:00-05:00",
+ "days": [
+  "2026-11-25",
+  "2026-11-26",
+  "2026-11-27",
+  "2026-11-28",
+  "2026-11-29"
+ ],
+ "mountains": [
+  {
+   "key": "killington",
+   "name": "Killington",
+   "state": "VT",
+   "summit_ft": 4241,
+   "base_ft": 1165,
+   "season_open": null,
+   "favored_by": [
+    "nw_upslope",
+    "clipper"
+   ],
+   "windows": {
+    "1d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "3d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.1,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.1
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.1,
+     "nws_disagrees": false
+    },
+    "5d": {
+     "snow_in": 0.9,
+     "lo_in": 0.0,
+     "hi_in": 2.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.8,
+      "gem_seamless": 2.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": null,
+     "nws_ice_in": null,
+     "nws_disagrees": false
+    }
+   },
+   "days": [
+    {
+     "date": "2026-11-25",
+     "snow_in": 0.0,
+     "precip_in": 0.0,
+     "precip_type": "dry",
+     "hi_f": 28,
+     "lo_f": 12,
+     "gust_mph": 12,
+     "freezing_level_ft": 3051,
+     "tags": []
+    },
+    {
+     "date": "2026-11-26",
+     "snow_in": 0.0,
+     "precip_in": 0.91,
+     "precip_type": "ice",
+     "hi_f": 26,
+     "lo_f": 20,
+     "gust_mph": 44,
+     "freezing_level_ft": 4396,
+     "tags": [
+      "mixing_base",
+      "freezing_rain",
+      "wind_hold_watch"
+     ]
+    },
+    {
+     "date": "2026-11-27",
+     "snow_in": 0.0,
+     "precip_in": 0.29,
+     "precip_type": "ice",
+     "hi_f": 31,
+     "lo_f": 26,
+     "gust_mph": 26,
+     "freezing_level_ft": 9383,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    },
+    {
+     "date": "2026-11-28",
+     "snow_in": 0.9,
+     "precip_in": 0.24,
+     "precip_type": "mix",
+     "hi_f": 28,
+     "lo_f": 24,
+     "gust_mph": 22,
+     "freezing_level_ft": 3281,
+     "tags": [
+      "mixing_base"
+     ]
+    },
+    {
+     "date": "2026-11-29",
+     "snow_in": 0.0,
+     "precip_in": 0.02,
+     "precip_type": "dry",
+     "hi_f": 32,
+     "lo_f": 24,
+     "gust_mph": 26,
+     "freezing_level_ft": 7251,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    }
+   ],
+   "storm_type": null,
+   "alerts": [],
+   "accumulation": null
+  },
+  {
+   "key": "pico",
+   "name": "Pico",
+   "state": "VT",
+   "summit_ft": 3967,
+   "base_ft": 2000,
+   "season_open": null,
+   "favored_by": [
+    "nw_upslope",
+    "clipper"
+   ],
+   "windows": {
+    "1d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "3d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.1,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.1
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.1,
+     "nws_disagrees": false
+    },
+    "5d": {
+     "snow_in": 0.3,
+     "lo_in": 0.0,
+     "hi_in": 0.6,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.2,
+      "gem_seamless": 0.6
+     },
+     "base_snow_in": 0.2,
+     "nws_in": null,
+     "nws_ice_in": null,
+     "nws_disagrees": false
+    }
+   },
+   "days": [
+    {
+     "date": "2026-11-25",
+     "snow_in": 0.0,
+     "precip_in": 0.0,
+     "precip_type": "dry",
+     "hi_f": 29,
+     "lo_f": 15,
+     "gust_mph": 10,
+     "freezing_level_ft": 2493,
+     "tags": []
+    },
+    {
+     "date": "2026-11-26",
+     "snow_in": 0.0,
+     "precip_in": 0.79,
+     "precip_type": "ice",
+     "hi_f": 28,
+     "lo_f": 20,
+     "gust_mph": 45,
+     "freezing_level_ft": 10499,
+     "tags": [
+      "mixing_base",
+      "freezing_rain",
+      "wind_hold_watch"
+     ]
+    },
+    {
+     "date": "2026-11-27",
+     "snow_in": 0.0,
+     "precip_in": 0.29,
+     "precip_type": "ice",
+     "hi_f": 32,
+     "lo_f": 28,
+     "gust_mph": 26,
+     "freezing_level_ft": 9055,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    },
+    {
+     "date": "2026-11-28",
+     "snow_in": 0.2,
+     "precip_in": 0.19,
+     "precip_type": "mix",
+     "hi_f": 29,
+     "lo_f": 26,
+     "gust_mph": 23,
+     "freezing_level_ft": 3150,
+     "tags": [
+      "mixing_base"
+     ]
+    },
+    {
+     "date": "2026-11-29",
+     "snow_in": 0.0,
+     "precip_in": 0.02,
+     "precip_type": "dry",
+     "hi_f": 33,
+     "lo_f": 25,
+     "gust_mph": 25,
+     "freezing_level_ft": 7251,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    }
+   ],
+   "storm_type": null,
+   "alerts": [],
+   "accumulation": null
+  },
+  {
+   "key": "sugarbush",
+   "name": "Sugarbush",
+   "state": "VT",
+   "summit_ft": 3975,
+   "base_ft": 1483,
+   "season_open": null,
+   "favored_by": [
+    "nw_upslope",
+    "clipper"
+   ],
+   "windows": {
+    "1d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "3d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.1,
+     "nws_disagrees": false
+    },
+    "5d": {
+     "snow_in": 0.4,
+     "lo_in": 0.0,
+     "hi_in": 1.1,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.2,
+      "gem_seamless": 1.1
+     },
+     "base_snow_in": 0.4,
+     "nws_in": null,
+     "nws_ice_in": null,
+     "nws_disagrees": false
+    }
+   },
+   "days": [
+    {
+     "date": "2026-11-25",
+     "snow_in": 0.0,
+     "precip_in": 0.0,
+     "precip_type": "dry",
+     "hi_f": 27,
+     "lo_f": 14,
+     "gust_mph": 10,
+     "freezing_level_ft": 2231,
+     "tags": []
+    },
+    {
+     "date": "2026-11-26",
+     "snow_in": 0.0,
+     "precip_in": 0.83,
+     "precip_type": "ice",
+     "hi_f": 28,
+     "lo_f": 17,
+     "gust_mph": 31,
+     "freezing_level_ft": 10072,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    },
+    {
+     "date": "2026-11-27",
+     "snow_in": 0.0,
+     "precip_in": 0.37,
+     "precip_type": "rain",
+     "hi_f": 34,
+     "lo_f": 28,
+     "gust_mph": 19,
+     "freezing_level_ft": 9186,
+     "tags": [
+      "mixing_base",
+      "freezing_rain",
+      "rain_summit"
+     ]
+    },
+    {
+     "date": "2026-11-28",
+     "snow_in": 0.4,
+     "precip_in": 0.21,
+     "precip_type": "mix",
+     "hi_f": 28,
+     "lo_f": 24,
+     "gust_mph": 16,
+     "freezing_level_ft": 3150,
+     "tags": [
+      "mixing_base"
+     ]
+    },
+    {
+     "date": "2026-11-29",
+     "snow_in": 0.0,
+     "precip_in": 0.01,
+     "precip_type": "dry",
+     "hi_f": 34,
+     "lo_f": 24,
+     "gust_mph": 21,
+     "freezing_level_ft": 6562,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    }
+   ],
+   "storm_type": null,
+   "alerts": [],
+   "accumulation": null
+  },
+  {
+   "key": "stratton",
+   "name": "Stratton",
+   "state": "VT",
+   "summit_ft": 3875,
+   "base_ft": 1872,
+   "season_open": null,
+   "favored_by": [
+    "coastal"
+   ],
+   "windows": {
+    "1d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "3d": {
+     "snow_in": 0.1,
+     "lo_in": 0.0,
+     "hi_in": 0.2,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.2,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "5d": {
+     "snow_in": 0.9,
+     "lo_in": 0.0,
+     "hi_in": 1.9,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 1.9,
+      "gem_seamless": 0.9
+     },
+     "base_snow_in": 0.3,
+     "nws_in": null,
+     "nws_ice_in": null,
+     "nws_disagrees": false
+    }
+   },
+   "days": [
+    {
+     "date": "2026-11-25",
+     "snow_in": 0.0,
+     "precip_in": 0.0,
+     "precip_type": "dry",
+     "hi_f": 30,
+     "lo_f": 15,
+     "gust_mph": 14,
+     "freezing_level_ft": 3018,
+     "tags": []
+    },
+    {
+     "date": "2026-11-26",
+     "snow_in": 0.0,
+     "precip_in": 1.13,
+     "precip_type": "ice",
+     "hi_f": 30,
+     "lo_f": 20,
+     "gust_mph": 44,
+     "freezing_level_ft": 10630,
+     "tags": [
+      "mixing_base",
+      "freezing_rain",
+      "wind_hold_watch"
+     ]
+    },
+    {
+     "date": "2026-11-27",
+     "snow_in": 0.1,
+     "precip_in": 0.35,
+     "precip_type": "rain",
+     "hi_f": 34,
+     "lo_f": 28,
+     "gust_mph": 32,
+     "freezing_level_ft": 9646,
+     "tags": [
+      "mixing_base",
+      "freezing_rain",
+      "rain_summit"
+     ]
+    },
+    {
+     "date": "2026-11-28",
+     "snow_in": 0.8,
+     "precip_in": 0.2,
+     "precip_type": "mix",
+     "hi_f": 30,
+     "lo_f": 24,
+     "gust_mph": 31,
+     "freezing_level_ft": 3412,
+     "tags": [
+      "mixing_base"
+     ]
+    },
+    {
+     "date": "2026-11-29",
+     "snow_in": 0.0,
+     "precip_in": 0.04,
+     "precip_type": "dry",
+     "hi_f": 33,
+     "lo_f": 24,
+     "gust_mph": 31,
+     "freezing_level_ft": 8169,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    }
+   ],
+   "storm_type": null,
+   "alerts": [],
+   "accumulation": null
+  },
+  {
+   "key": "loon",
+   "name": "Loon",
+   "state": "NH",
+   "summit_ft": 3065,
+   "base_ft": 950,
+   "season_open": null,
+   "favored_by": [
+    "coastal"
+   ],
+   "windows": {
+    "1d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "3d": {
+     "snow_in": 0.1,
+     "lo_in": 0.0,
+     "hi_in": 0.3,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.1,
+      "ecmwf_ifs025": 0.3,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "5d": {
+     "snow_in": 0.8,
+     "lo_in": 0.1,
+     "hi_in": 1.9,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.1,
+      "ecmwf_ifs025": 0.6,
+      "gem_seamless": 1.9
+     },
+     "base_snow_in": 0.0,
+     "nws_in": null,
+     "nws_ice_in": null,
+     "nws_disagrees": false
+    }
+   },
+   "days": [
+    {
+     "date": "2026-11-25",
+     "snow_in": 0.0,
+     "precip_in": 0.0,
+     "precip_type": "dry",
+     "hi_f": 32,
+     "lo_f": 14,
+     "gust_mph": 9,
+     "freezing_level_ft": 2657,
+     "tags": []
+    },
+    {
+     "date": "2026-11-26",
+     "snow_in": 0.0,
+     "precip_in": 0.64,
+     "precip_type": "ice",
+     "hi_f": 33,
+     "lo_f": 19,
+     "gust_mph": 48,
+     "freezing_level_ft": 11089,
+     "tags": [
+      "mixing_base",
+      "freezing_rain",
+      "wind_hold_watch"
+     ]
+    },
+    {
+     "date": "2026-11-27",
+     "snow_in": 0.1,
+     "precip_in": 0.37,
+     "precip_type": "rain",
+     "hi_f": 35,
+     "lo_f": 32,
+     "gust_mph": 31,
+     "freezing_level_ft": 11827,
+     "tags": [
+      "mixing_base",
+      "rain_summit"
+     ]
+    },
+    {
+     "date": "2026-11-28",
+     "snow_in": 0.7,
+     "precip_in": 0.12,
+     "precip_type": "snow",
+     "hi_f": 33,
+     "lo_f": 30,
+     "gust_mph": 20,
+     "freezing_level_ft": 3281,
+     "tags": [
+      "mixing_base"
+     ]
+    },
+    {
+     "date": "2026-11-29",
+     "snow_in": 0.1,
+     "precip_in": 0.03,
+     "precip_type": "dry",
+     "hi_f": 38,
+     "lo_f": 28,
+     "gust_mph": 24,
+     "freezing_level_ft": 6660,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    }
+   ],
+   "storm_type": "coastal",
+   "alerts": [],
+   "accumulation": null
+  },
+  {
+   "key": "cranmore",
+   "name": "Cranmore",
+   "state": "NH",
+   "summit_ft": 2000,
+   "base_ft": 500,
+   "season_open": null,
+   "favored_by": [
+    "coastal"
+   ],
+   "windows": {
+    "1d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "3d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.1,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "5d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": null,
+     "nws_ice_in": null,
+     "nws_disagrees": false
+    }
+   },
+   "days": [
+    {
+     "date": "2026-11-25",
+     "snow_in": 0.0,
+     "precip_in": 0.0,
+     "precip_type": "dry",
+     "hi_f": 34,
+     "lo_f": 15,
+     "gust_mph": 9,
+     "freezing_level_ft": 1969,
+     "tags": []
+    },
+    {
+     "date": "2026-11-26",
+     "snow_in": 0.0,
+     "precip_in": 0.71,
+     "precip_type": "ice",
+     "hi_f": 34,
+     "lo_f": 20,
+     "gust_mph": 30,
+     "freezing_level_ft": 10564,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    },
+    {
+     "date": "2026-11-27",
+     "snow_in": 0.0,
+     "precip_in": 0.24,
+     "precip_type": "rain",
+     "hi_f": 34,
+     "lo_f": 31,
+     "gust_mph": 22,
+     "freezing_level_ft": 8465,
+     "tags": [
+      "mixing_base",
+      "freezing_rain",
+      "rain_summit"
+     ]
+    },
+    {
+     "date": "2026-11-28",
+     "snow_in": 0.0,
+     "precip_in": 0.02,
+     "precip_type": "dry",
+     "hi_f": 40,
+     "lo_f": 33,
+     "gust_mph": 14,
+     "freezing_level_ft": 5971,
+     "tags": []
+    },
+    {
+     "date": "2026-11-29",
+     "snow_in": 0.0,
+     "precip_in": 0.01,
+     "precip_type": "dry",
+     "hi_f": 43,
+     "lo_f": 29,
+     "gust_mph": 16,
+     "freezing_level_ft": 7152,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    }
+   ],
+   "storm_type": "coastal",
+   "alerts": [],
+   "accumulation": null
+  },
+  {
+   "key": "sunday_river",
+   "name": "Sunday River",
+   "state": "ME",
+   "summit_ft": 3140,
+   "base_ft": 800,
+   "season_open": null,
+   "favored_by": [
+    "coastal"
+   ],
+   "windows": {
+    "1d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "3d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.1,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "5d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": null,
+     "nws_ice_in": null,
+     "nws_disagrees": false
+    }
+   },
+   "days": [
+    {
+     "date": "2026-11-25",
+     "snow_in": 0.0,
+     "precip_in": 0.0,
+     "precip_type": "dry",
+     "hi_f": 32,
+     "lo_f": 14,
+     "gust_mph": 8,
+     "freezing_level_ft": 2493,
+     "tags": []
+    },
+    {
+     "date": "2026-11-26",
+     "snow_in": 0.0,
+     "precip_in": 0.69,
+     "precip_type": "ice",
+     "hi_f": 30,
+     "lo_f": 18,
+     "gust_mph": 21,
+     "freezing_level_ft": 2329,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    },
+    {
+     "date": "2026-11-27",
+     "snow_in": 0.0,
+     "precip_in": 0.27,
+     "precip_type": "ice",
+     "hi_f": 31,
+     "lo_f": 26,
+     "gust_mph": 22,
+     "freezing_level_ft": 12927,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    },
+    {
+     "date": "2026-11-28",
+     "snow_in": 0.0,
+     "precip_in": 0.03,
+     "precip_type": "dry",
+     "hi_f": 32,
+     "lo_f": 28,
+     "gust_mph": 20,
+     "freezing_level_ft": 2986,
+     "tags": []
+    },
+    {
+     "date": "2026-11-29",
+     "snow_in": 0.0,
+     "precip_in": 0.01,
+     "precip_type": "dry",
+     "hi_f": 37,
+     "lo_f": 25,
+     "gust_mph": 19,
+     "freezing_level_ft": 6923,
+     "tags": []
+    }
+   ],
+   "storm_type": "coastal",
+   "alerts": [],
+   "accumulation": null
+  },
+  {
+   "key": "sugarloaf",
+   "name": "Sugarloaf",
+   "state": "ME",
+   "summit_ft": 4237,
+   "base_ft": 1417,
+   "season_open": null,
+   "favored_by": [
+    "coastal",
+    "clipper"
+   ],
+   "windows": {
+    "1d": {
+     "snow_in": 0.0,
+     "lo_in": 0.0,
+     "hi_in": 0.0,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.0,
+      "ecmwf_ifs025": 0.0,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.0,
+     "nws_ice_in": 0.0,
+     "nws_disagrees": false
+    },
+    "3d": {
+     "snow_in": 0.1,
+     "lo_in": 0.0,
+     "hi_in": 0.2,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.2,
+      "ecmwf_ifs025": 0.1,
+      "gem_seamless": 0.0
+     },
+     "base_snow_in": 0.0,
+     "nws_in": 0.1,
+     "nws_ice_in": 0.1,
+     "nws_disagrees": false
+    },
+    "5d": {
+     "snow_in": 0.6,
+     "lo_in": 0.2,
+     "hi_in": 0.8,
+     "confidence": "high",
+     "by_model": {
+      "gfs_seamless": 0.7,
+      "ecmwf_ifs025": 0.2,
+      "gem_seamless": 0.8
+     },
+     "base_snow_in": 0.1,
+     "nws_in": null,
+     "nws_ice_in": null,
+     "nws_disagrees": false
+    }
+   },
+   "days": [
+    {
+     "date": "2026-11-25",
+     "snow_in": 0.0,
+     "precip_in": 0.0,
+     "precip_type": "dry",
+     "hi_f": 26,
+     "lo_f": 10,
+     "gust_mph": 12,
+     "freezing_level_ft": 2526,
+     "tags": []
+    },
+    {
+     "date": "2026-11-26",
+     "snow_in": 0.1,
+     "precip_in": 0.53,
+     "precip_type": "ice",
+     "hi_f": 28,
+     "lo_f": 17,
+     "gust_mph": 23,
+     "freezing_level_ft": 2854,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    },
+    {
+     "date": "2026-11-27",
+     "snow_in": 0.0,
+     "precip_in": 0.44,
+     "precip_type": "ice",
+     "hi_f": 28,
+     "lo_f": 24,
+     "gust_mph": 24,
+     "freezing_level_ft": 9383,
+     "tags": [
+      "mixing_base",
+      "freezing_rain"
+     ]
+    },
+    {
+     "date": "2026-11-28",
+     "snow_in": 0.4,
+     "precip_in": 0.07,
+     "precip_type": "snow",
+     "hi_f": 28,
+     "lo_f": 24,
+     "gust_mph": 21,
+     "freezing_level_ft": 3051,
+     "tags": []
+    },
+    {
+     "date": "2026-11-29",
+     "snow_in": 0.1,
+     "precip_in": 0.01,
+     "precip_type": "dry",
+     "hi_f": 30,
+     "lo_f": 22,
+     "gust_mph": 21,
+     "freezing_level_ft": 6857,
+     "tags": []
+    }
+   ],
+   "storm_type": "coastal",
+   "alerts": [],
+   "accumulation": null
+  }
+ ],
+ "discussions": [
+  {
+   "office": "BTV",
+   "kind": "AFD",
+   "issued_at": "2026-11-25T11:07:00+00:00",
+   "text": ".WHAT HAS CHANGED... As of 139 AM EST Wednesday... Ice amounts Thursday night have been increased slightly, mainly over higher elevations and the northern Saint Lawrence Valley. Total rainfall amounts for the late week system continue to trend slightly higher, though no hydro impacts are expected. The wind forecast remains on track. && .KEY MESSAGES... As of 139 AM EST Wednesday... 1. A brief period of freezing rain is possible Thursday night, mainly across northern areas and higher elevations, with minor icing forecast. 2. Breezy winds and waves of rain will move through Thursday night into Friday. Localized stronger winds are expected over higher elevations of the southern Greens and Essex County NY. 3. Seasonably mild weather expected next week with the best chance of showers later Sunday night into Monday && .DISCUSSION... As of 139 AM EST Wednesday... KEY MESSAGE 1: Surface high pressure will remain in control today, keeping quiet weather in place. Temperatures will top out in the upper 30s to lower 40s, which is right around seasonal normals for this time of year. Temperatures will continue to moderate slightly on Thursday as high pressure shifts east of the area and return southerly flow develops. In the wake of the departing high pressure, a low pressure system will travel northward through the eastern United States, sending a wave of precipitation northward into our forecast area. Precipitation onset across our CWA is generally expected between 9 PM Thursday and midnight Thursday night. Temperatures ahead of the system on Thursday will have risen to above freezing for all but the highest elevations in our CWA. With dry air in place ahead of the system, wet-bulb cooling at the onset and localized northeasterly flow will bring temperatures to near or just below freezing across localized portions of the area. It will take some time to saturate through the low levels, so despite soundings that may be favorable for freezing rain at the onset, ice accumulations will be limited. The best window for freezing rain and accumulated ice will occur between 8 PM and 4 AM Thursday night/Friday morning. Total ice amounts are forecast to range from a glaze up to a tench of an inch across the northern Saint Lawrence Valley, eastern Adirondacks, and higher elevations of the Greens and northeastern Vermont. Outside of these areas, rain will be the predominant precipitation type throughout the event. Impacts from the initial ice will be limited however, as warming temperatures Friday morning will allow for a transition to a cold rain by daybreak for most areas. In addition, surfaces will start off above freezing Thursday, which will also limit accumulations. However, use caution if you have travel plans late Thursday and Thursday night, especially over elevated surfaces and bridges. KEY MESSAGE 2: Aside from a brief period of localized freezing rain, some localized strong winds are also expected. The core of an easterly 70 to 80 knot low level jet will move northward through our forecast area. The jet will move through at the same time as a wave of rain. The stabilizing effect of the rain on the low levels will prevent the strongest winds from mixing down to the valleys, though some breezy conditions are anticipated. However, higher elevations (2000 ft+) of the southern Greens and Essex County NY will see a period of strong winds with gusts reaching 35 to 55 mph Thursday night. Summits could gust in excess of 60 mph. These winds could be preceded by some light ice accumulations in the higher elevations, though this would mainly be limited to elevations above 2500 ft. By sunrise Friday morning, winds will start to diminish and precipitation type will be fully a cold rain across the forecast area. Waves of rain will continue Friday into Friday night, with some rain/snow mixing in by Friday night over higher elevations. Through the day Saturday, showers will diminish as the low pressure system pulls away from the area. All said and done, storm total precipitation amounts will generally range between 0.6 and 1.2 inch. Higher terrain of the eastern Greens and eastern Adirondacks will see orographic enhancement, while western slopes will see some degree of downsloping. With the area in a D0/D1 drought, this will fall as a beneficial rainfall and no hydro impacts are anticipated. KEY MESSAGE 3: A seasonably mild and rather uneventful stretch of weather is expected for the early to middle portions of next week as the majority of the CONUS remains awash with more or less zonal flow and air of Pacific origin. As prior forecaster noted, the chances of precipitation during this period remains highest for our area later Sunday night into Monday with the approach/passage of a weak frontal zone and associated shortwave. However, minimal impacts are expected with this system as boundary layer temperatures will be mild enough that p-type will fall mostly as light rain/rain showers in all but the highest elevations. Outside of this window, weak high pressure with partly cloudy skies and mainly light winds should be the rule. Temperatures should, on average range from 3-6 degrees above seasonal late November norms with daily highs in the 40s to locally near 50 and overnight lows in the 20s to mid 30s. && .AVIATION /12Z WEDNESDAY THROUGH SUNDAY/... Through 12Z Thursday...VFR with light/vrb winds generally 5 knots or less expected area wide through the forecast period as strong high pressure builds overhead. Skies mainly SKC with just some passing, thin high cirrus AOA 200 AGL. Outlook... Thanksgiving Day: VFR. NO SIG WX. Thursday Night: MVFR/IFR conditions possible. Definite RA, Definite FZRA. Friday: Mainly IFR, with areas MVFR possible. Definite RA. Friday Night: Mainly IFR, with local MVFR possible. Definite SHRA, Chance SHSN. Saturday: Mainly MVFR, with areas IFR possible. Chance SHRA. Saturday Night: Mainly MVFR,",
+   "storm_words": [
+    "freezing_rain",
+    "low_level_jet"
+   ]
+  },
+  {
+   "office": "ALY",
+   "kind": "AFD",
+   "issued_at": "2026-11-25T11:22:00+00:00",
+   "text": ".WHAT HAS CHANGED... Increased winds/gusts Thanksgiving into Thursday night, especially across western New England. Gusts of at least 40-45 mph are expected, although there is medium confidence in gusts exceeding 45 mph. Will continue to monitor trends for possible Wind Advisory. Lowered radial ice amounts from NBM to a few hundredths < 0.10\" for sheltered areas > 1500 ft in the S. Adirondacks and S. Greens. && .KEY MESSAGES... 1) Dry weather and seasonably cool temperatures will persist through tonight. 2) High confidence in a storm affecting eastern NY and western New England Thanksgiving Day into Thursday night with an initial period of a wintry mix mainly in the southern Adirondacks and southern Greens and moderate to heavy rain elsewhere. This may lead to slower travel for those traveling on Thanksgiving. 3) Medium to high confidence in wind gusts exceeding 40 mph in western New England and parts of the Taconics in NY Thursday afternoon into Thursday evening, which may blow around unsecured outdoor objects and result in downed tree branches and isolated power outages. If confidence in wind gusts greater than 45 mph increases, a Wind Advisory would be needed. && .DISCUSSION... KEY MESSAGE 1... A 1040 mb area of high pressure positioned across our region this morning, will gradually shift north/east into northern New England tonight. This high will continue to provide dry conditions along with seasonably cool temperatures for pre- holiday travel today. Temperatures will start out in the 10s to mid 20s, rising to highs ranging from the mid 30s in the mountains to lower/mid 40s in lower elevations. Winds will be lighter today, less than 5 mph. KEY MESSAGE 2... Dry conditions should persist through much of Thu A.M. before precipitation develops from south to north from late Thu A.M. into Thu P.M. associated with an upper-990s mb cyclone approaching from the N. Carolina/Virginia area. Diffluent flow aloft and isentropic lift will result in a solid shield of mainly rain, occurring over a 6-10 hour time frame. An intensifying low-level E-SE jet will bring a significant increase in deep layer moisture, with integrated water vapor anomalies of +1 to +2 STDEV resulting in PWAT anomalies surging to +2 to +3 STDEV Thu into Thu evening. Rain will fall moderate to heavy at times, especially during the evening. So while steady/widespread rain won't last long, total QPF of around 0.75\" to 1.75\" is expected with the greatest amounts in the E. Catskills into the Mid Hudson Valley and NW CT. Latest NBM probabilities for > 1.00\" of rain in < 24 hours are 60-95% across the region, although chances lower to 30-60% and limited to areas mentioned above. Given dry antecedent conditions and lack of rain for the past two weeks, flooding is not anticipated although ponding of water may occur especially in urban and poor drainage locations. Steady rain looks to taper off to showers after midnight Thu night, as a dry slot moves in rather quickly from the south. In terms of any wintry precip, this looks to be limited to mainly sheltered higher elevations (> 1500 ft) in parts of the S. Adirondacks and S. Greens, where surface temperatures look to be at or just below 32F at the onset of precip. Latest forecast soundings from RRFS indicate a fairly pronounced warm nose aloft developing, so most precip type would likely be freezing rain in these limited areas (slight chance of sleet at onset). Isolated spots in the E. Catskills could also see a brief period of freezing rain, but should quickly turn over the plain rain. Where the freezing rain occurs in the S. Adirondacks and S. Greens starting late Thu P.M., it could linger for at least a few hours into the evening. Radial ice accumulation in these limited areas look to be mainly a few hundredths to < 0.10\". KEY MESSAGE 3... As the storm system tracks north into the mid Atlantic region on Thu, E-SE winds will increase substantially through the day. NAEFs indicating easterly (u-component) 850 mb wind anomalies of -4 to -5 STDEV developing, with deterministic guidance showing 50-70 kt. The greatest winds will likely not fully mix down due to a strengthening low level inversion developing, however there may be winds of 40-50 kt displaced just beneath the inversion. Strongest winds look to occur just prior to or during onset of rain while the low levels are still relatively dry. This would be mainly late Thu afternoon into Thu evening. This type of flow regime favors strongest winds in the higher terrain of western New England into the Taconics in E. NY. NBM probabilities of > 40 mph max gusts are 60-90% in these areas, with a 30-70% of > 45 mph. If confidence continues to increase in gusts exceeding 45 mph, a Wind Advisory would be issued. Winds shift to the south and start to weaken late Thu night. && .AVIATION /12Z WEDNESDAY THROUGH SUNDAY/... Through 12Z Thursday...High pressure over the region will result in VFR conditions today into tonight. As the high retreats into northern New England and a storm system starts to approach from the south, high and mid level clouds will increase tonight. Cigs should mainly remain at VFR levels except lowering to MVFR at KPOU just prior to 12z Thursday. Winds will be variable at less than 5 kt tonight, becoming east-northeast around 3-8 kt overnight. Outlook... Thursday Night: High Operational Impact. Breezy. Definite RA. Friday: High Operational Impact. Definite SHRA. Friday Night: Moderate Operational Impact. Chance of SHRA. Saturday: No Operational Impact. NO SIG WX. Saturday Night: No Operational Impact. NO SIG WX. Sunday: No Operational Impact. NO SIG WX. Sunday Night: Moderate Operational Impact. Chance of RA. Monday: Moderate Operational Impact. Slight Chance of RA. &&",
+   "storm_words": [
+    "freezing_rain"
+   ]
+  },
+  {
+   "office": "GYX",
+   "kind": "AFD",
+   "issued_at": "2026-11-25T11:03:00+00:00",
+   "text": ".WHAT HAS CHANGED... Minor update to the Aviation section for the 12Z TAFs. && .KEY MESSAGES... 1. A large storm system will push north through New England Thursday afternoon into Friday. Gusty winds move along the coast while rain lifts through the area. Cool air locked in the mountains and foothills could produce freezing rain through the overnight. 2. High astronomical tides this week will bring high water to the coast. Combined with onshore winds, surge, and wave action associated with a large storm system, coastal flooding is becoming more likely for Thursday night's and Friday's high tide. && .DISCUSSION... KEY MESSAGE 1 DESCRIPTION... Quiet and dry weather expected through Thanksgiving morning. It will be much cooler, with highs mainly in the lower 30s to lower 40s during the afternoon. We could see widespread lows in the teens each morning which would be the coldest of the season thus far. Will then see deteriorating conditions Thanksgiving afternoon with the brunt of the impacts overnight into Black Friday morning. A coastal low will be developing east of FL on Wednesday night within a southern stream shortwave trough before moving northward towards the Carolinas on Thursday. As it moves up the coast, it will interact with an upper-level low over the Ohio Valley. These features are not expected to phase but rather remain as two separate entities, with the surface low tracking into the Gulf of Maine by early Friday, bringing the majority of the heavy rain and impacts to the region. Rain will overspread from south to north Thanksgiving evening, quickly becoming heavy. Expecting a quick 0.5-1.5\", likely falling within a six hour period or less. The upper-level low will lag behind, bringing lingering precipitation into Friday, which will be showery and much lighter in accumulation. The lower elevations/coastal plain should be all rain for the initial thump Thursday night, however continuing to see a decent cold air damming signal for the interior as some near-surface cold air gets jammed up against the mountains. With 850 mb temperatures hovering around +3 to +6 C at the onset of precipitation, not expecting sleet/snow at this point. Will have to watch closely for a period of freezing rain in the interior if temperatures can remain below freezing; right now it looks quite marginal. Chances for light snow showers will return by Friday afternoon as the airmass aloft cools behind the cold front, initially for the mountains, but some flakes for the lower elevations may be possible by Friday night-Saturday morning. As for wind, model soundings indicate mixing up to about 925 mb with a steep inversion above that for the coastal plain. Winds at 925 mb are around 45 kts, so reasonably think we could mix about 70% of that, resulting in gusts up around 35 mph along the coast. A pretty thick inversion will cap winds by the shore, while further inland, an even more shallow near-surface mixing profile should result in even weaker winds outside of the mountain peaks. KEY MESSAGE 2 DESCRIPTION... A trend for earlier arrival of the storm occlusion means two high tide cycles could reach minor flood stage for coastal flooding. The first around midnight Thursday night will feature the lower tide of the two, but may coincide with greater surge and wave action. Should timing align, these factors would make up for the lower background water levels, nearing Minor flood stage from Hampton up towards Portland. With a larger ensemble uncertainty than the following tide, will watch for more agreement in timing to further increase confidence for minor flooding and splash- over. The following high tide around noontime Friday will feature the higher astronomical tide. However the strong onshore wind will have lifted northeast with slowly decreasing wave action. Even still, surge guidance keeps around a foot of surge along the NH/ME coasts, enough to lead to more widespread Minor coastal flooding threat including towards the Midcoast. Would expect strong breaking waves to bring beach erosion through these tides. Wave heights in the near coastal waters will quickly rise to 7-9ft Thursday evening, to 10-14ft around midnight. Wave heights slowly decrease through Friday morning, but still remain in the 7-10ft range. && .AVIATION /12Z WEDNESDAY THROUGH SUNDAY/... Through 12z Thursday...VFR with light winds expected today into tonight under high pressure. Outlook... Thursday: E-NE winds will gradually increase to 10-15 kts with thickening and lowering clouds. A period of LLWS is possible late Thursday but forecast confidence for this is low. Thursday Night-Friday: IFR-LIFR restrictions likely due to RA and low ceilings. E-NE winds of 10-20 kts inland with 20-30 kts along coastal TAF sites. Forecast confidence is moderate. Friday Night-Sunday: Lingering restrictions are possible due to SHRA and low ceilings, although conditions should gradually improve. Forecast confidence is low. &&",
+   "storm_words": [
+    "coastal",
+    "freezing_rain"
+   ]
+  }
+ ],
+ "stale_models": [],
+ "verification": []
+}

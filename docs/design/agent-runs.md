@@ -84,7 +84,7 @@ job lock, and a failed step does not stop the next one.
 | `ingest-forecast` | 6:45 AM, 8:10 AM, 2:30 PM | Open-Meteo (summit, base), NWS grids, alerts, discussions → `fetch` → normalize | — |
 | `ingest-obs` | 6:50 AM, 8:10 AM, 2:30 PM | Resort adapters, PNS, LSR, NOHRSC → `fetch` → `observation`, `snow_report` | `conditions-extract`, only when an adapter fails |
 | `report-build` | 7:00 AM | derive → digest → `report-write` → `report-check` → (`report-revise` → `report-check`) → `report` | `report-write`, `report-revise` |
-| `report-refresh` | 8:15 AM, 2:40 PM | re-derive from the latest ingest; update numbers, alerts, conditions; re-run `report-check` against the morning narrative | `report-revise` only if the check now fails |
+| `report-refresh` | 8:15 AM, 2:40 PM | re-derive from the latest ingest; update numbers, alerts, conditions; re-run `report-check` against the newest checked draft of the day (the `agent_call` output that passed); with no checked draft the edition is `numbers_only` | `report-revise` only if the check now fails |
 | `forecast-verify` | 9:00 PM | read the NOHRSC grid ending 12Z today (published ~7:30 PM), then score yesterday's 1d forecast from each edition (7:00, 8:15, 2:40) against observations → `verification`; re-score the date a week before that (NOHRSC re-read) | — |
 | `skill-learn` | 2:00 AM nightly | rebuild `skill` from `verification` + `forecast_hourly` | — |
 | `knowledge-review` | Monday 3:00 AM | gather the week's evidence → `knowledge-propose` → proposed rows | `knowledge-propose` |
@@ -183,6 +183,29 @@ Verified by the J01 spike ([spikes/agent_sdk/](../../spikes/agent_sdk/README.md)
 - A storm type is named only if `storm_type` or a discussion names it.
 - Cautions mention every active alert and every `wind_hold_likely` day.
 
+How `report_check.py` reads the prose (so a draft can be written to pass):
+
+- Text is split into sentences and clauses (`;`, `—`, "while", "but",
+  "then"). A clause is about the mountains it names; one that names none is
+  about the mountains named earlier in its sentence, else the entry's own
+  mountain (`mountains[key]`, `best_bet.why`). It is about the days it names
+  (weekday names, today / tonight / tomorrow, weekend); one that names no day
+  keeps the previous clause's days. Clauses about no mountain (regional) are
+  not precip-checked; their snow numbers must match some mountain.
+- Precip words: ice = freezing rain, freezing drizzle, ice, icy, glaze; snow =
+  snow, snow showers, dusting, flurries, powder; mix = mix, wintry mix, sleet;
+  rain = rain, drizzle, showers; dry = dry, drying. A `mix` day also accepts
+  snow and rain words. Negated words ("no snow"), partial-day "dry until …",
+  and clauses about the base or valleys are skipped.
+- Snow numbers are amounts written with `″`, `"`, or "inches"; amounts
+  followed by "of ice" or "of liquid" are not snow. A number passes when it is
+  within 0.5″ of a day, multi-day sum, window mean, range end, model value,
+  NWS value, or accumulation value for the clause's mountains, or inside a
+  window's range.
+- Storm words: clipper; coastal low / storm, nor'easter; inland runner,
+  cutter; and "upslope" (needs a `nw_upslope` tag or a discussion).
+- A `null` `season_open` counts as open (date not known).
+
 The 2026-11-25 sample run would have failed the precip-type rule three times
 ([sample run](../experiments/2026-11-25-sample-run.md), finding 8) — the class
 of error this catches.
@@ -240,5 +263,5 @@ small structured-output call measured $0.005–0.034 per call at that price.
 |---------|----------|
 | One source down | That section shows "source unavailable" in the footer; the run continues |
 | Open-Meteo down | Retry 3× over 20 min; then publish yesterday's forecast marked stale |
-| `report-write` / `report-revise` fail or `report-check` fails twice | `numbers_only` page; rebuild every 15 min until 9 AM |
+| `report-write` / `report-revise` fail or `report-check` fails twice | `numbers_only` page; the `report-rebuild` slot (7:15, 7:30, … 9:00) runs `report-build` for today's newest edition while its newest version is `numbers_only`; it skips when agents are disabled or the daily call cap is reached |
 | Container down at 7:00 | `report-build` runs on startup if today has no report |
