@@ -167,7 +167,8 @@ CREATE TABLE knowledge (
 CREATE TABLE config_change (                -- threshold / weight changes, same approval flow
   id INTEGER PRIMARY KEY, path TEXT,        -- "mountain.loon.wind_hold_mph"
   old JSON, new JSON, reason TEXT, evidence JSON,
-  status TEXT, created_at TEXT, decided_at TEXT
+  status TEXT, created_at TEXT, decided_at TEXT,   -- proposed | accepted | rejected
+  decided_by TEXT                           -- migration 0002
 );
 
 -- Indexes -------------------------------------------------------------------
@@ -215,8 +216,14 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
    mountain where it beats `raw_mean` on the mountain's last 20 verified
    days: lower mean absolute error over the 1d rows of those days, every
    edition where both were scored. Both stay in the DB either way.
-5. **Knowledge** — `knowledge-propose` turns patterns in `skill` and the misses
-   into plain-language statements; accepted ones go into the `report-write` prompt.
+5. **Knowledge** — `knowledge-review` (Monday 3:00 AM) sends `knowledge-propose`
+   the `skill` cells with n ≥ 3 (and each cell's values at the previous call,
+   read from that call's `agent_call.input`), the week's MISSes with tags and
+   discussions, current `knowledge`, and the thresholds. Valid proposals are
+   stored with `status = 'proposed'` and `evidence = {keys, agent_call,
+   run_id}`; `config_change.old` is the effective value when proposed. The
+   owner accepts or rejects them from the CLI; accepted statements go into the
+   `report-write` prompt and accepted config changes overlay `mountains.json`.
 
 ## Bootstrapping before the first storm
 

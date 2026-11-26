@@ -91,6 +91,7 @@ hazelst/
     verify.py            # forecast-verify
     learn.py             # skill-learn (SQL + bias/weights)
     backfill.py          # season-backfill (Previous Runs, IEM LSR / PNS, NOHRSC → same tables)
+    knowledge.py         # validate and store knowledge-propose output; owner decisions
     corrected.py         # corrected forecast method
     digest.py            # DB -> report-write input
     agents/
@@ -102,7 +103,7 @@ hazelst/
     web.py               # Starlette app
     jobs.py              # job functions (ingest-forecast, report-build, ...)
     scheduler.py         # cron wiring + startup catch-up
-    cli.py               # hazelst serve|run|rebuild|replay|knowledge|backup|record|season-backfill
+    cli.py               # hazelst serve|run|schedule|replay|knowledge|config|agents|record|season-backfill
   config/mountains.json
   .claude/skills/hazel-st/SKILL.md     # regional knowledge; part of the report-write system prompt
   .claude/commands/                    # /forecast, /powder, /mountain (call the CLI locally)
@@ -124,6 +125,7 @@ network except Claude, web never writes.**
 | `derive` | `forecast_hourly`, `nws_grid` for a run | `forecast_window`, `forecast_day` | Pure functions over DB rows; property-tested |
 | `digest` | DB for a date | `ReportDigest` (Pydantic) | The only input `report-write` sees |
 | `agents/*` | typed input | typed output + `agent_call` row | No DB writes beyond `agent_call` |
+| `knowledge` | `KnowledgeProposals`, the input it answered | proposed `knowledge` / `config_change` rows; owner decisions | Called by `knowledge-review` and the CLI |
 | `report_check` | `ReportDraft`, `ReportDigest` | list of errors | Pure; the publish gate |
 | `render` | `ReportPayload` + narrative | HTML | Pure; golden-tested |
 | `web` | DB (read-only connection) | HTTP | Cached until the next job commits |
@@ -154,11 +156,14 @@ Mon 03:00 knowledge-review ─▶ knowledge / config_change (proposed)
 |--------|-------|-----------|
 | Environment | `CLAUDE_CODE_OAUTH_TOKEN` (secret), `HOME` (`/tmp/home`, writable for the Claude CLI), `NWS_USER_AGENT`, `TZ`, `HAZELST_DB`, `HAZELST_AGENT_DAILY_CALLS` (default 10), `HAZELST_ENABLE_AGENTS`, `HAZELST_SCHEDULER` (run the job schedule inside `hazelst serve`; default false, `true` on frank), `HAZELST_AGENT_MODEL_<ROLE>` / `HAZELST_AGENT_EFFORT_<ROLE>` (optional per-role overrides) | frank compose / SOPS |
 | `config/mountains.json` (in image) | Roster, coordinates, elevations, thresholds, adapters, `season_open` | PR + release |
-| `config_change` (accepted rows) | Threshold and weight overrides learned in season | `hazelst config accept <id>` |
+| `config_change` (accepted rows) | Threshold overrides learned in season (`mountain.<key>.wind_hold_mph.watch` / `.likely`) | `hazelst config accept <id>` |
 | `agents/prompts/*` + `SKILL.md` (in image) | Role prompts, regional knowledge | PR + release |
 
-Effective config = file values overlaid by accepted `config_change` rows,
-logged at the start of each run.
+Effective config = file values overlaid by accepted `config_change` rows (in
+the order accepted), applied by `config.load()` and again by every job run, so
+a long-running scheduler picks up a change at its next run. Each run logs the
+applied ids (`"step": "config"`); `hazelst config` prints them as
+`config_changes`. A row that no longer fits the roster is skipped and logged.
 
 ## 8. HTTP surface
 

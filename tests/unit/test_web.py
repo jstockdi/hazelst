@@ -24,7 +24,8 @@ def client(path: Path) -> TestClient:
 def test_health_ok_on_fresh_db(db_path: Path) -> None:
     resp = client(db_path).get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok", "user_version": 1, "last_report_build": None}
+    latest = len(db.load_migrations())
+    assert resp.json() == {"status": "ok", "user_version": latest, "last_report_build": None}
 
 
 def test_health_fails_after_failed_report_build(db_path: Path) -> None:

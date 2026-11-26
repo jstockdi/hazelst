@@ -7,6 +7,7 @@ added by the job that implements them.
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import sqlite3
 import sys
@@ -14,8 +15,8 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-from hazelst import __version__, config, db, jobs
-from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable
+from hazelst import __version__, config, db, jobs, knowledge
+from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable, sha256
 from hazelst.agents.prompts import role_prompt
 from hazelst.agents.schemas import ConditionsExtract
 from hazelst.sources import base, open_meteo
@@ -28,12 +29,117 @@ def _cmd_config(args: argparse.Namespace) -> int:
     out = {
         "settings": cfg.settings.public_dict(),
         "timezone": cfg.timezone,
+        "config_changes": list(cfg.config_changes),
         "mountains": [m.key for m in cfg.mountains]
         if not args.full
         else [m.model_dump(mode="json") for m in cfg.mountains],
     }
     print(json.dumps(out, indent=2))
     return 0
+
+
+def _decide(table: knowledge.Table, decision: knowledge.Decision, row_id: int) -> int:
+    cfg = config.load()
+    conn = _open_db(cfg)
+    try:
+        with db.transaction(conn):
+            row = knowledge.decide(conn, cfg, table, row_id, decision, now=db.utc_now())
+    except knowledge.DecisionError as exc:
+        print(f"hazelst: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        conn.close()
+    print(json.dumps(row, indent=2))
+    return 0
+
+
+def _cmd_config_decide(args: argparse.Namespace) -> int:
+    return _decide("config_change", args.decision, args.id)
+
+
+def _cmd_knowledge_decide(args: argparse.Namespace) -> int:
+    return _decide("knowledge", args.decision, args.id)
+
+
+def _cmd_knowledge_list(args: argparse.Namespace) -> int:
+    cfg = config.load()
+    conn = _open_db(cfg)
+    try:
+        status = None if args.status == "all" else args.status
+        out = {
+            "knowledge": knowledge.rows(conn, "knowledge", status),
+            "config_change": knowledge.rows(conn, "config_change", status),
+        }
+    finally:
+        conn.close()
+    print(json.dumps(out, indent=2))
+    return 0
+
+
+def _cmd_replay(args: argparse.Namespace) -> int:
+    """Regenerate a stored report's narrative with the current prompts and accepted knowledge.
+
+    Prints the stored and regenerated narratives and a diff of the body. Publishes
+    nothing; the Claude calls are logged in `agent_call` as usual.
+    """
+    from hazelst import digest
+    from hazelst.agents.prompts import system_prompt
+    from hazelst.models import ReportPayload
+    from hazelst.narrative import accepted_knowledge, build_narrative
+
+    cfg = config.load()
+    conn = _open_db(cfg)
+    try:
+        sql = (
+            "SELECT version, status, headline, best_bet, narrative_md, payload FROM report"
+            " WHERE for_date = ?"
+        )
+        params: tuple[object, ...] = (args.date.isoformat(),)
+        if args.version is not None:
+            sql, params = sql + " AND version = ?", (*params, args.version)
+        row = conn.execute(sql + " ORDER BY version DESC LIMIT 1", params).fetchone()
+        if row is None:
+            print(f"hazelst: no stored report for {args.date}", file=sys.stderr)
+            return 1
+        payload = ReportPayload.model_validate_json(row["payload"])
+        report_digest = digest.build(conn, payload)
+        statements = accepted_knowledge(conn)
+        result = build_narrative(AgentClient(conn, cfg.settings), report_digest, statements)
+    finally:
+        conn.close()
+    stored_md = row["narrative_md"] or ""
+    replay_md = result.page.body_md if result.page else ""
+    out = {
+        "date": args.date.isoformat(),
+        "accepted_knowledge": len(statements),
+        "prompt_sha": sha256(system_prompt("report-write", statements)),
+        "stored": {
+            "version": row["version"],
+            "status": row["status"],
+            "headline": row["headline"],
+            "best_bet": json.loads(row["best_bet"]) if row["best_bet"] else None,
+        },
+        "replay": {
+            "status": result.status,
+            "reason": result.reason,
+            "check_errors": result.errors,
+            "agent_calls": result.call_ids,
+            "headline": result.page.headline if result.page else None,
+            "best_bet": result.page.best_bet.model_dump(mode="json")
+            if result.page and result.page.best_bet
+            else None,
+        },
+    }
+    print(json.dumps(out, indent=2))
+    diff = difflib.unified_diff(
+        stored_md.splitlines(),
+        replay_md.splitlines(),
+        f"stored v{row['version']}",
+        "replay",
+        lineterm="",
+    )
+    print("\n".join(diff) or "(narratives are identical)")
+    return 0 if result.status == "published" else 1
 
 
 def _cmd_migrate(args: argparse.Namespace) -> int:
@@ -310,6 +416,39 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_config.add_argument("--full", action="store_true", help="include every mountain field")
     p_config.set_defaults(handler=_cmd_config)
+    config_sub = p_config.add_subparsers(dest="config_command", metavar="<config-command>")
+    for decision, verb in (("accepted", "accept"), ("rejected", "reject")):
+        p = config_sub.add_parser(verb, help=f"{verb} a proposed config_change (by id)")
+        p.add_argument("id", type=int)
+        p.set_defaults(handler=_cmd_config_decide, decision=decision)
+
+    p_knowledge = sub.add_parser(
+        "knowledge", help="proposed knowledge and config changes: list, accept, reject"
+    )
+    knowledge_sub = p_knowledge.add_subparsers(
+        dest="knowledge_command", metavar="<knowledge-command>"
+    )
+    p_list = knowledge_sub.add_parser("list", help="knowledge and config_change rows")
+    p_list.add_argument(
+        "--status",
+        default="proposed",
+        choices=["proposed", "accepted", "rejected", "retired", "all"],
+        help="rows with this status (default: proposed)",
+    )
+    p_list.set_defaults(handler=_cmd_knowledge_list)
+    for decision, verb in (("accepted", "accept"), ("rejected", "reject")):
+        p = knowledge_sub.add_parser(verb, help=f"{verb} a proposed knowledge statement (by id)")
+        p.add_argument("id", type=int)
+        p.set_defaults(handler=_cmd_knowledge_decide, decision=decision)
+
+    p_replay = sub.add_parser(
+        "replay",
+        help="regenerate a stored report's narrative with the current prompts and accepted"
+        " knowledge, and compare (publishes nothing)",
+    )
+    p_replay.add_argument("date", type=date.fromisoformat)
+    p_replay.add_argument("--version", type=int, help="report version (default: the newest)")
+    p_replay.set_defaults(handler=_cmd_replay)
 
     p_migrate = sub.add_parser(
         "migrate", help="apply pending database migrations and sync the mountain roster"

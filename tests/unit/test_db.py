@@ -10,6 +10,8 @@ import pytest
 from hazelst import cli, config, db
 
 DATA_MODEL = config.PROJECT_ROOT / "docs" / "design" / "data-model.md"
+LATEST = len(db.load_migrations())
+ALL = list(range(1, LATEST + 1))
 
 
 def spec_schema() -> dict[str, list[tuple[str, str, int]]]:
@@ -51,8 +53,8 @@ def conn(db_path: Path) -> sqlite3.Connection:
 def test_migrate_from_empty_matches_data_model(db_path: Path) -> None:
     c = db.connect(db_path)
     assert db.user_version(c) == 0
-    assert db.migrate(c) == [1]
-    assert db.user_version(c) == 1
+    assert db.migrate(c) == ALL
+    assert db.user_version(c) == LATEST
     assert schema(c) == spec_schema()
     assert len(schema(c)) == 17
 
@@ -66,7 +68,7 @@ def test_migrate_rerun_is_noop(db_path: Path) -> None:
     c.close()
     c2 = db.connect(db_path)
     assert db.migrate(c2) == []
-    assert db.user_version(c2) == 1
+    assert db.user_version(c2) == LATEST
 
 
 def test_verification_has_edition_in_key(conn: sqlite3.Connection) -> None:
@@ -93,10 +95,12 @@ def test_readonly_connection_does_not_create_file(tmp_path: Path) -> None:
 
 
 def test_failed_migration_rolls_back(conn: sqlite3.Connection) -> None:
-    bad = db.Migration(2, "0002_bad.sql", "CREATE TABLE extra (x INT);\nSELECT * FROM nope;")
-    with pytest.raises(db.MigrationError, match=r"0002_bad\.sql"):
+    bad = db.Migration(
+        LATEST + 1, "9999_bad.sql", "CREATE TABLE extra (x INT);\nSELECT * FROM nope;"
+    )
+    with pytest.raises(db.MigrationError, match=r"9999_bad\.sql"):
         db.migrate(conn, [*db.load_migrations(), bad])
-    assert db.user_version(conn) == 1
+    assert db.user_version(conn) == LATEST
     assert "extra" not in schema(conn)
 
 
@@ -114,7 +118,7 @@ def test_migrations_are_numbered_without_gaps() -> None:
 
 def test_two_connections_apply_once(db_path: Path) -> None:
     a, b = db.connect(db_path), db.connect(db_path)
-    assert db.migrate(a) == [1]
+    assert db.migrate(a) == ALL
     assert db.migrate(b) == []
 
 
@@ -221,9 +225,9 @@ def test_cli_migrate_twice(
     monkeypatch.setenv("HAZELST_DB", str(db_path))
     assert cli.main(["migrate"]) == 0
     first = json.loads(capsys.readouterr().out)
-    assert first["user_version"] == {"before": 0, "after": 1}
-    assert first["applied"] == [1]
+    assert first["user_version"] == {"before": 0, "after": LATEST}
+    assert first["applied"] == ALL
     assert cli.main(["migrate"]) == 0
     second = json.loads(capsys.readouterr().out)
-    assert second["user_version"] == {"before": 1, "after": 1}
+    assert second["user_version"] == {"before": LATEST, "after": LATEST}
     assert second["applied"] == []
