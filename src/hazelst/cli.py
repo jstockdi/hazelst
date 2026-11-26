@@ -209,6 +209,30 @@ def _cmd_agents_smoke(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def _cmd_agents_narrate(args: argparse.Namespace) -> int:
+    """write -> check -> revise on a saved digest; prints the outcome and the markdown."""
+    from hazelst.digest import ReportDigest
+    from hazelst.narrative import accepted_knowledge, build_narrative
+
+    cfg = config.load()
+    digest = ReportDigest.model_validate_json(Path(args.digest).read_text("utf-8"))
+    conn = _open_db(cfg)
+    try:
+        result = build_narrative(AgentClient(conn, cfg.settings), digest, accepted_knowledge(conn))
+    finally:
+        conn.close()
+    summary = {
+        "status": result.status,
+        "reason": result.reason,
+        "errors": result.errors,
+        "call_ids": result.call_ids,
+    }
+    print(json.dumps(summary, indent=2))
+    if result.markdown:
+        print(result.markdown)
+    return 0 if result.status == "published" else 1
+
+
 def _cmd_agents_calls(args: argparse.Namespace) -> int:
     cfg = config.load()
     conn = _open_db(cfg)
@@ -305,6 +329,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_calls.add_argument("--limit", type=int, default=10)
     p_calls.set_defaults(handler=_cmd_agents_calls)
+    p_narrate = agents_sub.add_parser(
+        "narrate", help="report-write, report-check, report-revise on a saved digest JSON"
+    )
+    p_narrate.add_argument("--digest", required=True, help="path to a ReportDigest JSON file")
+    p_narrate.set_defaults(handler=_cmd_agents_narrate)
 
     return parser
 

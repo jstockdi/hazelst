@@ -183,6 +183,29 @@ Verified by the J01 spike ([spikes/agent_sdk/](../../spikes/agent_sdk/README.md)
 - A storm type is named only if `storm_type` or a discussion names it.
 - Cautions mention every active alert and every `wind_hold_likely` day.
 
+How `report_check.py` reads the prose (so a draft can be written to pass):
+
+- Text is split into sentences and clauses (`;`, `—`, "while", "but",
+  "then"). A clause is about the mountains it names; one that names none is
+  about the mountains named earlier in its sentence, else the entry's own
+  mountain (`mountains[key]`, `best_bet.why`). It is about the days it names
+  (weekday names, today / tonight / tomorrow, weekend); one that names no day
+  keeps the previous clause's days. Clauses about no mountain (regional) are
+  not precip-checked; their snow numbers must match some mountain.
+- Precip words: ice = freezing rain, freezing drizzle, ice, icy, glaze; snow =
+  snow, snow showers, dusting, flurries, powder; mix = mix, wintry mix, sleet;
+  rain = rain, drizzle, showers; dry = dry, drying. A `mix` day also accepts
+  snow and rain words. Negated words ("no snow"), partial-day "dry until …",
+  and clauses about the base or valleys are skipped.
+- Snow numbers are amounts written with `″`, `"`, or "inches"; amounts
+  followed by "of ice" or "of liquid" are not snow. A number passes when it is
+  within 0.5″ of a day, multi-day sum, window mean, range end, model value,
+  NWS value, or accumulation value for the clause's mountains, or inside a
+  window's range.
+- Storm words: clipper; coastal low / storm, nor'easter; inland runner,
+  cutter; and "upslope" (needs a `nw_upslope` tag or a discussion).
+- A `null` `season_open` counts as open (date not known).
+
 The 2026-11-25 sample run would have failed the precip-type rule three times
 ([sample run](../experiments/2026-11-25-sample-run.md), finding 8) — the class
 of error this catches.

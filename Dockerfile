@@ -11,6 +11,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock .python-version README.md ./
 RUN uv sync --locked --no-dev --no-install-project
 COPY src ./src
+COPY .claude/skills/hazel-st/SKILL.md ./.claude/skills/hazel-st/SKILL.md
 RUN uv sync --locked --no-dev --no-editable
 
 # --- runtime: venv and config only; no compilers, no uv ----------------------------

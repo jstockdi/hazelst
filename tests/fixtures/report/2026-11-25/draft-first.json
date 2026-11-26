@@ -1,0 +1,23 @@
+{
+  "headline": "Ski the cold, quiet Thanksgiving morning; a coastal storm brings ice Thursday night, then rain",
+  "best_bet": {
+    "mountain": "sunday_river",
+    "day": "2026-11-26",
+    "why": "Dry until afternoon, with summit gusts near 20 mph while southern Vermont and Loon gust past 40."
+  },
+  "storm": "High pressure keeps today and Thanksgiving morning dry and cold, with lows in the teens (NWS Gray). A coastal low forms off Florida tonight, runs up the coast, and reaches the Gulf of Maine by early Friday. Warm air arrives aloft first, so cold air trapped in the mountains turns the onset to freezing rain Thursday night (8 PM to 4 AM per NWS Burlington). Friday, rain reaches the summits at Sugarbush, Stratton, Loon, and Cranmore, while Killington, Pico, Sunday River, and Sugarloaf stay icy up top. Models agree on about an inch of liquid and almost no snow: the 3-day summit snow is 0–0.3″ everywhere. A little snow returns Saturday, up to about 1″ at Killington and Stratton.",
+  "mountains": {
+    "killington": "Dry and cold through Thursday midday; summit gusts reach about 44 mph Thursday afternoon, then rain overnight that turns the summit to slush Friday. Up to 1″ Saturday (models 0–2″).",
+    "pico": "Same weather as Killington: ice Thursday night into Friday; not yet open for the season.",
+    "sugarbush": "Lighter wind Thursday (gusts ~31 mph). Ice Thursday night, and the summit warms to 34 °F Friday with rain to the top. About ½″ Saturday.",
+    "stratton": "First to see the storm: freezing rain starts Thursday (NWS Albany), with gusts above 40 mph Thursday afternoon. Rain to the summit Friday; around 1″ Saturday.",
+    "loon": "Windiest on the list Thursday, with summit gusts near 48 mph, so expect lift holds. Rain to the summit Friday (35 °F); about ½–1″ of snow Saturday.",
+    "cranmore": "A wintry mix Thursday night even on the low summit, then rain Friday afternoon. Dry and 40 °F Saturday.",
+    "sunday_river": "The calmest Thursday (gusts ~21 mph) and dry until afternoon. Rain Thursday night that lingers into Friday; dry Saturday.",
+    "sugarloaf": "Coldest summit (26–28 °F), so the ice holds longest here: glaze Thursday night into Friday. About ½″ of snow Saturday."
+  },
+  "cautions": [
+    "Wind: gusts above 40 mph Thursday afternoon and evening in western New England (NWS Albany); lift holds possible at Loon, Killington, Pico, and Stratton.",
+    "Ice: freezing rain Thursday night across the higher elevations and northern areas, up to 0.1″ of ice. Treat Thanksgiving-night mountain roads as icy."
+  ]
+}
