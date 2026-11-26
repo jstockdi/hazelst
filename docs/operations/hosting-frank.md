@@ -20,7 +20,7 @@ follows the same contract as `mixtape` and `bcl`.
 | File | Change |
 |------|--------|
 | `projects/hazelst/compose.yml` | New stack (below) |
-| `projects/hazelst/secrets.enc.env` | SOPS-encrypted `ANTHROPIC_API_KEY`; decrypted at deploy to git-ignored `hazelst.env` |
+| `projects/hazelst/secrets.enc.env` | SOPS-encrypted `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`); decrypted at deploy to git-ignored `hazelst.env` (mode 600) |
 | `platform/Caddyfile` | `http://hazelst.thmxtp.com { reverse_proxy hazelst:8080 }` |
 | `platform/cloudflared/config.yml` | Ingress rule `hostname: hazelst.thmxtp.com` → `http://caddy:80`, above the catch-all |
 | `systemd/frank-hazelst.service` | Boot supervision, same shape as the other stacks |
@@ -40,10 +40,11 @@ services:
     container_name: hazelst
     restart: unless-stopped
     networks: [edge]          # Caddy reaches hazelst:8080; outbound HTTPS for data sources
-    env_file: [hazelst.env]   # ANTHROPIC_API_KEY (decrypted from secrets.enc.env)
+    env_file: [hazelst.env]   # CLAUDE_CODE_OAUTH_TOKEN (decrypted from secrets.enc.env)
     environment:
       TZ: America/New_York
-      NWS_USER_AGENT: hazelst-forecast
+      NWS_USER_AGENT: hazelst-forecast (github.com/jstockdi/hazelst)
+      HOME: /tmp/home         # writable HOME on the tmpfs for the Claude CLI
     volumes:
       - /srv/hazelst:/data:rw # SQLite; host dir pre-chowned 65532:65532, 0750
     user: "65532:65532"
@@ -58,6 +59,11 @@ services:
         limits: { cpus: "1.0", memory: 512M }
 ```
 
+`ANTHROPIC_API_KEY` must not appear in `hazelst.env` or `environment`: the
+Claude CLI prefers it over the token. The Claude CLI writes ~32 KB of config
+files under `HOME` per call; `/tmp` is a tmpfs, so nothing persists and the root
+filesystem stays read-only (verified in the J01 spike).
+
 No published ports, no host network, plain HTTP on `edge` (TLS terminates at
 Cloudflare, like `bcl-gateway`).
 
@@ -65,7 +71,8 @@ Cloudflare, like `bcl-gateway`).
 
 The container needs HTTPS egress to: `api.open-meteo.com`, `api.weather.gov`,
 `mesonet.agron.iastate.edu`, the NOHRSC data host, each enabled resort report site, and
-`api.anthropic.com`. frank is dual-stack with no per-container egress filter
+`api.anthropic.com` (Claude Agent SDK; nonessential CLI traffic such as
+telemetry and update checks is disabled). frank is dual-stack with no per-container egress filter
 today; if one is added, this is the allowlist.
 
 ## Operations
