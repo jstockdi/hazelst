@@ -15,6 +15,43 @@ All sources below are free and keyless (NWS requires a `User-Agent` header).
 | **NWS Area Forecast Discussion** | `api.weather.gov/products/types/AFD/locations/{BTV,ALY,GYX}` | Key Messages + Discussion text | Narrative: storm type, timing, mixing, confidence |
 | **WPC discussions** | `api.weather.gov/products/types/{PMD,QPF}/...` (confirm product codes) | Short-range and winter-weather discussion text | Narrative: national storm track |
 
+### Open-Meteo request details (verified 2026-11-26)
+
+- Request: `timezone=GMT` (stored times are UTC; a local-time response uses one
+  offset for the whole series, which is wrong across a DST change),
+  `models=gfs_seamless,ecmwf_ifs025,gem_seamless`, `past_days=7`,
+  `forecast_days=7`, `temperature_unit=fahrenheit`, `wind_speed_unit=mph`,
+  `precipitation_unit=inch`. The same hourly variables are requested at summit
+  and base.
+- Units follow `hourly_units`, which normalize reads per variable: with these
+  options `snowfall` and `precipitation` are inches, but `snow_depth` and
+  `freezing_level_height` are **feet** (stored as inches and feet).
+  `freezing_level_height` is `undefined` for ECMWF and GEM.
+- Model run times: `api.open-meteo.com/data/{id}/static/meta.json`, fetched in
+  every ingest and stored as `fetch` rows (`source = open_meteo_meta`).
+  `last_run_initialisation_time` becomes `forecast_hourly.issued_at`.
+
+  | Model | meta.json id |
+  |-------|--------------|
+  | `gfs_seamless` | `ncep_gfs013` (GFS run; HRRR blends into the first hours) |
+  | — | `ncep_hrrr_conus` (recorded, not used for `issued_at`) |
+  | `ecmwf_ifs025` | `ecmwf_ifs025` |
+  | `gem_seamless` | `cmc_gem_gdps` |
+
+- `cmc_gem_gdps/static/meta.json` stopped updating on 2026-05-26 (its
+  `data_end_time` is 2026-06-05) while GEM data in the forecast response stays
+  current. When a meta.json's `data_end_time` is before the fetch, its run time
+  cannot describe the data served, so the run is **estimated** from the
+  model's own cycle: the latest initialisation on `update_interval_seconds`
+  that is available by the fetch time given the file's last observed delay
+  (`last_run_availability_time − last_run_initialisation_time`). The ingest
+  summary marks such run times `estimated: true`.
+- Raw `fetch` rows: `params` is `{"query": {…}, "meta": {…}}`; for forecasts
+  `meta` holds the elevation and the mountain keys in request order (the
+  response list follows that order).
+- Fixtures: `hazelst record open-meteo` writes each raw response to
+  `tests/fixtures/open_meteo/<date>/<label>.json.gz`.
+
 ## Accumulation and conditions
 
 | Source | Endpoint | Fields used | Feeds |

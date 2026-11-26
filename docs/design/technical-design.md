@@ -202,7 +202,7 @@ Summarized from [agent-runs.md](agent-runs.md):
 |-------|------|-----|
 | Unit | Window/day math (daily buckets sum to windows), tags, precip type, NWS proration, confidence | `pytest`, small hand-built series |
 | Regression | The three precip-type errors from the sample run must fail `report-check` | Fixture drafts |
-| Normalize | Each source's parser on recorded responses | `tests/fixtures/<source>/*.json.gz` from `hazelst record` |
+| Normalize | Each source's parser on recorded responses | `tests/fixtures/<source>/<date>/*.json.gz` from `hazelst record <source>` |
 | Contract | Each resort adapter on saved pages; alert when a live page stops parsing | Fixture HTML + nightly live check in `ingest-obs` |
 | Golden | Rendered HTML for a fixture day (text diff) | `tests/golden/` |
 | Agents | Schema round-trip and `report-check` on stubbed outputs; no live calls in CI | Stub client |
