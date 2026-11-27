@@ -74,6 +74,8 @@
      "snow_in": 0.0,
      "precip_in": 0.0,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 28,
      "lo_f": 12,
      "gust_mph": 12,
@@ -85,13 +87,15 @@
      "snow_in": 0.0,
      "precip_in": 0.91,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit"
+     ],
      "hi_f": 26,
      "lo_f": 20,
      "gust_mph": 44,
      "freezing_level_ft": 4396,
      "tags": [
-      "mixing_base",
-      "freezing_rain",
       "wind_hold_watch"
      ]
     },
@@ -100,41 +104,41 @@
      "snow_in": 0.0,
      "precip_in": 0.29,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit"
+     ],
      "hi_f": 31,
      "lo_f": 26,
      "gust_mph": 26,
      "freezing_level_ft": 9383,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-28",
      "snow_in": 0.9,
      "precip_in": 0.24,
      "precip_type": "mix",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [],
      "hi_f": 28,
      "lo_f": 24,
      "gust_mph": 22,
      "freezing_level_ft": 3281,
-     "tags": [
-      "mixing_base"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-29",
      "snow_in": 0.0,
      "precip_in": 0.02,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 32,
      "lo_f": 24,
      "gust_mph": 26,
      "freezing_level_ft": 7251,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     }
    ],
    "storm_type": null,
@@ -205,6 +209,8 @@
      "snow_in": 0.0,
      "precip_in": 0.0,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 29,
      "lo_f": 15,
      "gust_mph": 10,
@@ -216,13 +222,16 @@
      "snow_in": 0.0,
      "precip_in": 0.79,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit",
+      "base"
+     ],
      "hi_f": 28,
      "lo_f": 20,
      "gust_mph": 45,
      "freezing_level_ft": 10499,
      "tags": [
-      "mixing_base",
-      "freezing_rain",
       "wind_hold_watch"
      ]
     },
@@ -231,41 +240,41 @@
      "snow_in": 0.0,
      "precip_in": 0.29,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit"
+     ],
      "hi_f": 32,
      "lo_f": 28,
      "gust_mph": 26,
      "freezing_level_ft": 9055,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-28",
      "snow_in": 0.2,
      "precip_in": 0.19,
      "precip_type": "mix",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [],
      "hi_f": 29,
      "lo_f": 26,
      "gust_mph": 23,
      "freezing_level_ft": 3150,
-     "tags": [
-      "mixing_base"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-29",
      "snow_in": 0.0,
      "precip_in": 0.02,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 33,
      "lo_f": 25,
      "gust_mph": 25,
      "freezing_level_ft": 7251,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     }
    ],
    "storm_type": null,
@@ -336,6 +345,8 @@
      "snow_in": 0.0,
      "precip_in": 0.0,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 27,
      "lo_f": 14,
      "gust_mph": 10,
@@ -347,56 +358,56 @@
      "snow_in": 0.0,
      "precip_in": 0.83,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit"
+     ],
      "hi_f": 28,
      "lo_f": 17,
      "gust_mph": 31,
      "freezing_level_ft": 10072,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-27",
      "snow_in": 0.0,
      "precip_in": 0.37,
      "precip_type": "rain",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit"
+     ],
      "hi_f": 34,
      "lo_f": 28,
      "gust_mph": 19,
      "freezing_level_ft": 9186,
-     "tags": [
-      "mixing_base",
-      "freezing_rain",
-      "rain_summit"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-28",
      "snow_in": 0.4,
      "precip_in": 0.21,
      "precip_type": "mix",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [],
      "hi_f": 28,
      "lo_f": 24,
      "gust_mph": 16,
      "freezing_level_ft": 3150,
-     "tags": [
-      "mixing_base"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-29",
      "snow_in": 0.0,
      "precip_in": 0.01,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 34,
      "lo_f": 24,
      "gust_mph": 21,
      "freezing_level_ft": 6562,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     }
    ],
    "storm_type": null,
@@ -466,6 +477,8 @@
      "snow_in": 0.0,
      "precip_in": 0.0,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 30,
      "lo_f": 15,
      "gust_mph": 14,
@@ -477,13 +490,16 @@
      "snow_in": 0.0,
      "precip_in": 1.13,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit",
+      "base"
+     ],
      "hi_f": 30,
      "lo_f": 20,
      "gust_mph": 44,
      "freezing_level_ft": 10630,
      "tags": [
-      "mixing_base",
-      "freezing_rain",
       "wind_hold_watch"
      ]
     },
@@ -492,42 +508,41 @@
      "snow_in": 0.1,
      "precip_in": 0.35,
      "precip_type": "rain",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit"
+     ],
      "hi_f": 34,
      "lo_f": 28,
      "gust_mph": 32,
      "freezing_level_ft": 9646,
-     "tags": [
-      "mixing_base",
-      "freezing_rain",
-      "rain_summit"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-28",
      "snow_in": 0.8,
      "precip_in": 0.2,
      "precip_type": "mix",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [],
      "hi_f": 30,
      "lo_f": 24,
      "gust_mph": 31,
      "freezing_level_ft": 3412,
-     "tags": [
-      "mixing_base"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-29",
      "snow_in": 0.0,
      "precip_in": 0.04,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 33,
      "lo_f": 24,
      "gust_mph": 31,
      "freezing_level_ft": 8169,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     }
    ],
    "storm_type": null,
@@ -597,6 +612,8 @@
      "snow_in": 0.0,
      "precip_in": 0.0,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 32,
      "lo_f": 14,
      "gust_mph": 9,
@@ -608,13 +625,15 @@
      "snow_in": 0.0,
      "precip_in": 0.64,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit"
+     ],
      "hi_f": 33,
      "lo_f": 19,
      "gust_mph": 48,
      "freezing_level_ft": 11089,
      "tags": [
-      "mixing_base",
-      "freezing_rain",
       "wind_hold_watch"
      ]
     },
@@ -623,41 +642,39 @@
      "snow_in": 0.1,
      "precip_in": 0.37,
      "precip_type": "rain",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [],
      "hi_f": 35,
      "lo_f": 32,
      "gust_mph": 31,
      "freezing_level_ft": 11827,
-     "tags": [
-      "mixing_base",
-      "rain_summit"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-28",
      "snow_in": 0.7,
      "precip_in": 0.12,
      "precip_type": "snow",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [],
      "hi_f": 33,
      "lo_f": 30,
      "gust_mph": 20,
      "freezing_level_ft": 3281,
-     "tags": [
-      "mixing_base"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-29",
      "snow_in": 0.1,
      "precip_in": 0.03,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 38,
      "lo_f": 28,
      "gust_mph": 24,
      "freezing_level_ft": 6660,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     }
    ],
    "storm_type": "coastal",
@@ -727,6 +744,8 @@
      "snow_in": 0.0,
      "precip_in": 0.0,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 34,
      "lo_f": 15,
      "gust_mph": 9,
@@ -738,35 +757,38 @@
      "snow_in": 0.0,
      "precip_in": 0.71,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit"
+     ],
      "hi_f": 34,
      "lo_f": 20,
      "gust_mph": 30,
      "freezing_level_ft": 10564,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-27",
      "snow_in": 0.0,
      "precip_in": 0.24,
      "precip_type": "rain",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit"
+     ],
      "hi_f": 34,
      "lo_f": 31,
      "gust_mph": 22,
      "freezing_level_ft": 8465,
-     "tags": [
-      "mixing_base",
-      "freezing_rain",
-      "rain_summit"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-28",
      "snow_in": 0.0,
      "precip_in": 0.02,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 40,
      "lo_f": 33,
      "gust_mph": 14,
@@ -778,14 +800,13 @@
      "snow_in": 0.0,
      "precip_in": 0.01,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 43,
      "lo_f": 29,
      "gust_mph": 16,
      "freezing_level_ft": 7152,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     }
    ],
    "storm_type": "coastal",
@@ -855,6 +876,8 @@
      "snow_in": 0.0,
      "precip_in": 0.0,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 32,
      "lo_f": 14,
      "gust_mph": 8,
@@ -866,34 +889,39 @@
      "snow_in": 0.0,
      "precip_in": 0.69,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit",
+      "base"
+     ],
      "hi_f": 30,
      "lo_f": 18,
      "gust_mph": 21,
      "freezing_level_ft": 2329,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-27",
      "snow_in": 0.0,
      "precip_in": 0.27,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit"
+     ],
      "hi_f": 31,
      "lo_f": 26,
      "gust_mph": 22,
      "freezing_level_ft": 12927,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-28",
      "snow_in": 0.0,
      "precip_in": 0.03,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 32,
      "lo_f": 28,
      "gust_mph": 20,
@@ -905,6 +933,8 @@
      "snow_in": 0.0,
      "precip_in": 0.01,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 37,
      "lo_f": 25,
      "gust_mph": 19,
@@ -980,6 +1010,8 @@
      "snow_in": 0.0,
      "precip_in": 0.0,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 26,
      "lo_f": 10,
      "gust_mph": 12,
@@ -991,34 +1023,39 @@
      "snow_in": 0.1,
      "precip_in": 0.53,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit",
+      "base"
+     ],
      "hi_f": 28,
      "lo_f": 17,
      "gust_mph": 23,
      "freezing_level_ft": 2854,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-27",
      "snow_in": 0.0,
      "precip_in": 0.44,
      "precip_type": "ice",
+     "base_precip_type": "rain",
+     "freezing_rain_at": [
+      "summit"
+     ],
      "hi_f": 28,
      "lo_f": 24,
      "gust_mph": 24,
      "freezing_level_ft": 9383,
-     "tags": [
-      "mixing_base",
-      "freezing_rain"
-     ]
+     "tags": []
     },
     {
      "date": "2026-11-28",
      "snow_in": 0.4,
      "precip_in": 0.07,
      "precip_type": "snow",
+     "base_precip_type": "mix",
+     "freezing_rain_at": [],
      "hi_f": 28,
      "lo_f": 24,
      "gust_mph": 21,
@@ -1030,6 +1067,8 @@
      "snow_in": 0.1,
      "precip_in": 0.01,
      "precip_type": "dry",
+     "base_precip_type": "dry",
+     "freezing_rain_at": [],
      "hi_f": 30,
      "lo_f": 22,
      "gust_mph": 21,

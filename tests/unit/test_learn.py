@@ -16,6 +16,7 @@ import pytest
 
 from hazelst import config, corrected, db, jobs, learn, method
 from hazelst.models import Forecast, ForecastWindow, MountainForecast
+from tests.drafts import report_config
 from tests.support import replay_client
 from tests.unit.test_schedule import recorded
 
@@ -350,7 +351,7 @@ def test_skill_learn_job_rebuilds_skill(tmp_path: Path) -> None:
 @pytest.fixture
 def built(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> config.Config:
     monkeypatch.setattr(jobs, "clock", lambda: datetime(2026, 11, 26, 12, 0, tzinfo=UTC))
-    c = config.load({"HAZELST_DB": str(tmp_path / "h.db")})
+    c = report_config(monkeypatch, tmp_path / "h.db")
     jobs.run_job(c, "ingest-forecast", date(2026, 11, 26), client=replay_client(recorded()))
     return c
 

@@ -243,18 +243,35 @@ AM, which moves GFS snow totals in the first two days and turns Sugarbush on
 Fri 27 from rain to ice; GEM totals match to 0.1″ in 19 of 24 windows. NWS
 grids from that morning were not saved, so NWS values are not compared.
 
-## Precip type (per mountain per day, at the summit)
+## Precip type (per mountain per day, at the summit and at the base)
 
-Computed in code and stored in `forecast_day.precip_type`; the page and the
-narrative both read it, neither infers it.
+Computed in code (`tags.day_precip`); the page and the narrative read it,
+neither infers it. The same rules run at each elevation with that elevation's
+2 m temperature and snow (the liquid and the wet hours are the summit
+series'; the two points share a latitude and longitude):
 
 | Order | Rule | Type |
 |-------|------|------|
 | 1 | liquid < 0.05″ and snow < 0.2″ | `dry` |
 | 2 | snow ≥ 5 × liquid (half or more fell as ~10:1 snow) | `snow` |
-| 3 | `rain_summit` | `rain` |
-| 4 | `freezing_rain` | `ice` |
+| 3 | a wet hour above 33 °F at that elevation | `rain` |
+| 4 | a wet hour at or below 32 °F there with 850 hPa above 32 °F, or NWS ice ≥ 0.01″ | `ice` |
 | 5 | otherwise | `mix` |
+
+- `precip_type` is the summit's (stored in `forecast_day.precip_type`; the
+  page's "What falls" grid), `base_precip_type` the base's.
+- `freezing_rain_at` lists each elevation that has a freezing-rain hour (rule
+  4) on a day that is not `dry` there, so a `rain` day can still carry
+  freezing rain at the summit. NWS ice counts at both elevations.
+- These three fields are the single source of precip type for a mountain-day
+  in the digest (J33, decisions row 33). The tags `mixing_base`,
+  `rain_summit`, and `freezing_rain` stay in `forecast_day.tags` and the page
+  JSON (skill cells read them) but are not passed to the writer, since a
+  mountain-wide `freezing_rain` tag beside a summit `rain` type read as a
+  contradiction (2026-11-27, Sugarloaf Monday).
+- Before J33 the summit's rule 4 used the colder of the summit and base
+  temperatures; re-deriving every production run of 2026-11-26/27 with the
+  summit-only rule reproduced every stored `precip_type`.
 
 ## Powder score
 

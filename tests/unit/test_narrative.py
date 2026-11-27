@@ -18,6 +18,8 @@ from hazelst.agents.schemas import ReportDraft
 from hazelst.agents.stub import StubBackend
 from hazelst.digest import ReportDigest
 from hazelst.narrative import (
+    MAX_REVISIONS,
+    NarrativeError,
     accepted_knowledge,
     build_narrative,
     page_narrative,
@@ -97,8 +99,7 @@ def test_accepted_knowledge_only(conn: sqlite3.Connection) -> None:
 def test_clean_draft_publishes_after_one_call(conn: sqlite3.Connection) -> None:
     backend = StubBackend({"report-write": GOOD})
     result = build_narrative(client(conn, backend), DIGEST, ["k1"], run_id=None)
-    assert result.status == "published"
-    assert result.draft == GOOD
+    assert result.draft == GOOD and result.revisions == 0
     assert result.call_ids == [1]
     assert check_errors(conn) == [("report-write", [])]
     request = backend.requests[0]
@@ -109,8 +110,7 @@ def test_clean_draft_publishes_after_one_call(conn: sqlite3.Connection) -> None:
 def test_sample_run_first_draft_is_revised(conn: sqlite3.Connection) -> None:
     backend = StubBackend({"report-write": FIRST, "report-revise": GOOD})
     result = build_narrative(client(conn, backend), DIGEST)
-    assert result.status == "published"
-    assert result.draft == GOOD
+    assert result.draft == GOOD and result.revisions == 1
     assert result.call_ids == [1, 2]
     (write_row, revise_row) = check_errors(conn)
     assert write_row[0] == "report-write" and write_row[1] is not None
@@ -120,55 +120,73 @@ def test_sample_run_first_draft_is_revised(conn: sqlite3.Connection) -> None:
     assert sent.draft == FIRST and sent.errors == write_row[1] and sent.digest == DIGEST
 
 
-def test_second_failed_check_is_numbers_only(conn: sqlite3.Connection) -> None:
-    backend = StubBackend({"report-write": FIRST, "report-revise": FIRST})
+def test_each_revision_gets_the_previous_drafts_exact_errors(conn: sqlite3.Connection) -> None:
+    # Round 1 fixes one of three errors, round 2 another, round 3 the last.
+    def fixed(draft: ReportDraft, key: str) -> ReportDraft:
+        return draft.model_copy(update={"mountains": {**draft.mountains, key: GOOD.mountains[key]}})
+
+    two_left = fixed(FIRST, "killington")
+    one_left = fixed(two_left, "cranmore")
+    backend = StubBackend({"report-write": FIRST, "report-revise": [two_left, one_left, GOOD]})
     result = build_narrative(client(conn, backend), DIGEST)
-    assert result.status == "numbers_only"
-    assert result.reason == "report-check failed twice"
-    assert len(result.errors) == 3
-    assert result.page is None
+    assert result.draft == GOOD and result.revisions == MAX_REVISIONS == 3
+    sent = [ReviseInput.model_validate_json(r.prompt) for r in backend.requests[1:]]
+    stored = [errors for _, errors in check_errors(conn)]
+    assert [s.errors for s in sent] == stored[:3]
+    assert [len(s.errors) for s in sent] == [3, 2, 1]
+    assert [s.draft for s in sent] == [FIRST, two_left, one_left]
 
 
-def test_disabled_agents_are_numbers_only(conn: sqlite3.Connection) -> None:
+def test_checks_failing_after_three_revisions_raise(conn: sqlite3.Connection) -> None:
+    backend = StubBackend({"report-write": FIRST, "report-revise": [FIRST] * 3})
+    with pytest.raises(NarrativeError) as caught:
+        build_narrative(client(conn, backend), DIGEST)
+    assert caught.value.reason == "report-check failed after 3 revisions"
+    assert len(caught.value.errors) == 3
+    assert caught.value.call_ids == [1, 2, 3, 4]
+    assert "precip_type" in str(caught.value)
+
+
+def test_disabled_agents_raise(conn: sqlite3.Connection) -> None:
     backend = StubBackend({"report-write": GOOD})
-    result = build_narrative(client(conn, backend, enable_agents=False, claude_token=None), DIGEST)
-    assert result.status == "numbers_only"
-    assert result.reason is not None and "disabled" in result.reason
+    with pytest.raises(NarrativeError, match="disabled"):
+        build_narrative(client(conn, backend, enable_agents=False, claude_token=None), DIGEST)
     assert backend.requests == [] and check_errors(conn) == []
 
 
-def test_cap_reached_is_numbers_only(conn: sqlite3.Connection) -> None:
+def test_cap_reached_raises(conn: sqlite3.Connection) -> None:
     backend = StubBackend({"report-write": GOOD})
-    result = build_narrative(client(conn, backend, agent_daily_calls=0), DIGEST)
-    assert result.status == "numbers_only"
-    assert result.reason is not None and "cap" in result.reason
+    with pytest.raises(NarrativeError, match="cap"):
+        build_narrative(client(conn, backend, agent_daily_calls=0), DIGEST)
 
 
-def test_failed_write_call_is_numbers_only(conn: sqlite3.Connection) -> None:
+def test_failed_write_call_raises(conn: sqlite3.Connection) -> None:
     error = AgentResponse("error_max_turns", True, None)
-    result = build_narrative(client(conn, StubBackend({"report-write": error})), DIGEST)
-    assert result.status == "numbers_only"
-    assert result.reason is not None and result.reason.startswith("report-write:")
+    with pytest.raises(NarrativeError) as caught:
+        build_narrative(client(conn, StubBackend({"report-write": error})), DIGEST)
+    assert caught.value.reason.startswith("report-write:")
 
 
-def test_failed_revise_call_is_numbers_only(conn: sqlite3.Connection) -> None:
+def test_failed_revise_call_raises(conn: sqlite3.Connection) -> None:
     backend = StubBackend({"report-write": FIRST, "report-revise": RuntimeError("down")})
-    result = build_narrative(client(conn, backend), DIGEST)
-    assert result.status == "numbers_only"
-    assert result.reason is not None and result.reason.startswith("report-revise:")
-    assert len(result.errors) == 3
+    with pytest.raises(NarrativeError) as caught:
+        build_narrative(client(conn, backend), DIGEST)
+    assert caught.value.reason.startswith("report-revise:")
+    assert len(caught.value.errors) == 3
 
 
 def test_refresh_recheck_without_calls_when_still_valid(conn: sqlite3.Connection) -> None:
     backend = StubBackend()
     result = recheck_narrative(client(conn, backend), DIGEST, GOOD)
-    assert result.status == "published" and result.call_ids == []
+    assert result.call_ids == [] and result.draft == GOOD
 
 
-def test_refresh_revises_when_numbers_changed(conn: sqlite3.Connection) -> None:
-    backend = StubBackend({"report-revise": GOOD})
+def test_refresh_revises_the_morning_draft_when_numbers_changed(conn: sqlite3.Connection) -> None:
+    backend = StubBackend({"report-revise": [FIRST, GOOD]})
     result = recheck_narrative(client(conn, backend), DIGEST, FIRST)
-    assert result.status == "published" and result.call_ids == [1]
+    assert result.call_ids == [1, 2] and result.revisions == 2
+    first = ReviseInput.model_validate_json(backend.requests[0].prompt)
+    assert first.draft == FIRST and len(first.errors) == 3
 
 
 # --- markdown --------------------------------------------------------------------------

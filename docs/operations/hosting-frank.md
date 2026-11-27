@@ -101,13 +101,15 @@ today; if one is added, this is the allowlist.
   about 10 MB/day (data-model.md, Size); a full copy was 523 MB on 2026-11-27.
   List the copies inside the container (`docker exec hazelst ls -l
   /data/backups`); the host path needs `sudo`.
-- **Alerts:** `/metrics` exports `hazelst_report_published_timestamp_seconds`
-  and `hazelst_backup_last_success_timestamp_seconds`, read from the database at
+- **Alerts:** `/metrics` exports `hazelst_report_published_timestamp_seconds`,
+  `hazelst_backup_last_success_timestamp_seconds`, and
+  `hazelst_report_job_failed`, read from the database at
   scrape time. frank's Prometheus (frank-monitoring, on `edge`) scrapes
   `hazelst:8080` and evaluates `rules/hazelst.rules.yml`:
   `HazelstReportStale` (newest report older than 26 h for 15 min),
-  `HazelstBackupStale` (newest backup older than 8 days for 30 min; backups are weekly), and
-  `HazelstScrapeDown` (`up == 0` for 10 min). Like frank's other rules they
+  `HazelstBackupStale` (newest backup older than 8 days for 30 min; backups are weekly),
+  `HazelstReportFailed` (`hazelst_report_job_failed == 1`: the newest report
+  job published nothing; J33), and `HazelstScrapeDown` (`up == 0` for 10 min). Like frank's other rules they
   surface in Prometheus `/alerts` and Grafana; no Alertmanager pages yet.
 - **Season backfill** (manual, once after the first deploy): loads the
   2025–26 season and rebuilds `skill`:
@@ -178,8 +180,14 @@ today; if one is added, this is the allowlist.
   docker exec hazelst hazelst run skill-learn
   ```
 - **Failure behavior:** a failed source degrades that section (noted in the page
-  footer); a failed Claude call publishes the numbers-only page with "report
-  delayed" and retries every 15 minutes until 9 AM.
+  footer). A report job that cannot publish a checked narrative (a failed
+  Claude call, or `report-check` still failing after three revisions) fails:
+  nothing is published, the previous edition stays, `/health` returns 503, and
+  `hazelst_report_job_failed` is 1, which fires `HazelstReportFailed`. The
+  7:15–9:00 rebuild slot retries a failed morning edition every 15 minutes.
+  Read the reason and the last check errors in `docker logs hazelst` (the
+  `narrative` step) or `run.error`; after fixing, publish by hand with
+  `docker exec hazelst hazelst run report-refresh --edition <0815|1440> --now`.
 
 ## Defaults
 

@@ -12,6 +12,7 @@ import pytest
 
 from hazelst import config, db, jobs, scheduler
 from hazelst.sources import base
+from tests.drafts import report_config
 from tests.support import FIXTURES, load_fixtures, replay_client
 
 ET = ZoneInfo("America/New_York")
@@ -218,7 +219,7 @@ def recorded() -> list[base.Fetched]:
 @pytest.fixture
 def cfg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> config.Config:
     monkeypatch.setattr(jobs, "clock", lambda: datetime(2026, 11, 26, 12, 0, tzinfo=UTC))
-    c = config.load({"HAZELST_DB": str(tmp_path / "h.db")})
+    c = report_config(monkeypatch, tmp_path / "h.db")
     jobs.run_job(c, "ingest-forecast", DAY, client=replay_client(recorded()))
     return c
 
@@ -234,18 +235,18 @@ def reports(c: config.Config) -> list[tuple[Any, ...]]:
     ]
 
 
-def test_three_numbers_only_editions_in_schedule_order(cfg: config.Config) -> None:
+def test_three_editions_in_schedule_order(cfg: config.Config) -> None:
     for kind in ("report-build", "report-refresh", "report-refresh"):
         summary = jobs.run_job(cfg, kind, DAY, options={"force": True})
-        assert summary["status"] == "numbers_only"
+        assert summary["status"] == "published"
     assert reports(cfg) == [
-        (1, "numbers_only", "0700"),
-        (2, "numbers_only", "0815"),
-        (3, "numbers_only", "1440"),
+        (1, "published", "0700"),
+        (2, "published", "0815"),
+        (3, "published", "1440"),
     ]
     conn = db.connect(cfg.settings.db_path)
     payload = json.loads(conn.execute("SELECT payload FROM report WHERE version = 1").fetchone()[0])
-    assert payload["status"] == "numbers_only" and payload["edition"] == "0700"
+    assert payload["status"] == "published" and payload["edition"] == "0700"
     assert payload["notes"] == [] and payload["sources_unavailable"] == []
     assert {m["key"] for m in payload["mountains"]} == {m.key for m in cfg.mountains}
     stratton = next(m for m in payload["mountains"] if m["key"] == "stratton")
@@ -258,7 +259,7 @@ def test_scheduled_report_is_idempotent(cfg: config.Config) -> None:
     jobs.run_job(cfg, "report-build", DAY, options={"edition": "0700"})
     again = jobs.run_job(cfg, "report-build", DAY, options={"edition": "0700"})
     assert again["status"].startswith("skipped")
-    assert reports(cfg) == [(1, "numbers_only", "0700")]
+    assert reports(cfg) == [(1, "published", "0700")]
     forced = jobs.run_job(cfg, "report-build", DAY, options={"edition": "0700", "force": True})
     assert forced["version"] == 2
 

@@ -11,7 +11,6 @@ from hazelst.models import (
     Forecast,
     MountainReport,
     ReportPayload,
-    ReportStatus,
     VerificationSummary,
 )
 from hazelst.sources import discussions
@@ -27,7 +26,6 @@ def build_payload(
     mountains: Sequence[Mountain],
     *,
     issued: datetime,
-    status: ReportStatus,
     edition: str | None = None,
     alerts: Mapping[str, Sequence[str]] | None = None,
     discussion_texts: Mapping[str, str] | None = None,
@@ -59,7 +57,6 @@ def build_payload(
         date=forecast.date,
         issued=issued,
         edition=edition,
-        status=status,
         anchor=anchor,
         days=[d.label for d in first],
         past_days=[

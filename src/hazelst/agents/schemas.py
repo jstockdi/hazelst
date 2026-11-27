@@ -28,7 +28,10 @@ class BestBet(_Schema):
 class ReportDraft(_Schema):
     """Output of `report-write` and `report-revise`."""
 
-    headline: str = Field(min_length=1, description="One line, at most 14 words")
+    headline: str = Field(
+        min_length=1,
+        description="A text alert, at most 12 words: amount, resorts, day; then the catch",
+    )
     best_bet: BestBet
     storm: str = Field(
         min_length=1,

@@ -15,8 +15,9 @@ from hazelst.agents.client import AgentClient, AgentRequest
 from hazelst.agents.knowledge_propose import KnowledgeInput
 from hazelst.agents.schemas import ConfigChangeProposal, KnowledgeProposal, KnowledgeProposals
 from hazelst.agents.stub import Responder, StubBackend
+from tests.drafts import passing_draft
 from tests.support import replay_client
-from tests.unit.test_report_build import DAY, NOON, passing_draft, recorded
+from tests.unit.test_report_build import DAY, NOON, recorded
 
 MONDAY = date(2026, 11, 30)  # reviews 2026-11-22 .. 2026-11-28
 AFD = (
@@ -407,7 +408,7 @@ def test_replay_regenerates_with_accepted_knowledge(
 
     def replayed(request: AgentRequest) -> Any:
         draft = passing_draft(request)
-        return draft.model_copy(update={"headline": "Replayed headline"})
+        return draft.model_copy(update={"headline": "Replayed headline for all eight"})
 
     backend = use_stub(monkeypatch, {"report-write": [passing_draft, replayed]})
     jobs.run_job(cfg, "report-build", DAY)
@@ -421,9 +422,9 @@ def test_replay_regenerates_with_accepted_knowledge(
     summary = json.loads(out[: out.index("\n}\n") + 2])
     assert summary["accepted_knowledge"] == 1
     assert summary["stored"]["version"] == 1
-    assert summary["stored"]["headline"] == "Forecast numbers for the next five days"
+    assert summary["stored"]["headline"] == "Forecast numbers for all eight"
     assert summary["replay"]["status"] == "published"
-    assert summary["replay"]["headline"] == "Replayed headline"
+    assert summary["replay"]["headline"] == "Replayed headline for all eight"
     assert "(narratives are identical)" in out  # same body, new headline
     assert UPSLOPE in backend.requests[1].system_prompt
     assert conn.execute("SELECT count(*) FROM report").fetchone()[0] == 1  # nothing published

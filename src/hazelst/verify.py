@@ -275,12 +275,15 @@ class EditionForecast:
 
 
 def edition_forecasts(conn: sqlite3.Connection, for_date: date) -> list[EditionForecast]:
-    """The 1d forecasts of each edition's newest report version for `for_date`."""
+    """The 1d forecasts of each edition's newest report version for `for_date`.
+
+    Every stored version counts, whatever its status: a row from before J33 marked
+    `numbers_only` still holds that edition's forecast.
+    """
     runs = conn.execute(
         "SELECT json_extract(r.payload, '$.edition') AS edition, r.run_id FROM report r"
         " JOIN (SELECT json_extract(payload, '$.edition') AS edition, max(version) AS version"
-        "       FROM report WHERE for_date = ? AND status IN ('published', 'numbers_only')"
-        "       GROUP BY 1) latest"
+        "       FROM report WHERE for_date = ? GROUP BY 1) latest"
         " ON latest.version = r.version AND r.for_date = ?"
         " WHERE latest.edition IS NOT NULL ORDER BY 1",
         (for_date.isoformat(), for_date.isoformat()),

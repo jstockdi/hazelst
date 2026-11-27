@@ -44,7 +44,7 @@ CallStatus = Literal["ok", "error", "invalid"]
 
 
 class AgentError(Exception):
-    """Base class for agent failures; callers fall back to `numbers_only`."""
+    """Base class for agent failures; the report job fails and the published edition stays."""
 
 
 class AgentUnavailable(AgentError):

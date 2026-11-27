@@ -14,12 +14,16 @@ import sys
 from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hazelst import __version__, config, db, jobs, knowledge
 from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable, sha256
 from hazelst.agents.prompts import role_prompt
 from hazelst.agents.schemas import ConditionsExtract
 from hazelst.sources import base, open_meteo
+
+if TYPE_CHECKING:
+    from hazelst.narrative import Narrative
 
 Handler = Callable[[argparse.Namespace], int]
 
@@ -76,6 +80,26 @@ def _cmd_knowledge_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _narrate(build: Callable[[], Narrative]) -> tuple[Narrative | None, dict[str, object]]:
+    """Run a narrative build; the outcome as a summary (a failure is reported, not raised)."""
+    from hazelst.narrative import NarrativeError
+
+    try:
+        result = build()
+    except NarrativeError as exc:
+        return None, {
+            "status": "failed",
+            "reason": exc.reason,
+            "check_errors": exc.errors,
+            "agent_calls": exc.call_ids,
+        }
+    return result, {
+        "status": "published",
+        "revisions": result.revisions,
+        "agent_calls": result.call_ids,
+    }
+
+
 def _cmd_replay(args: argparse.Namespace) -> int:
     """Regenerate a stored report's narrative with the current prompts and accepted knowledge.
 
@@ -104,11 +128,13 @@ def _cmd_replay(args: argparse.Namespace) -> int:
         payload = ReportPayload.model_validate_json(row["payload"])
         report_digest = digest.build(conn, payload)
         statements = accepted_knowledge(conn)
-        result = build_narrative(AgentClient(conn, cfg.settings), report_digest, statements)
+        client = AgentClient(conn, cfg.settings)
+        result, summary = _narrate(lambda: build_narrative(client, report_digest, statements))
     finally:
         conn.close()
+    page = result.page if result else None
     stored_md = row["narrative_md"] or ""
-    replay_md = result.page.body_md if result.page else ""
+    replay_md = page.body_md if page else ""
     out = {
         "date": args.date.isoformat(),
         "accepted_knowledge": len(statements),
@@ -120,14 +146,9 @@ def _cmd_replay(args: argparse.Namespace) -> int:
             "best_bet": json.loads(row["best_bet"]) if row["best_bet"] else None,
         },
         "replay": {
-            "status": result.status,
-            "reason": result.reason,
-            "check_errors": result.errors,
-            "agent_calls": result.call_ids,
-            "headline": result.page.headline if result.page else None,
-            "best_bet": result.page.best_bet.model_dump(mode="json")
-            if result.page and result.page.best_bet
-            else None,
+            **summary,
+            "headline": page.headline if page else None,
+            "best_bet": page.best_bet.model_dump(mode="json") if page and page.best_bet else None,
         },
     }
     print(json.dumps(out, indent=2))
@@ -139,7 +160,7 @@ def _cmd_replay(args: argparse.Namespace) -> int:
         lineterm="",
     )
     print("\n".join(diff) or "(narratives are identical)")
-    return 0 if result.status == "published" else 1
+    return 0 if result else 1
 
 
 def _cmd_migrate(args: argparse.Namespace) -> int:
@@ -679,20 +700,16 @@ def _cmd_agents_narrate(args: argparse.Namespace) -> int:
     digest = ReportDigest.model_validate_json(Path(args.digest).read_text("utf-8"))
     conn = _open_db(cfg)
     try:
-        result = build_narrative(AgentClient(conn, cfg.settings), digest, accepted_knowledge(conn))
+        client = AgentClient(conn, cfg.settings)
+        statements = accepted_knowledge(conn)
+        result, summary = _narrate(lambda: build_narrative(client, digest, statements))
     finally:
         conn.close()
-    summary = {
-        "status": result.status,
-        "reason": result.reason,
-        "errors": result.errors,
-        "call_ids": result.call_ids,
-    }
     print(json.dumps(summary, indent=2))
-    if result.page:
+    if result:
         print(result.page.model_dump_json(indent=2, exclude={"body_md"}))
         print(result.page.body_md)
-    return 0 if result.status == "published" else 1
+    return 0 if result else 1
 
 
 def _cmd_agents_calls(args: argparse.Namespace) -> int:

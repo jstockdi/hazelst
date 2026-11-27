@@ -18,6 +18,8 @@ from hazelst.models import ReportPayload
 from hazelst.ratio import ALL_BANDS, BOTH_SIDES, MEAN_MODEL, DayWater, LeadDay
 from hazelst.render import page
 from hazelst.sources import open_meteo
+from tests.drafts import report_config
+from tests.pages import recorded_narrative
 from tests.support import FIXTURES, load_fixtures, replay_client
 from tests.unit import test_derive as td
 from tests.unit.test_ratio import add_hours, add_report
@@ -142,7 +144,7 @@ FINE_DAY = FIXTURES / "open_meteo" / "2026-11-27"
 @pytest.fixture
 def built(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> config.Config:
     monkeypatch.setattr(jobs, "clock", lambda: datetime(2026, 11, 27, 12, 0, tzinfo=UTC))
-    c = config.load({"HAZELST_DB": str(tmp_path / "h.db")})
+    c = report_config(monkeypatch, tmp_path / "h.db")
     jobs.run_job(
         c, "ingest-forecast", date(2026, 11, 27), client=replay_client(load_fixtures(FINE_DAY))
     )
@@ -197,7 +199,7 @@ def test_report_build_stores_fine_candidates_and_applies_the_chosen_day_1(
     assert sum(d.snow_in for d in kf.days[:3]) == pytest.approx(kf.windows["3d"].snow_in, abs=0.2)
     assert sum(d.snow_in for d in kf.days) == pytest.approx(kf.windows["5d"].snow_in, abs=0.3)
     assert by_key["loon"].day1_method is None
-    html = page.render_report(payload)
+    html = page.render_report(payload, recorded_narrative())
     assert "day 1: HRRR ratio" in html
 
 

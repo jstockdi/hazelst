@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -7,8 +8,8 @@ from prometheus_client import CollectorRegistry
 from starlette.testclient import TestClient
 
 from hazelst import db, web
-from hazelst.models import ReportPayload
-from tests.pages import recorded_payload, sample_narrative, sample_payload
+from hazelst.models import Narrative, ReportPayload
+from tests.pages import recorded_narrative, recorded_payload, sample_narrative, sample_payload
 
 
 def insert(
@@ -16,10 +17,10 @@ def insert(
     payload: ReportPayload,
     *,
     version: int = 1,
-    status: str = "numbers_only",
-    narrative: bool = False,
+    status: str = "published",
+    narrative: Narrative | None = None,
 ) -> None:
-    n = sample_narrative() if narrative else None
+    n = narrative
     conn.execute(
         "INSERT INTO report (for_date, version, run_id, headline, best_bet, narrative_md,"
         " payload, status, published_at) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?)",
@@ -41,8 +42,8 @@ def db_path(tmp_path: Path) -> Path:
     path = tmp_path / "hazelst.db"
     conn = db.connect(path)
     db.migrate(conn)
-    insert(conn, sample_payload(), status="published", narrative=True)
-    insert(conn, recorded_payload())
+    insert(conn, sample_payload(), narrative=sample_narrative())
+    insert(conn, recorded_payload(), narrative=recorded_narrative())
     conn.close()
     return path
 
@@ -55,7 +56,22 @@ def test_today_falls_back_to_latest(db_path: Path) -> None:
     resp = client(db_path).get("/")
     assert resp.status_code == 200
     assert "Hazel St Forecast · 2026-11-26" in resp.text
-    assert "The written report is delayed." in resp.text
+    assert recorded_narrative().headline in resp.text
+
+
+def test_rows_from_before_j33_without_prose_are_not_shown(db_path: Path) -> None:
+    # A `numbers_only` row (written before J33) never replaces the published edition.
+    conn = db.connect(db_path)
+    newer = recorded_payload().model_copy(update={"edition": "1440"})
+    insert(conn, newer, version=2, status="numbers_only")
+    only_numbers = sample_payload().model_copy(update={"date": date(2026, 11, 24)})
+    insert(conn, only_numbers, status="numbers_only")
+    conn.close()
+    c = client(db_path)
+    html = c.get("/d/2026-11-26").text
+    assert recorded_narrative().headline in html and "<p>Thu 26 Nov 2026 · 7:00 AM</p>" in html
+    assert c.get("/d/2026-11-24").status_code == 404
+    assert 'href="/d/2026-11-24"' not in c.get("/archive").text
 
 
 def test_report_by_date_with_narrative(db_path: Path) -> None:
@@ -76,7 +92,7 @@ def test_report_json(db_path: Path) -> None:
     resp = client(db_path).get("/api/report/2026-11-26.json")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["status"] == "numbers_only"
+    assert body["status"] == "published"
     killington = next(m for m in body["mountains"] if m["key"] == "killington")
     assert set(killington["forecast"]["windows"]) == {"1d", "3d", "5d"}
     assert ReportPayload.model_validate(body).date.isoformat() == "2026-11-26"
@@ -90,13 +106,13 @@ def test_archive_lists_dates_newest_first(db_path: Path) -> None:
 
 def test_new_version_replaces_cached_page(db_path: Path) -> None:
     c = client(db_path)
-    assert "Best bet" not in c.get("/d/2026-11-26").text
+    assert "8:15 AM edition" not in c.get("/d/2026-11-26").text
     conn = db.connect(db_path)
     payload = recorded_payload().model_copy(update={"edition": "0815"})
-    insert(conn, payload, version=2, status="published", narrative=True)
+    insert(conn, payload, version=2, narrative=sample_narrative())
     conn.close()
     html = c.get("/d/2026-11-26").text
-    assert "Best bet" in html and "<p>Thu 26 Nov 2026 · 8:15 AM</p>" in html
+    assert sample_narrative().headline in html and "<p>Thu 26 Nov 2026 · 8:15 AM</p>" in html
 
 
 def test_static_fonts_and_css(db_path: Path) -> None:
@@ -127,8 +143,8 @@ def test_page_renders_payload_from_a_newer_release(tmp_path: Path) -> None:
     conn = db.connect(path)
     db.migrate(conn)
     conn.execute(
-        "INSERT INTO report (for_date, version, payload, status, published_at)"
-        " VALUES (?, 1, ?, 'numbers_only', ?)",
+        "INSERT INTO report (for_date, version, headline, narrative_md, payload, status,"
+        " published_at) VALUES (?, 1, 'h', '## The storm', ?, 'published', ?)",
         (payload["date"], json.dumps(payload), payload["issued"]),
     )
     conn.close()
