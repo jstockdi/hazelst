@@ -6,12 +6,14 @@ order (data-model.md, "How the data compounds"):
 
 1. `resort`: the earliest non-stale resort report on X + 1 with a 24 h value
    (then `resort_llm`, which never overrides an adapter value);
-2. `pns` / `lsr`: point reports within 5 mi of the mountain in `snow_report`:
+2. `snocountry`: the resort-reported value SnoCountry holds for obs_date X + 1
+   (an inferred zero counts: the resort reported a base depth that day);
+3. `pns` / `lsr`: point reports within 5 mi of the mountain in `snow_report`:
    24 h reports ending 4-10 AM on X + 1; if there are none, reports of unknown
    span (LSRs, storm totals) ending in the window or by 10 AM on X + 1. The
    highest report counts, because spotters sit below the summits;
-3. `nohrsc`: the 24 h grid ending 12Z on X + 1;
-4. none: `NO_OBS`.
+4. `nohrsc`: the 24 h grid ending 12Z on X + 1;
+5. none: `NO_OBS`.
 
 `observation.obs_date` D means "the 24 h ending the morning of D", so day X
 reads obs_date X + 1. HIT is within 2 inches or 30% of the observed value.
@@ -49,7 +51,7 @@ class Observed:
     """The observed snow for one mountain-day and where it came from."""
 
     snow_in: float
-    source: str  # resort | resort_llm | pns | lsr | nohrsc
+    source: str  # resort | resort_llm | snocountry | pns | lsr | nohrsc
     detail: str  # observation id, or snow_report ids
 
 
@@ -105,6 +107,15 @@ def _resort(conn: sqlite3.Connection, mountain: str, obs_date: date) -> Observed
     return None
 
 
+def _snocountry(conn: sqlite3.Connection, mountain: str, obs_date: date) -> Observed | None:
+    row = conn.execute(
+        "SELECT id, new_24h_in FROM observation WHERE mountain = ? AND source = 'snocountry'"
+        " AND obs_date = ? AND new_24h_in IS NOT NULL ORDER BY id DESC LIMIT 1",
+        (mountain, obs_date.isoformat()),
+    ).fetchone()
+    return None if row is None else Observed(float(row[1]), "snocountry", f"observation:{row[0]}")
+
+
 def _point_reports(conn: sqlite3.Connection, mountain: str, day: date, tz: str) -> Observed | None:
     """The highest qualifying PNS / LSR report within 5 mi (see the module docstring)."""
     rows = conn.execute(
@@ -146,6 +157,7 @@ def observed(
     obs_date = day + timedelta(days=1)
     return (
         _resort(conn, mountain, obs_date)
+        or _snocountry(conn, mountain, obs_date)
         or _point_reports(conn, mountain, day, tz)
         or _nohrsc(conn, mountain, obs_date)
     )

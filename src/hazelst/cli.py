@@ -257,7 +257,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
 
 def _cmd_season_backfill(args: argparse.Namespace) -> int:
-    """Backfill `--from`..`--to` one month per job run, then rebuild `skill`."""
+    """Backfill `--from`..`--to` one month per job run, then rebuild `skill`.
+
+    With only whole-history sources (`--sources snocountry`) it is one job run.
+    """
     import time
 
     from hazelst import backfill
@@ -272,7 +275,13 @@ def _cmd_season_backfill(args: argparse.Namespace) -> int:
     started = time.monotonic()
     chunks = []
     code = 0
-    for first, last in backfill.chunks(args.start, args.to):
+    # Range-bound steps run one job per month; whole-history steps alone need one run.
+    pieces = (
+        [(args.start, args.to)]
+        if set(steps) <= backfill.WHOLE_HISTORY_STEPS
+        else list(backfill.chunks(args.start, args.to))
+    )
+    for first, last in pieces:
         options = {"start": first, "end": last, "steps": steps}
         try:
             summary = jobs.run_job(
@@ -298,6 +307,22 @@ def _cmd_season_backfill(args: argparse.Namespace) -> int:
     }
     print(json.dumps(out, indent=2, default=str))
     return code
+
+
+def _cmd_forecast_verify(args: argparse.Namespace) -> int:
+    """Re-score report dates `--from`..`--to` from stored observations (one job run)."""
+    cfg = config.load()
+    if args.to < args.start:
+        raise config.ConfigError("--to is before --from")
+    summary = jobs.run_job(
+        cfg,
+        "forecast-verify",
+        args.to,
+        options={"start": args.start, "end": args.to},
+        lock_timeout_s=args.lock_wait,
+    )
+    print(json.dumps(summary, indent=2, default=str))
+    return 0
 
 
 SMOKE_PAGE = """\
@@ -500,12 +525,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_backfill = sub.add_parser(
         "season-backfill",
-        help="load a past range (Previous Runs, IEM LSR / PNS, NOHRSC), then rebuild skill",
+        help="load a past range (Previous Runs, IEM LSR / PNS, NOHRSC, SnoCountry),"
+        " then rebuild skill",
     )
     p_backfill.add_argument("--from", dest="start", type=date.fromisoformat, required=True)
     p_backfill.add_argument("--to", type=date.fromisoformat, required=True)
     p_backfill.add_argument(
-        "--steps", help="comma-separated subset of previous_runs,lsr,pns,nohrsc (default: all)"
+        "--sources",
+        "--steps",
+        dest="steps",
+        help="comma-separated subset of previous_runs,lsr,pns,nohrsc,snocountry (default: all)",
     )
     p_backfill.add_argument("--no-learn", action="store_true", help="skip the skill-learn run")
     p_backfill.add_argument(
@@ -515,6 +544,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="seconds to wait for the job lock per month (default 1200)",
     )
     p_backfill.set_defaults(handler=_cmd_season_backfill)
+
+    p_verify = sub.add_parser(
+        "forecast-verify",
+        help="re-score every edition of each report date in a range from stored observations",
+    )
+    p_verify.add_argument("--from", dest="start", type=date.fromisoformat, required=True)
+    p_verify.add_argument("--to", type=date.fromisoformat, required=True)
+    p_verify.add_argument(
+        "--lock-wait",
+        type=float,
+        default=1200.0,
+        help="seconds to wait for the job lock (default 1200)",
+    )
+    p_verify.set_defaults(handler=_cmd_forecast_verify)
 
     p_schedule = sub.add_parser("schedule", help="print the job schedule and each slot's next run")
     p_schedule.set_defaults(handler=_cmd_schedule)

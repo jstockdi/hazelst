@@ -79,7 +79,8 @@ Cloudflare, like `bcl-gateway`).
 
 The container needs HTTPS egress to: `api.open-meteo.com`,
 `previous-runs-api.open-meteo.com` (`season-backfill` only), `api.weather.gov`,
-`mesonet.agron.iastate.edu`, the NOHRSC data host, each enabled resort report site, and
+`mesonet.agron.iastate.edu`, the NOHRSC data host, `good-cormorant-17.convex.site`
+and `snocountry.com` (SnoCountry), each enabled resort report site, and
 `api.anthropic.com` (Claude Agent SDK; nonessential CLI traffic such as
 telemetry and update checks is disabled). frank is dual-stack with no per-container egress filter
 today; if one is added, this is the allowlist.
@@ -120,6 +121,20 @@ today; if one is added, this is the allowlist.
   (NOHRSC grids are half of it). Run it outside the 6:45–9:00 AM and
   2:30–2:45 PM slots. It is idempotent: a rerun sends only the requests that
   failed before, so after an error the same command fills the gaps.
+
+  **SnoCountry history** (J23, once after its deploy): one request per
+  mountain loads the whole resort history, then the stored editions are
+  re-scored and `skill` is rebuilt:
+
+  ```bash
+  docker exec hazelst hazelst season-backfill --from 2019-11-01 --to 2026-04-30 --sources snocountry --no-learn
+  docker exec hazelst hazelst forecast-verify --from 2024-01-20 --to 2026-04-30
+  docker exec hazelst hazelst run skill-learn
+  ```
+
+  `--sources` takes any subset of `previous_runs,lsr,pns,nohrsc,snocountry`.
+  With `snocountry` alone it is one job run (about 2 s, 15,700 rows); a rerun
+  sends no requests.
 - **Failure behavior:** a failed source degrades that section (noted in the page
   footer); a failed Claude call publishes the numbers-only page with "report
   delayed" and retries every 15 minutes until 9 AM.

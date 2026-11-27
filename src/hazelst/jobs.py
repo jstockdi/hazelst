@@ -40,7 +40,17 @@ from hazelst.agents.schemas import ReportDraft
 from hazelst.models import Narrative, ReportPayload, ReportStatus
 from hazelst.render import page
 from hazelst.render.payload import build_payload
-from hazelst.sources import base, discussions, iem, nohrsc, nws, open_meteo, pns, snow_report
+from hazelst.sources import (
+    base,
+    discussions,
+    iem,
+    nohrsc,
+    nws,
+    open_meteo,
+    pns,
+    snocountry,
+    snow_report,
+)
 from hazelst.sources.resorts import source as resorts
 
 
@@ -346,6 +356,40 @@ def ingest_nohrsc(ctx: JobContext) -> dict[str, Any]:
     return {"latest": latest.isoformat(), "ends": out or "up to date"}
 
 
+def ingest_snocountry(ctx: JobContext) -> dict[str, Any]:
+    """Each mountain's SnoCountry document → `observation` (source snocountry), upserted.
+
+    The current report fills today's row when the resort feed fails; the
+    history refreshes past rows. A failed mountain is reported; the step fails
+    only when every mountain fails.
+    """
+    statuses: dict[str, Any] = {}
+    ok = 0
+    for m in ctx.cfg.mountains:
+        if not m.snocountry_id:
+            continue
+        try:
+            fetched = snocountry.fetch_one(ctx.client, m)
+            rows = snocountry.normalize(fetched, ctx.cfg.timezone)
+        except (base.SourceError, snocountry.NormalizeError) as exc:
+            statuses[m.key] = {"status": "failed", "error": str(exc)}
+            continue
+        with db.transaction(ctx.conn):
+            fetch_id = base.store_fetch(ctx.conn, ctx.run_id, fetched)
+            written = snocountry.store(ctx.conn, rows, fetch_id)
+        latest = rows[-1] if rows else None
+        statuses[m.key] = {
+            "status": "ok",
+            "observation": written,
+            "latest": latest.obs_date if latest else None,
+            "fallback": fetched.url != snocountry.URL,
+        }
+        ok += 1
+    if statuses and not ok:
+        raise JobError("snocountry: every mountain failed")
+    return {"ok": ok, "mountains": statuses}
+
+
 def ingest_resorts(ctx: JobContext, agents: AgentClient | None = None) -> dict[str, Any]:
     """Resort report adapters: fetch within the daily budget, store `observation` rows.
 
@@ -421,6 +465,7 @@ OBS_SOURCES: dict[str, SourceStep] = {
     "lsr": ingest_lsr,
     "nohrsc": ingest_nohrsc,
     "resorts": ingest_resorts,
+    "snocountry": ingest_snocountry,
 }
 
 
@@ -676,7 +721,17 @@ def forecast_verify(ctx: JobContext) -> None:
     morning) is published by then, so it is read first; resort and point
     reports for this morning came in with today's `ingest-obs`. The run's
     date is the evening it runs: `hazelst run forecast-verify --date D` scores D - 1.
+
+    With options `start` and `end` (`hazelst forecast-verify --from --to`), it
+    re-scores every report date in that range from the stored observations
+    instead, fetching nothing.
     """
+    start, end = ctx.options.get("start"), ctx.options.get("end")
+    if start is not None or end is not None:
+        if not isinstance(start, date) or not isinstance(end, date) or end < start:
+            raise JobError("forecast-verify range needs start <= end")
+        rescore_range(ctx, start, end)
+        return
     try:
         ctx.summary["nohrsc"] = {"status": "ok", **ingest_nohrsc(ctx)}
     except Exception as exc:  # a missing grid leaves the resort and point reports
@@ -691,6 +746,32 @@ def forecast_verify(ctx: JobContext) -> None:
         scored[day.isoformat()] = {"rows": written, "model_mean": verify.summarize(rows)}
     ctx.summary["scored"] = scored
     log_event(run_id=ctx.run_id, step="forecast-verify", scored=scored)
+
+
+def rescore_range(ctx: JobContext, start: date, end: date) -> None:
+    """Re-score each report date `start`..`end` that has stored editions."""
+    days = rows_total = 0
+    sources: dict[str, int] = {}
+    day = start
+    while day <= end:
+        rows = verify.verify_date(ctx.conn, ctx.cfg.mountains, day, ctx.cfg.timezone)
+        if rows:
+            with db.transaction(ctx.conn):
+                rows_total += verify.store(ctx.conn, rows)
+            days += 1
+            for r in rows:
+                if r.method == verify.RAW_MEAN:
+                    key = r.observed_source or "none"
+                    sources[key] = sources.get(key, 0) + 1
+        day += timedelta(days=1)
+    ctx.summary["rescored"] = {
+        "from": start.isoformat(),
+        "to": end.isoformat(),
+        "days": days,
+        "rows": rows_total,
+        "model_mean_observed_source": dict(sorted(sources.items())),
+    }
+    log_event(run_id=ctx.run_id, step="forecast-verify", rescored=ctx.summary["rescored"])
 
 
 # --- backup ------------------------------------------------------------------------------
@@ -853,4 +934,5 @@ RECORDERS: dict[str, tuple[Recorder, Callable[[base.Fetched], str]]] = {
     "nws": (nws.fetch, nws.label),
     "discussions": (lambda client, _mountains: discussions.fetch(client), discussions.label),
     "resorts": (resorts.record, resorts.label),
+    "snocountry": (snocountry.fetch, snocountry.label),
 }

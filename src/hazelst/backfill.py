@@ -11,6 +11,8 @@ For report days `start`..`end` (local dates):
   -> `discussion` (`PNS`), `snow_report`.
 - `nohrsc`: the NOHRSC 24 h grid ending 12Z on each day + 1 (the day's
   obs_date) -> `observation` (`nohrsc`).
+- `snocountry`: one request per mountain for the resort's whole SnoCountry
+  history (not limited to the range) -> `observation` (`snocountry`).
 
 `skill-learn` then learns from these days like verified live days: the
 observation comes from `verify.observed` (no `verification` rows exist for a
@@ -18,10 +20,12 @@ backfilled day), and the forecasts from `forecast_hourly`.
 
 Idempotent: a request whose response is already stored with HTTP 200 (same
 source, URL, and query) is not sent again, PNS products are fetched once
-(`discussion` ids), and NOHRSC dates with stored rows are skipped. Rerunning a
-range therefore sends only the requests that failed before and writes nothing
-twice. The CLI runs one job per month so the job lock is released between
-months and scheduled jobs are not held up for the whole season.
+(`discussion` ids), NOHRSC dates with stored rows are skipped, and a
+SnoCountry resort already stored is not requested again (its rows upsert).
+Rerunning a range therefore sends only the requests that failed before and
+writes nothing twice. The CLI runs one job per month so the job lock is
+released between months and scheduled jobs are not held up for the whole
+season (one job in all when only whole-history steps are selected).
 """
 
 from __future__ import annotations
@@ -38,7 +42,16 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from hazelst import config, db
-from hazelst.sources import base, iem, nohrsc, open_meteo, pns, previous_runs, snow_report
+from hazelst.sources import (
+    base,
+    iem,
+    nohrsc,
+    open_meteo,
+    pns,
+    previous_runs,
+    snocountry,
+    snow_report,
+)
 
 
 @dataclass
@@ -279,8 +292,43 @@ class Backfill:
             day += timedelta(days=1)
         return counts
 
+    def snocountry(self, start: date, end: date) -> Counts:
+        """Each mountain's full SnoCountry history, once (the range does not narrow it)."""
+        counts = Counts()
+        for m in self.cfg.mountains:
+            if not m.snocountry_id:
+                continue
+            query = snocountry.params(m.snocountry_id)
+            if self._seen(snocountry.SOURCE, snocountry.URL, query) or self._seen(
+                snocountry.SOURCE, snocountry.FALLBACK_URL, query
+            ):
+                counts.cached += 1
+                continue
+            fetched = self._get(
+                counts,
+                snocountry.SOURCE,
+                snocountry.URL,
+                query,
+                partial(snocountry.fetch_one, self.client, m),
+            )
+            if fetched is None:
+                continue
+            try:
+                rows = snocountry.normalize(fetched, self.cfg.timezone)
+            except snocountry.NormalizeError as exc:
+                counts.errors.append(str(exc))
+                continue
+            with db.transaction(self.conn):
+                fetch_id = base.store_fetch(self.conn, self.run_id, fetched)
+                counts.add("observation", snocountry.store(self.conn, rows, fetch_id))
+            counts.add("inferred_zero", sum(1 for r in rows if r.inferred_zero))
+            self._remember(fetched)
+        return counts
 
-STEPS: tuple[str, ...] = ("previous_runs", "lsr", "pns", "nohrsc")
+
+STEPS: tuple[str, ...] = ("previous_runs", "lsr", "pns", "nohrsc", "snocountry")
+# Steps that load a whole history in one pass, whatever the range.
+WHOLE_HISTORY_STEPS = frozenset({"snocountry"})
 
 
 def run(bf: Backfill, start: date, end: date, steps: tuple[str, ...] = STEPS) -> dict[str, Any]:
