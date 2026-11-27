@@ -30,9 +30,8 @@ decisions row 26.
   summed into days and windows like `raw_mean`: the headline is the mean of
   the models in use (stale models left out), the range the min-max of the
   per-model totals.
-- **Gate.** The page uses `resort_ratio` for a mountain's headline, range,
-  chart, and table only where it beats `raw_mean` on the mountain's last 20
-  verified days (`corrected.gate`).
+- **Where it shows.** The page uses `resort_ratio` for a mountain's headline,
+  range, chart, and table only where `method_gate` chose it (`method.py`).
 """
 
 from __future__ import annotations
@@ -581,14 +580,6 @@ def store_rows(
     return len(params)
 
 
-def shown(
-    conn: sqlite3.Connection, mountains: Iterable[str], before: date
-) -> dict[str, corrected.GateResult]:
-    """Gate results for the mountains whose headline the page takes from `resort_ratio`."""
-    results = (corrected.gate(conn, m, before, METHOD) for m in mountains)
-    return {g.mountain: g for g in results if g.passed}
-
-
 def apply(
     forecast: Forecast, computed: Mapping[str, RatioForecast], passed: Iterable[str]
 ) -> Forecast:
@@ -725,7 +716,28 @@ def _corrected_value(
     return sum(values[m] * weights[m] for m in values) / sum(weights.values())
 
 
-def backtest(
+# Backtest method -> the `forecast_window` method it reproduces (others keep their name).
+LIVE_NAMES: dict[str, str] = {"ratio_upslope": METHOD}
+
+
+@dataclass(frozen=True)
+class HeldOutDay:
+    """One held-out mountain-day: the resort report and each backtest method's forecast."""
+
+    mountain: str
+    day: date
+    observed: float
+    forecasts: dict[str, float]  # backtest method -> 1d forecast, rounded to 0.01
+
+
+@dataclass(frozen=True)
+class HeldOut:
+    fit_days: int
+    days: list[HeldOutDay]
+    corrected_fallback_days: int
+
+
+def held_out(
     conn: sqlite3.Connection,
     mountains: Sequence[Mountain],
     *,
@@ -733,13 +745,13 @@ def backtest(
     test_from: date,
     test_to: date,
     tz: str = TIMEZONE,
-) -> Backtest:
-    """Fit on lead-day-1 days through `fit_to` only; score `test_from`..`test_to`.
+) -> HeldOut:
+    """Fit on lead-day-1 days through `fit_to` only; each method's forecast for the test days.
 
-    A test day is a mountain-day with a resort report where the report or any
-    method's forecast is at least 0.5 inch, so every method is scored on the
-    same days. `corrected` uses skill cells learned through `fit_to`; a day
-    without cells takes the raw mean.
+    A test day is a mountain-day `test_from`..`test_to` with a resort report
+    where the report or any method's forecast is at least 0.5 inch, so every
+    method is scored on the same days. `corrected` uses skill cells learned
+    through `fit_to`; a day without cells takes the raw mean.
     """
     keys = {m.key for m in mountains}
     days = {k: v for k, v in lead_days(conn, tz, end=test_to).items() if k[0] in keys}
@@ -747,7 +759,7 @@ def backtest(
     pairs = fit_pairs(days, observed, lambda d: d <= fit_to)
     ratios = Ratios(fit(pairs, fit_to))
     cells = _corrected_cells(conn, mountains, fit_to, tz)
-    rows: dict[str, list[tuple[str, float, float]]] = defaultdict(list)
+    out: list[HeldOutDay] = []
     fallback = 0
     for key, ld in sorted(days.items()):
         if not test_from <= ld.day <= test_to or key not in observed:
@@ -759,24 +771,47 @@ def backtest(
         temp = ratios.mean_snow(ld, split=False)
         upslope = ratios.mean_snow(ld, split=True)
         found = _corrected_value(ld.mountain, raw, cells)
-        corr = mean if found is None else found
         forecasts = {
             "raw_mean": mean,
             "flat_10": mean * FLAT_RATIO / SNOW_PER_WATER,
             "ratio_temp": mean if temp is None else temp,
             "ratio_upslope": mean if upslope is None else upslope,
-            "corrected": corr,
+            "corrected": mean if found is None else found,
         }
         obs = observed[key]
         if max(obs, *forecasts.values()) < learn.SNOW_DAY_IN:
             continue
         fallback += 1 if found is None else 0
-        for method, value in forecasts.items():
-            rows[method].append((ld.mountain, round(value, 2), obs))
+        out.append(
+            HeldOutDay(ld.mountain, ld.day, obs, {m: round(v, 2) for m, v in forecasts.items()})
+        )
+    return HeldOut(
+        fit_days=len({(ld.mountain, ld.day) for ld, _ in pairs}),
+        days=out,
+        corrected_fallback_days=fallback,
+    )
+
+
+def backtest(
+    conn: sqlite3.Connection,
+    mountains: Sequence[Mountain],
+    *,
+    fit_to: date,
+    test_from: date,
+    test_to: date,
+    tz: str = TIMEZONE,
+) -> Backtest:
+    """`held_out`, scored per mountain and for all: n, bias ratio, MAE, hit rate."""
+    found = held_out(conn, mountains, fit_to=fit_to, test_from=test_from, test_to=test_to, tz=tz)
+    keys = sorted({m.key for m in mountains})
     out: list[BacktestCell] = []
-    for mountain in [*sorted(keys), ALL_MOUNTAINS]:
+    for mountain in [*keys, ALL_MOUNTAINS]:
         for method in BACKTEST_METHODS:
-            group = [(f, o) for m, f, o in rows[method] if mountain in (ALL_MOUNTAINS, m)]
+            group = [
+                (d.forecasts[method], d.observed)
+                for d in found.days
+                if mountain in (ALL_MOUNTAINS, d.mountain) and method in d.forecasts
+            ]
             if not group:
                 continue
             forecast_total = sum(f for f, _ in group)
@@ -798,7 +833,7 @@ def backtest(
         fit_to=fit_to,
         test_from=test_from,
         test_to=test_to,
-        fit_days=len({(ld.mountain, ld.day) for ld, _ in pairs}),
+        fit_days=found.fit_days,
         cells=out,
-        corrected_fallback_days=fallback,
+        corrected_fallback_days=found.corrected_fallback_days,
     )

@@ -95,6 +95,7 @@ hazelst/
     stations.py          # stations summary: season snowfall per GHCN station by elevation
     knowledge.py         # validate and store knowledge-propose output; owner decisions
     corrected.py         # corrected forecast method
+    method.py            # method choice per mountain (method_gate)
     digest.py            # DB -> report-write input
     agents/
       client.py          # one place for SDK options, model, effort, logging, daily call cap

@@ -56,7 +56,7 @@ def test_migrate_from_empty_matches_data_model(db_path: Path) -> None:
     assert db.migrate(c) == ALL
     assert db.user_version(c) == LATEST
     assert schema(c) == spec_schema()
-    assert len(schema(c)) == 18
+    assert len(schema(c)) == 19
 
 
 def test_migrate_rerun_is_noop(db_path: Path) -> None:

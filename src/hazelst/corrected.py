@@ -1,4 +1,4 @@
-"""The `corrected` forecast method and the gate that decides when the page shows it.
+"""The `corrected` forecast method.
 
 data-model.md, "How the data compounds", step 4:
 
@@ -11,12 +11,10 @@ data-model.md, "How the data compounds", step 4:
   proportional to 1 / MAE. A window gets a `corrected` row only when every
   segment it spans has at least one qualifying model; models without a cell
   are left out of the blend.
-- **Gate.** `report-build` stores `corrected` rows whenever they exist, and
-  `forecast-verify` scores them beside `raw_mean`. The page shows the
-  corrected value for a mountain only after it beats the model mean on the
-  mountain's last 20 verified days: the mean absolute error of `corrected`
-  over the 1d rows of those days (every edition where both were scored) is
-  below that of `raw_mean`.
+- **Where it shows.** `report-build` stores `corrected` rows whenever they
+  exist, and `forecast-verify` scores them beside `raw_mean`. The page shows
+  the corrected value beneath the headline only for a mountain where
+  `method_gate` chose it (`method.py`, decisions row 28).
 """
 
 from __future__ import annotations
@@ -25,16 +23,13 @@ import json
 import sqlite3
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
 
-from hazelst import verify
 from hazelst.derive import confidence
 from hazelst.learn import ALL_TAGS
 from hazelst.models import Forecast, MountainForecast, WindowKey
 
 METHOD = "corrected"
 MIN_N = 10
-GATE_DAYS = 20
 SCALE_LIMITS = (0.25, 4.0)
 MIN_MAE_IN = 0.1  # floor for the 1 / MAE weight
 SEGMENTS: dict[WindowKey, tuple[str, ...]] = {
@@ -68,23 +63,6 @@ class CorrectedWindow:
     lo_in: float
     hi_in: float
     by_model: dict[str, float | None]  # each model's corrected window total, where it has cells
-
-
-@dataclass(frozen=True)
-class GateResult:
-    mountain: str
-    days: int
-    method_mae: float | None  # the gated method's MAE (corrected, or resort_ratio)
-    raw_mean_mae: float | None
-
-    @property
-    def passed(self) -> bool:
-        return (
-            self.days >= GATE_DAYS
-            and self.method_mae is not None
-            and self.raw_mean_mae is not None
-            and self.method_mae < self.raw_mean_mae
-        )
 
 
 # --- skill cells -----------------------------------------------------------------------
@@ -208,41 +186,6 @@ def store(
         params,
     )
     return len(params)
-
-
-# --- gate ----------------------------------------------------------------------------------
-
-
-def gate(conn: sqlite3.Connection, mountain: str, before: date, method: str = METHOD) -> GateResult:
-    """`method` (default corrected) vs. the model mean over the mountain's last 20 verified
-    days before `before`: 1d rows of every edition where both were scored."""
-    rows = conn.execute(
-        "SELECT c.for_date, abs(c.error_in), abs(r.error_in) FROM verification c"
-        " JOIN verification r ON r.for_date = c.for_date AND r.edition = c.edition"
-        "  AND r.mountain = c.mountain AND r.window = c.window AND r.method = ?"
-        " WHERE c.mountain = ? AND c.window = ? AND c.method = ? AND c.for_date < ?"
-        "  AND c.result != 'NO_OBS' AND r.result != 'NO_OBS'"
-        " ORDER BY c.for_date DESC",
-        (verify.RAW_MEAN, mountain, verify.WINDOW, method, before.isoformat()),
-    ).fetchall()
-    days = set(sorted({r[0] for r in rows}, reverse=True)[:GATE_DAYS])
-    kept = [r for r in rows if r[0] in days]
-    if not kept:
-        return GateResult(mountain, 0, None, None)
-    return GateResult(
-        mountain=mountain,
-        days=len(days),
-        method_mae=round(sum(r[1] for r in kept) / len(kept), 3),
-        raw_mean_mae=round(sum(r[2] for r in kept) / len(kept), 3),
-    )
-
-
-def shown(
-    conn: sqlite3.Connection, mountains: Iterable[str], before: date
-) -> dict[str, GateResult]:
-    """Gate results for the mountains whose corrected value the page shows."""
-    results = (gate(conn, m, before) for m in mountains)
-    return {g.mountain: g for g in results if g.passed}
 
 
 def apply(

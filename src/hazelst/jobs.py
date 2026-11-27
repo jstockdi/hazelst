@@ -30,6 +30,7 @@ from hazelst import (
     digest,
     knowledge,
     learn,
+    method,
     narrative,
     ratio,
     verify,
@@ -660,9 +661,10 @@ def build_report(ctx: JobContext, kind: str) -> None:
         raise JobError(f"ingest run {ingest_run} has no forecast rows")
     raw = derive.derive(ctx.cfg.mountains, inputs, for_date=ctx.for_date, as_of=now)
     corrections = corrected.correct(raw, corrected.load_cells(ctx.conn))
-    passed = corrected.shown(ctx.conn, corrections, ctx.for_date)
     ratio_forecasts = ratio.compute(raw, inputs.hourly, ratio.Ratios.load(ctx.conn))
-    ratio_passed = ratio.shown(ctx.conn, ratio_forecasts, ctx.for_date)
+    choice = method.load(ctx.conn)
+    passed = [m for m in choice.shows(corrected.METHOD) if m in corrections]
+    ratio_passed = [m for m in choice.uses(ratio.METHOD) if m in ratio_forecasts]
     forecast = ratio.apply(corrected.apply(raw, corrections, passed), ratio_forecasts, ratio_passed)
     notes: list[str] = []
     ingested = datetime.fromisoformat(started[0])
@@ -847,13 +849,17 @@ def backup(ctx: JobContext) -> None:
 
 
 def skill_learn(ctx: JobContext) -> None:
-    """Rebuild `skill` (learn.py) and refit `snow_ratio` (ratio.py) from verified days."""
+    """Rebuild `skill` (learn.py), refit `snow_ratio` (ratio.py), and re-choose each
+    mountain's method (`method_gate`, method.py) from verified days."""
     found = learn.samples(ctx.conn, ctx.cfg.mountains, ctx.for_date, ctx.cfg.timezone)
     rows = learn.build(found)
     ratios = ratio.refit(ctx.conn, ctx.cfg.mountains, ctx.for_date, ctx.cfg.timezone)
     with db.transaction(ctx.conn):
         written = learn.store(ctx.conn, rows, clock())
         ratio_rows = ratio.store(ctx.conn, ratios)
+    gate = method.choose(ctx.conn, ctx.cfg.mountains, ctx.for_date, ctx.cfg.timezone)
+    with db.transaction(ctx.conn):
+        method.store(ctx.conn, gate, clock())
     ctx.summary.update(
         {
             "samples": len(found),
@@ -864,6 +870,9 @@ def skill_learn(ctx: JobContext) -> None:
             "snow_ratio_mountains": sorted(
                 {r.mountain for r in ratios if r.mountain != ratio.ALL_MOUNTAINS}
             ),
+            "method_gate": {
+                r.mountain: r.method for r in gate if r.chosen and r.method not in method.BESIDE
+            },
         }
     )
     log_event(

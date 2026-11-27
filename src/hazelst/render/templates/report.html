@@ -43,12 +43,12 @@
     <thead><tr><th>Mountain</th><th>Next<br>24 h</th><th>Next<br>3 days</th><th>Next<br>5 days</th></tr></thead>
     <tbody>
 {% for m in rows %}
-      <tr><td class="name">{{ m.name }}<small>{{ method_labels[m.forecast.method] }}</small>{% if not m.is_open %}<small>closed</small>{% endif %}</td>
+      <tr><td class="name">{{ m.name }}<small>{{ method_labels.get(m.forecast.method, m.forecast.method) }}</small>{% if not m.is_open %}<small>closed</small>{% endif %}</td>
 {%- for key in ("1d", "3d", "5d") %}{% set w = m.forecast.windows[key] %}<td><b>{{ w.snow_in | num }}″</b>{% if w.range[1] > w.range[0] %}<small>{{ w.range[0] | num }}–{{ w.range[1] | num }}</small>{% endif %}{% if w.nws_in is not none %}<small>NWS {{ w.nws_in | num }}</small>{% endif %}{% if w.raw_mean_in is not none %}<small>Mean {{ w.raw_mean_in | num }}″</small>{% endif %}{% if w.corrected_in is not none %}<small>Corrected {{ w.corrected_in | num }}″</small>{% endif %}</td>{% endfor %}</tr>
 {% endfor %}
     </tbody>
   </table>
-  <p class="lead fct-note">Model mean: Open-Meteo snowfall (7:1), mean of the models. Resort ratio: each model's snow water times the ratio fitted to that resort's reports, shown where it has beaten the mean on the mountain's last 20 verified days.</p>
+  <p class="lead fct-note">Model mean: Open-Meteo snowfall (7:1), mean of the models. Resort ratio: each model's snow water times the ratio fitted to that resort's reports, shown where its average 1-day error beat the mean's by at least 0.05″ on the last complete season (fitted on earlier seasons), or on this season's verified snow days once a mountain has 20. Corrected, where shown, passed the same test.</p>
 
   <div class="part">Accumulation · snow that has fallen</div>
   <h2>Last 7 days</h2>
