@@ -325,6 +325,25 @@ def _cmd_forecast_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_stations_summary(args: argparse.Namespace) -> int:
+    """Season snowfall per GHCN station near each mountain, highest first."""
+    from hazelst import stations
+    from hazelst.sources import ghcn
+
+    cfg = config.load()
+    listed = ghcn.load_stations(ghcn.stations_path(cfg.settings))
+    conn = _open_db(cfg)
+    try:
+        rows = stations.summary(conn, cfg.mountains, listed, args.season)
+    finally:
+        conn.close()
+    if args.json:
+        print(json.dumps(stations.as_dict(rows), indent=2))
+    else:
+        print(stations.format_text(rows, args.season), end="")
+    return 0
+
+
 SMOKE_PAGE = """\
 Snow Report - updated 6:42 AM
 Sample page for the hazelst agent smoke test.
@@ -525,7 +544,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_backfill = sub.add_parser(
         "season-backfill",
-        help="load a past range (Previous Runs, IEM LSR / PNS, NOHRSC, SnoCountry),"
+        help="load a past range (Previous Runs, IEM LSR / PNS, NOHRSC, SnoCountry,"
+        " GHCN-Daily),"
         " then rebuild skill",
     )
     p_backfill.add_argument("--from", dest="start", type=date.fromisoformat, required=True)
@@ -534,7 +554,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--sources",
         "--steps",
         dest="steps",
-        help="comma-separated subset of previous_runs,lsr,pns,nohrsc,snocountry (default: all)",
+        help="comma-separated subset of previous_runs,lsr,pns,nohrsc,snocountry,ghcn"
+        " (default: all)",
     )
     p_backfill.add_argument("--no-learn", action="store_true", help="skip the skill-learn run")
     p_backfill.add_argument(
@@ -558,6 +579,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="seconds to wait for the job lock (default 1200)",
     )
     p_verify.set_defaults(handler=_cmd_forecast_verify)
+
+    p_stations = sub.add_parser("stations", help="GHCN-Daily stations near each mountain")
+    stations_sub = p_stations.add_subparsers(dest="stations_command", metavar="<stations-command>")
+    p_st_summary = stations_sub.add_parser(
+        "summary", help="season snowfall per station by elevation, next to SnoCountry"
+    )
+    p_st_summary.add_argument(
+        "--season", type=int, required=True, help="season start year (2025 = 2025-26)"
+    )
+    p_st_summary.add_argument("--json", action="store_true", help="print JSON")
+    p_st_summary.set_defaults(handler=_cmd_stations_summary)
 
     p_schedule = sub.add_parser("schedule", help="print the job schedule and each slot's next run")
     p_schedule.set_defaults(handler=_cmd_schedule)

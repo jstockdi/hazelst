@@ -97,7 +97,7 @@ CREATE TABLE observation (                  -- one row per source per mountain p
   surface TEXT, raw JSON
 );
 CREATE TABLE snow_report (                  -- point reports: NWS PNS / LSR, GHCN-Daily stations
-  id TEXT PRIMARY KEY, product_id TEXT, place TEXT, -- id: "lat,lon,ending_at,snow_in" (lat/lon to 2 dp)
+  id TEXT PRIMARY KEY, product_id TEXT, place TEXT, -- id: "lat,lon,ending_at,snow_in" (lat/lon to 2 dp); GHCN: "ghcn:{station}:{date}", product_id 'GHCN'
   lat REAL, lon REAL, elev_ft INT, ending_at TEXT,
   snow_in REAL, hours INT,
   nearest_mountain TEXT, distance_mi REAL
@@ -190,8 +190,10 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
    are not copied into `observation`. Day X (6 AM X to 6 AM X + 1) reads
    obs_date X + 1: the earliest non-stale resort report that day (`resort_llm`
    only without an adapter value); else the `snocountry` row for obs_date
-   X + 1; else the highest PNS / LSR report within
-   5 mi, using 24 h reports ending 4–10 AM on X + 1, or reports of unknown span
+   X + 1; else the highest PNS / LSR / GHCN report within
+   5 mi (`observed_source` `pns`, `lsr`, or `ghcn`; on a tie the GHCN copy is
+   named), using 24 h reports ending 4–10 AM on X + 1 (GHCN co-op and CoCoRaHS
+   days end at 7 AM; Mount Washington's calendar day never qualifies), or reports of unknown span
    (LSRs, storm totals) ending in the window by 10 AM; else the NOHRSC 24 h
    grid ending 12Z on X + 1. HIT is within 2″ or 30% of the observation.
    `forecast-verify` runs at 9 PM on X + 1 and scores the newest report

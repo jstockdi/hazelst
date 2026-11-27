@@ -489,6 +489,39 @@ day ends at the morning observation) and midnight ending the date for
 Mount Washington (`USW00014755`, calendar day). The 5 mi rule in
 verification then treats a co-op report like a 24 h PNS report.
 
+Implementation (J24, verified 2026-11-26):
+
+- **Station list:** `config/stations.json`, generated 2026-11-26 by
+  `scripts/make_stations.py` from NCEI `ghcnd-stations.txt` and
+  `ghcnd-inventory.txt`: US stations in VT, NH, ME, NY, and MA whose
+  inventory shows `SNOW` with a last year of 2024 or later (the inventory
+  gives years only), within 20 mi of a mountain, plus `USW00014755` for
+  Loon, Cranmore, Sunday River, and Sugarloaf. A station near two mountains
+  has one entry per mountain (132 stations, 158 entries: Killington 21,
+  Pico 20, Sugarbush 42, Stratton 28, Loon 13, Cranmore 18, Sunday River 9,
+  Sugarloaf 7). The `snow_report` row takes the entry with the smallest
+  distance. Within 5 mi (eligible as truth): Cranmore 4 stations, Stratton
+  3, Sugarbush 1; the other five mountains have none.
+- **Requests:** the service allows at most 100 stations per request
+  (HTTP 400 above that); requests carry 50. Values are strings (`"4.2"`); a
+  date without `SNOW`, or with a non-numeric value, has no row. `SNWD` is
+  fetched and kept in the raw `fetch` body; `snow_report` has no depth
+  column.
+- **`ending_at`:** 7 AM local for co-op (`USC…`) and CoCoRaHS (`US1…`)
+  stations; midnight ending the date for first-order stations (`USW…`:
+  Mount Washington and the Rutland, Montpelier, and Berlin airports),
+  which keep a calendar day. A calendar-day report never falls in the
+  4–10 AM window, so it is context only.
+- **Storage:** rows insert or replace (a later, quality-checked value wins);
+  GHCN ids never collide with PNS / LSR ids. A CoCoRaHS report can also
+  appear in a PNS; both rows are kept, and verification names `ghcn` when
+  they tie for the highest value.
+- **Runs:** `ingest-obs` step `ghcn` re-reads the last 10 days (report date
+  − 9 .. report date) every run; `season-backfill --sources ghcn` reads
+  dates start..end + 1 per month. `hazelst stations summary --season Y`
+  prints each mountain's stations by elevation with season snowfall (July 1
+  Y to June 30 Y + 1) and days reported, next to the SnoCountry season total.
+
 Examples near each mountain (elevation, distance from the configured point):
 Lonesome Lake Hut 2,746 ft, 8 mi (Loon); Hermit Lake Snowplot 3,749 ft,
 16 mi (Cranmore); Shrewsbury 0.8 W 1,463 ft, 7 mi (Killington); Bondville
@@ -503,12 +536,13 @@ Each `ingest-obs` run for report date D:
 |------|-------|--------|
 | `pns` | For each office, the api.weather.gov PNS listing (the IEM AFOS listing for D − 1 and D when the live listing fails, or when D is older than yesterday); then each product issued from the start of D − 1 to the end of D (local) that is not stored yet | Text in `discussion` (`kind = 'PNS'`, AFOS product id, so a product is fetched once whichever path found it); reports in `snow_report` |
 | `lsr` | IEM LSR GeoJSON for the same window (UTC) | `snow_report` (`hours` null) |
+| `ghcn` | NCEI GHCN-Daily for every listed station, dates D − 9..D (J24) | `snow_report` (`hours` 24) |
 | `nohrsc` | The 24 h, 48 h, and season grids ending 12Z on the newest published date (D − 1 during the day; D after 00:30Z on D + 1, which covers the 9 PM `forecast-verify`), plus the grids ending D − 8 once more if they were first read before the 7-day reprocessing window | One `observation` row per mountain per end date: `source = 'nohrsc'`, `obs_date` = the end date, `reported_at` = 12Z on it, `new_24h_in`, `new_48h_in`, `season_in`; `fetch_id` is the 24 h grid and `raw` holds the pixel, grid URLs, and every grid's `fetch` id. A re-read replaces the rows |
 | `snocountry` (J23) | Each mountain's SnoCountry document ([SnoCountry](#snocountry)) | `observation` rows (`source = 'snocountry'`) upserted per mountain and date: the current report and the history |
 
 The 72 h grid has no `observation` column and is not fetched. A step fails
 (and its section shows "source unavailable") when no office listing could be
-read (`pns`), the LSR request fails (`lsr`), or the newest NOHRSC 24 h grid is
+read (`pns`), the LSR request fails (`lsr`), no GHCN batch succeeds (`ghcn`), or the newest NOHRSC 24 h grid is
 neither stored nor fetchable (`nohrsc`); the other steps still run.
 
 `obs_date` convention (all `observation` sources): obs_date D is the 24 h
@@ -543,8 +577,8 @@ backfills GFS and GEM, and ECMWF `skill` rows start from live verification.
 
 ### Season backfill (J22)
 
-`hazelst season-backfill --from D --to D` loads report days D..D into the
-live tables, one `season-backfill` job per calendar month, then runs
+`hazelst season-backfill --from D --to D [--sources a,b]` loads report days
+D..D into the live tables (all steps, or the listed ones), one `season-backfill` job per calendar month, then runs
 `skill-learn` (`backfill.py`, `sources/previous_runs.py`):
 
 | Step | Request | Writes |
@@ -554,6 +588,7 @@ live tables, one `season-backfill` job per calendar month, then runs
 | `pns` | IEM AFOS listing per office per day (D..end + 1), then each new product's text | `discussion` (`PNS`), `snow_report` |
 | `nohrsc` | The 24 h grid ending 12Z on each obs_date (D + 1..end + 1) | `observation` (`nohrsc`) |
 | `snocountry` | One document per mountain, the whole history whatever the range (J23) | `observation` (`snocountry`), upserted |
+| `ghcn` | NCEI Access Data Service, `SNOW,SNWD` for dates D..end + 1, one request per 50 stations in `config/stations.json` (J24) | `snow_report` (`product_id` `GHCN`) |
 
 `--sources` (alias `--steps`) selects steps, e.g. `--sources snocountry`;
 with only whole-history steps the command is a single job run, not one per

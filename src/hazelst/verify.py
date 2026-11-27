@@ -8,10 +8,12 @@ order (data-model.md, "How the data compounds"):
    (then `resort_llm`, which never overrides an adapter value);
 2. `snocountry`: the resort-reported value SnoCountry holds for obs_date X + 1
    (an inferred zero counts: the resort reported a base depth that day);
-3. `pns` / `lsr`: point reports within 5 mi of the mountain in `snow_report`:
-   24 h reports ending 4-10 AM on X + 1; if there are none, reports of unknown
-   span (LSRs, storm totals) ending in the window or by 10 AM on X + 1. The
-   highest report counts, because spotters sit below the summits;
+3. `pns` / `lsr` / `ghcn`: point reports within 5 mi of the mountain in
+   `snow_report`: 24 h reports ending 4-10 AM on X + 1 (PNS `SNOW_24`, and
+   GHCN co-op and CoCoRaHS days, which end at 7 AM); if there are none,
+   reports of unknown span (LSRs, storm totals) ending in the window or by
+   10 AM on X + 1. The highest report counts, because spotters sit below the
+   summits; on a tie the GHCN copy is named (a quality-checked record);
 4. `nohrsc`: the 24 h grid ending 12Z on X + 1;
 5. none: `NO_OBS`.
 
@@ -44,6 +46,7 @@ WINDOW = "1d"
 RAW_MEAN = "raw_mean"
 SEASON_LOOKBACK_DAYS = 3  # season and base come from a report at most this old
 DAILY_REPORT_HOURS = (4, 10)  # a 24 h point report ending in this local-hour range
+GHCN_PRODUCT = "GHCN"  # snow_report.product_id of GHCN-Daily station rows
 
 
 @dataclass(frozen=True)
@@ -51,7 +54,7 @@ class Observed:
     """The observed snow for one mountain-day and where it came from."""
 
     snow_in: float
-    source: str  # resort | resort_llm | snocountry | pns | lsr | nohrsc
+    source: str  # resort | resort_llm | snocountry | pns | lsr | ghcn | nohrsc
     detail: str  # observation id, or snow_report ids
 
 
@@ -116,8 +119,14 @@ def _snocountry(conn: sqlite3.Connection, mountain: str, obs_date: date) -> Obse
     return None if row is None else Observed(float(row[1]), "snocountry", f"observation:{row[0]}")
 
 
+def _report_source(product_id: str) -> str:
+    if product_id == GHCN_PRODUCT:
+        return "ghcn"
+    return "pns" if "-PNS" in product_id else "lsr"
+
+
 def _point_reports(conn: sqlite3.Connection, mountain: str, day: date, tz: str) -> Observed | None:
-    """The highest qualifying PNS / LSR report within 5 mi (see the module docstring)."""
+    """The highest qualifying PNS / LSR / GHCN report within 5 mi (see the module docstring)."""
     rows = conn.execute(
         "SELECT id, product_id, ending_at, snow_in, hours FROM snow_report"
         " WHERE nearest_mountain = ? AND distance_mi <= ? AND snow_in IS NOT NULL",
@@ -136,8 +145,8 @@ def _point_reports(conn: sqlite3.Connection, mountain: str, day: date, tz: str) 
     chosen = daily or other
     if not chosen:
         return None
-    best = max(chosen, key=lambda r: r[3])
-    source = "pns" if "-PNS" in str(best[1]) else "lsr"
+    best = max(chosen, key=lambda r: (r[3], r[1] == GHCN_PRODUCT))
+    source = _report_source(str(best[1]))
     return Observed(float(best[3]), source, f"snow_report:{best[0]}")
 
 

@@ -1,0 +1,1429 @@
+{
+ "generated": "2026-11-27",
+ "source": "NCEI ghcnd-stations.txt and ghcnd-inventory.txt (scripts/make_stations.py)",
+ "rule": "SNOW in 2024 or later, within 20 mi; USW00014755 for loon, cranmore, sunday_river, sugarloaf",
+ "stations": [
+  {
+   "id": "USC00275995",
+   "name": "N CONWAY, NH",
+   "lat": 44.0561,
+   "lon": -71.1297,
+   "elev_ft": 522,
+   "mountain": "cranmore",
+   "distance_mi": 0.9
+  },
+  {
+   "id": "US1NHCR0046",
+   "name": "NORTH CONWAY 1.8 SSE, NH",
+   "lat": 44.0296,
+   "lon": -71.1166,
+   "elev_ft": 561,
+   "mountain": "cranmore",
+   "distance_mi": 1.8
+  },
+  {
+   "id": "US1NHCR0011",
+   "name": "NORTH CONWAY 1.4 SSW, NH",
+   "lat": 44.0356,
+   "lon": -71.1401,
+   "elev_ft": 512,
+   "mountain": "cranmore",
+   "distance_mi": 2.0
+  },
+  {
+   "id": "US1NHCR0012",
+   "name": "INTERVALE 2.7 N, NH",
+   "lat": 44.1128,
+   "lon": -71.1396,
+   "elev_ft": 688,
+   "mountain": "cranmore",
+   "distance_mi": 4.2
+  },
+  {
+   "id": "US1NHCR0041",
+   "name": "ALBANY 2.8 SW, NH",
+   "lat": 43.9265,
+   "lon": -71.2156,
+   "elev_ft": 660,
+   "mountain": "cranmore",
+   "distance_mi": 10.3
+  },
+  {
+   "id": "US1NHCR0015",
+   "name": "JACKSON 3.7 NW, NH",
+   "lat": 44.1907,
+   "lon": -71.226,
+   "elev_ft": 1166,
+   "mountain": "cranmore",
+   "distance_mi": 10.9
+  },
+  {
+   "id": "US1NHCR0053",
+   "name": "EATON CENTER 1.6 SSE, NH",
+   "lat": 43.8891,
+   "lon": -71.0699,
+   "elev_ft": 530,
+   "mountain": "cranmore",
+   "distance_mi": 11.7
+  },
+  {
+   "id": "USC00271190",
+   "name": "CARTER NOTCH HUT, NH",
+   "lat": 44.2594,
+   "lon": -71.1956,
+   "elev_ft": 3317,
+   "mountain": "cranmore",
+   "distance_mi": 14.7
+  },
+  {
+   "id": "USC00278614",
+   "name": "TAMWORTH 4, NH",
+   "lat": 43.8644,
+   "lon": -71.2664,
+   "elev_ft": 541,
+   "mountain": "cranmore",
+   "distance_mi": 15.3
+  },
+  {
+   "id": "US1NHCR0043",
+   "name": "TAMWORTH 3.4 ESE, NH",
+   "lat": 43.8404,
+   "lon": -71.1954,
+   "elev_ft": 472,
+   "mountain": "cranmore",
+   "distance_mi": 15.5
+  },
+  {
+   "id": "USC00276818",
+   "name": "PINKHAM NOTCH, NH",
+   "lat": 44.2581,
+   "lon": -71.2525,
+   "elev_ft": 2025,
+   "mountain": "cranmore",
+   "distance_mi": 15.6
+  },
+  {
+   "id": "USC00273860",
+   "name": "HERMIT LAKE SNOWPLOT, NH",
+   "lat": 44.2614,
+   "lon": -71.2833,
+   "elev_ft": 3749,
+   "mountain": "cranmore",
+   "distance_mi": 16.5
+  },
+  {
+   "id": "US1NHCR0051",
+   "name": "WEST OSSIPEE 0.8 W, NH",
+   "lat": 43.8227,
+   "lon": -71.1882,
+   "elev_ft": 434,
+   "mountain": "cranmore",
+   "distance_mi": 16.6
+  },
+  {
+   "id": "USC00273856",
+   "name": "HARVARD CABIN SNOWPLOT, NH",
+   "lat": 44.2664,
+   "lon": -71.2781,
+   "elev_ft": 3484,
+   "mountain": "cranmore",
+   "distance_mi": 16.7
+  },
+  {
+   "id": "US1MEOX0035",
+   "name": "PORTER 2.6 N, ME",
+   "lat": 43.834,
+   "lon": -70.9383,
+   "elev_ft": 642,
+   "mountain": "cranmore",
+   "distance_mi": 17.6
+  },
+  {
+   "id": "USW00014755",
+   "name": "MT WASHINGTON, NH",
+   "lat": 44.2703,
+   "lon": -71.3033,
+   "elev_ft": 6272,
+   "mountain": "cranmore",
+   "distance_mi": 17.6
+  },
+  {
+   "id": "USC00271800",
+   "name": "CRAWFORD NOTCH, NH",
+   "lat": 44.2197,
+   "lon": -71.4128,
+   "elev_ft": 1893,
+   "mountain": "cranmore",
+   "distance_mi": 18.7
+  },
+  {
+   "id": "US1NHCR0048",
+   "name": "EFFINGHAM 2.1 N, NH",
+   "lat": 43.7914,
+   "lon": -70.9918,
+   "elev_ft": 415,
+   "mountain": "cranmore",
+   "distance_mi": 19.2
+  },
+  {
+   "id": "US1VTRT0028",
+   "name": "SHREWSBURY 0.8 W, VT",
+   "lat": 43.5081,
+   "lon": -72.8824,
+   "elev_ft": 1463,
+   "mountain": "killington",
+   "distance_mi": 7.3
+  },
+  {
+   "id": "USC00436995",
+   "name": "RUTLAND, VT",
+   "lat": 43.6253,
+   "lon": -72.9781,
+   "elev_ft": 620,
+   "mountain": "killington",
+   "distance_mi": 8.0
+  },
+  {
+   "id": "USW00094737",
+   "name": "RUTLAND STATE AP, VT",
+   "lat": 43.5333,
+   "lon": -72.95,
+   "elev_ft": 784,
+   "mountain": "killington",
+   "distance_mi": 8.1
+  },
+  {
+   "id": "US1VTRT0034",
+   "name": "PITTSFIELD 2.5 S, VT",
+   "lat": 43.7361,
+   "lon": -72.8166,
+   "elev_ft": 1140,
+   "mountain": "killington",
+   "distance_mi": 9.1
+  },
+  {
+   "id": "US1VTRT0033",
+   "name": "CHITTENDEN 0.2 W, VT",
+   "lat": 43.7074,
+   "lon": -72.9523,
+   "elev_ft": 1113,
+   "mountain": "killington",
+   "distance_mi": 9.7
+  },
+  {
+   "id": "USC00431433",
+   "name": "CHITTENDEN, VT",
+   "lat": 43.7064,
+   "lon": -72.9617,
+   "elev_ft": 1163,
+   "mountain": "killington",
+   "distance_mi": 10.0
+  },
+  {
+   "id": "US1VTRT0008",
+   "name": "PITTSFORD 2.2 SSE, VT",
+   "lat": 43.6757,
+   "lon": -73.0165,
+   "elev_ft": 483,
+   "mountain": "killington",
+   "distance_mi": 11.0
+  },
+  {
+   "id": "US1VTRT0013",
+   "name": "WEST RUTLAND 0.9 SSE, VT",
+   "lat": 43.5806,
+   "lon": -73.0407,
+   "elev_ft": 546,
+   "mountain": "killington",
+   "distance_mi": 11.2
+  },
+  {
+   "id": "US1VTRT0001",
+   "name": "WEST RUTLAND 1.2 N, VT",
+   "lat": 43.6107,
+   "lon": -73.0466,
+   "elev_ft": 678,
+   "mountain": "killington",
+   "distance_mi": 11.3
+  },
+  {
+   "id": "US1VTRT0032",
+   "name": "WALLINGFORD 2.8 ESE, VT",
+   "lat": 43.454,
+   "lon": -72.9275,
+   "elev_ft": 1442,
+   "mountain": "killington",
+   "distance_mi": 11.7
+  },
+  {
+   "id": "US1VTWR0036",
+   "name": "BARNARD 2.7 NW, VT",
+   "lat": 43.7522,
+   "lon": -72.6629,
+   "elev_ft": 1610,
+   "mountain": "killington",
+   "distance_mi": 12.9
+  },
+  {
+   "id": "US1VTRT0025",
+   "name": "WALLINGFORD 2.7 SSW, VT",
+   "lat": 43.4337,
+   "lon": -72.9903,
+   "elev_ft": 602,
+   "mountain": "killington",
+   "distance_mi": 14.5
+  },
+  {
+   "id": "USC00439984",
+   "name": "WOODSTOCK, VT",
+   "lat": 43.6303,
+   "lon": -72.5072,
+   "elev_ft": 600,
+   "mountain": "killington",
+   "distance_mi": 15.8
+  },
+  {
+   "id": "US1VTWR0002",
+   "name": "POMFRET 2.6 N, VT",
+   "lat": 43.7423,
+   "lon": -72.5255,
+   "elev_ft": 1585,
+   "mountain": "killington",
+   "distance_mi": 17.5
+  },
+  {
+   "id": "US1VTWR0029",
+   "name": "BETHEL 3.5 WNW, VT",
+   "lat": 43.8444,
+   "lon": -72.7026,
+   "elev_ft": 1406,
+   "mountain": "killington",
+   "distance_mi": 17.6
+  },
+  {
+   "id": "US1VTWR0013",
+   "name": "PROCTORSVILLE 0.3 NNE, VT",
+   "lat": 43.3862,
+   "lon": -72.6359,
+   "elev_ft": 983,
+   "mountain": "killington",
+   "distance_mi": 17.7
+  },
+  {
+   "id": "US1VTWR0033",
+   "name": "HARTLAND 4.1 W, VT",
+   "lat": 43.5336,
+   "lon": -72.4805,
+   "elev_ft": 1140,
+   "mountain": "killington",
+   "distance_mi": 17.7
+  },
+  {
+   "id": "US1VTWR0006",
+   "name": "LUDLOW 3.4 S, VT",
+   "lat": 43.3472,
+   "lon": -72.6968,
+   "elev_ft": 1727,
+   "mountain": "killington",
+   "distance_mi": 18.8
+  },
+  {
+   "id": "US1VTWR0022",
+   "name": "ROCHESTER 0.3 NE, VT",
+   "lat": 43.8782,
+   "lon": -72.8046,
+   "elev_ft": 985,
+   "mountain": "killington",
+   "distance_mi": 19.0
+  },
+  {
+   "id": "US1VTWR0010",
+   "name": "WEST WINDSOR 1.7 S, VT",
+   "lat": 43.4616,
+   "lon": -72.492,
+   "elev_ft": 739,
+   "mountain": "killington",
+   "distance_mi": 19.2
+  },
+  {
+   "id": "US1VTWR0032",
+   "name": "QUECHEE 0.7 WSW, VT",
+   "lat": 43.6434,
+   "lon": -72.4325,
+   "elev_ft": 821,
+   "mountain": "killington",
+   "distance_mi": 19.6
+  },
+  {
+   "id": "USC00274810",
+   "name": "LONESOME LAKE HUT, NH",
+   "lat": 44.1383,
+   "lon": -71.703,
+   "elev_ft": 2746,
+   "mountain": "loon",
+   "distance_mi": 8.2
+  },
+  {
+   "id": "US1NHGR0056",
+   "name": "EASTON 0.6 ESE, NH",
+   "lat": 44.1479,
+   "lon": -71.7895,
+   "elev_ft": 1138,
+   "mountain": "loon",
+   "distance_mi": 11.4
+  },
+  {
+   "id": "USC00279970",
+   "name": "ZEALAND FALLS HUT, NH",
+   "lat": 44.1958,
+   "lon": -71.4944,
+   "elev_ft": 2700,
+   "mountain": "loon",
+   "distance_mi": 12.7
+  },
+  {
+   "id": "US1NHGR0051",
+   "name": "CAMPTON 1.6 SSE, NH",
+   "lat": 43.8309,
+   "lon": -71.6296,
+   "elev_ft": 768,
+   "mountain": "loon",
+   "distance_mi": 14.2
+  },
+  {
+   "id": "USC00271800",
+   "name": "CRAWFORD NOTCH, NH",
+   "lat": 44.2197,
+   "lon": -71.4128,
+   "elev_ft": 1893,
+   "mountain": "loon",
+   "distance_mi": 16.4
+  },
+  {
+   "id": "US1NHGR0049",
+   "name": "PLYMOUTH 3.7 N, NH",
+   "lat": 43.7905,
+   "lon": -71.6841,
+   "elev_ft": 884,
+   "mountain": "loon",
+   "distance_mi": 17.3
+  },
+  {
+   "id": "US1NHGR0069",
+   "name": "NORTH HAVERHILL 2.9 E, NH",
+   "lat": 44.0897,
+   "lon": -71.9624,
+   "elev_ft": 974,
+   "mountain": "loon",
+   "distance_mi": 17.4
+  },
+  {
+   "id": "US1NHGR0065",
+   "name": "PLYMOUTH 2.7 NNE, NH",
+   "lat": 43.7763,
+   "lon": -71.6817,
+   "elev_ft": 563,
+   "mountain": "loon",
+   "distance_mi": 18.2
+  },
+  {
+   "id": "USC00274176",
+   "name": "HOLDERNESS 4.6 NW, NH",
+   "lat": 43.7739,
+   "lon": -71.6556,
+   "elev_ft": 820,
+   "mountain": "loon",
+   "distance_mi": 18.2
+  },
+  {
+   "id": "USC00279091",
+   "name": "WENTWORTH, NH",
+   "lat": 43.8669,
+   "lon": -71.9164,
+   "elev_ft": 653,
+   "mountain": "loon",
+   "distance_mi": 18.8
+  },
+  {
+   "id": "US1NHGR0011",
+   "name": "PLYMOUTH 1.6 NNE, NH",
+   "lat": 43.7603,
+   "lon": -71.6889,
+   "elev_ft": 613,
+   "mountain": "loon",
+   "distance_mi": 19.3
+  },
+  {
+   "id": "US1NHGR0017",
+   "name": "LITTLETON 0.6 S, NH",
+   "lat": 44.3033,
+   "lon": -71.7632,
+   "elev_ft": 891,
+   "mountain": "loon",
+   "distance_mi": 19.8
+  },
+  {
+   "id": "USW00014755",
+   "name": "MT WASHINGTON, NH",
+   "lat": 44.2703,
+   "lon": -71.3033,
+   "elev_ft": 6272,
+   "mountain": "loon",
+   "distance_mi": 22.6
+  },
+  {
+   "id": "US1VTRT0034",
+   "name": "PITTSFIELD 2.5 S, VT",
+   "lat": 43.7361,
+   "lon": -72.8166,
+   "elev_ft": 1140,
+   "mountain": "pico",
+   "distance_mi": 5.3
+  },
+  {
+   "id": "US1VTRT0033",
+   "name": "CHITTENDEN 0.2 W, VT",
+   "lat": 43.7074,
+   "lon": -72.9523,
+   "elev_ft": 1113,
+   "mountain": "pico",
+   "distance_mi": 6.3
+  },
+  {
+   "id": "USC00431433",
+   "name": "CHITTENDEN, VT",
+   "lat": 43.7064,
+   "lon": -72.9617,
+   "elev_ft": 1163,
+   "mountain": "pico",
+   "distance_mi": 6.7
+  },
+  {
+   "id": "USC00436995",
+   "name": "RUTLAND, VT",
+   "lat": 43.6253,
+   "lon": -72.9781,
+   "elev_ft": 620,
+   "mountain": "pico",
+   "distance_mi": 7.3
+  },
+  {
+   "id": "US1VTRT0008",
+   "name": "PITTSFORD 2.2 SSE, VT",
+   "lat": 43.6757,
+   "lon": -73.0165,
+   "elev_ft": 483,
+   "mountain": "pico",
+   "distance_mi": 8.8
+  },
+  {
+   "id": "USW00094737",
+   "name": "RUTLAND STATE AP, VT",
+   "lat": 43.5333,
+   "lon": -72.95,
+   "elev_ft": 784,
+   "mountain": "pico",
+   "distance_mi": 10.4
+  },
+  {
+   "id": "US1VTRT0001",
+   "name": "WEST RUTLAND 1.2 N, VT",
+   "lat": 43.6107,
+   "lon": -73.0466,
+   "elev_ft": 678,
+   "mountain": "pico",
+   "distance_mi": 10.8
+  },
+  {
+   "id": "US1VTRT0028",
+   "name": "SHREWSBURY 0.8 W, VT",
+   "lat": 43.5081,
+   "lon": -72.8824,
+   "elev_ft": 1463,
+   "mountain": "pico",
+   "distance_mi": 10.8
+  },
+  {
+   "id": "US1VTWR0036",
+   "name": "BARNARD 2.7 NW, VT",
+   "lat": 43.7522,
+   "lon": -72.6629,
+   "elev_ft": 1610,
+   "mountain": "pico",
+   "distance_mi": 10.9
+  },
+  {
+   "id": "US1VTRT0013",
+   "name": "WEST RUTLAND 0.9 SSE, VT",
+   "lat": 43.5806,
+   "lon": -73.0407,
+   "elev_ft": 546,
+   "mountain": "pico",
+   "distance_mi": 11.4
+  },
+  {
+   "id": "US1VTWR0029",
+   "name": "BETHEL 3.5 WNW, VT",
+   "lat": 43.8444,
+   "lon": -72.7026,
+   "elev_ft": 1406,
+   "mountain": "pico",
+   "distance_mi": 14.4
+  },
+  {
+   "id": "US1VTRT0032",
+   "name": "WALLINGFORD 2.8 ESE, VT",
+   "lat": 43.454,
+   "lon": -72.9275,
+   "elev_ft": 1442,
+   "mountain": "pico",
+   "distance_mi": 15.0
+  },
+  {
+   "id": "US1VTWR0022",
+   "name": "ROCHESTER 0.3 NE, VT",
+   "lat": 43.8782,
+   "lon": -72.8046,
+   "elev_ft": 985,
+   "mountain": "pico",
+   "distance_mi": 15.1
+  },
+  {
+   "id": "US1VTWR0017",
+   "name": "ROCHESTER 2.3 NE, VT",
+   "lat": 43.8942,
+   "lon": -72.7699,
+   "elev_ft": 2026,
+   "mountain": "pico",
+   "distance_mi": 16.4
+  },
+  {
+   "id": "US1VTWR0037",
+   "name": "ROCHESTER 1.7 NNE, VT",
+   "lat": 43.8977,
+   "lon": -72.7952,
+   "elev_ft": 1521,
+   "mountain": "pico",
+   "distance_mi": 16.5
+  },
+  {
+   "id": "US1VTWR0002",
+   "name": "POMFRET 2.6 N, VT",
+   "lat": 43.7423,
+   "lon": -72.5255,
+   "elev_ft": 1585,
+   "mountain": "pico",
+   "distance_mi": 16.8
+  },
+  {
+   "id": "USC00439984",
+   "name": "WOODSTOCK, VT",
+   "lat": 43.6303,
+   "lon": -72.5072,
+   "elev_ft": 600,
+   "mountain": "pico",
+   "distance_mi": 16.9
+  },
+  {
+   "id": "US1VTRT0025",
+   "name": "WALLINGFORD 2.7 SSW, VT",
+   "lat": 43.4337,
+   "lon": -72.9903,
+   "elev_ft": 602,
+   "mountain": "pico",
+   "distance_mi": 17.4
+  },
+  {
+   "id": "US1VTAD0020",
+   "name": "HANCOCK 0.3 S, VT",
+   "lat": 43.9217,
+   "lon": -72.8404,
+   "elev_ft": 902,
+   "mountain": "pico",
+   "distance_mi": 17.9
+  },
+  {
+   "id": "US1VTOG0010",
+   "name": "BRAINTREE 2.8 SW, VT",
+   "lat": 43.9357,
+   "lon": -72.7483,
+   "elev_ft": 1611,
+   "mountain": "pico",
+   "distance_mi": 19.5
+  },
+  {
+   "id": "US1VTBN0024",
+   "name": "BONDVILLE 2.4 WNW, VT",
+   "lat": 43.1621,
+   "lon": -72.9171,
+   "elev_ft": 1712,
+   "mountain": "stratton",
+   "distance_mi": 3.4
+  },
+  {
+   "id": "US1VTWH0046",
+   "name": "JAMAICA 1.9 WNW, VT",
+   "lat": 43.1136,
+   "lon": -72.8106,
+   "elev_ft": 1521,
+   "mountain": "stratton",
+   "distance_mi": 4.9
+  },
+  {
+   "id": "US1VTWH0044",
+   "name": "RAWSONVILLE 0.9 NE, VT",
+   "lat": 43.1557,
+   "lon": -72.8282,
+   "elev_ft": 1069,
+   "mountain": "stratton",
+   "distance_mi": 5.0
+  },
+  {
+   "id": "US1VTBN0007",
+   "name": "MANCHESTER 2.8 ENE, VT",
+   "lat": 43.1727,
+   "lon": -73.0181,
+   "elev_ft": 930,
+   "mountain": "stratton",
+   "distance_mi": 6.9
+  },
+  {
+   "id": "US1VTBN0027",
+   "name": "MANCHESTER CENTER 2.3 NE, VT",
+   "lat": 43.1947,
+   "lon": -73.0204,
+   "elev_ft": 755,
+   "mountain": "stratton",
+   "distance_mi": 8.0
+  },
+  {
+   "id": "US1VTBN0023",
+   "name": "PERU 1.3 E, VT",
+   "lat": 43.2314,
+   "lon": -72.8732,
+   "elev_ft": 1502,
+   "mountain": "stratton",
+   "distance_mi": 8.4
+  },
+  {
+   "id": "US1VTBN0028",
+   "name": "MANCHESTER CENTER 0.9 NE, VT",
+   "lat": 43.1871,
+   "lon": -73.0451,
+   "elev_ft": 805,
+   "mountain": "stratton",
+   "distance_mi": 8.6
+  },
+  {
+   "id": "US1VTWH0042",
+   "name": "LONDONDERRY 0.6 W, VT",
+   "lat": 43.2262,
+   "lon": -72.8179,
+   "elev_ft": 1145,
+   "mountain": "stratton",
+   "distance_mi": 9.0
+  },
+  {
+   "id": "US1VTWH0043",
+   "name": "LONDONDERRY 0.1 NE, VT",
+   "lat": 43.2271,
+   "lon": -72.806,
+   "elev_ft": 1162,
+   "mountain": "stratton",
+   "distance_mi": 9.4
+  },
+  {
+   "id": "US1VTBN0032",
+   "name": "MANCHESTER 1.8 SSW, VT",
+   "lat": 43.1409,
+   "lon": -73.0919,
+   "elev_ft": 964,
+   "mountain": "stratton",
+   "distance_mi": 9.5
+  },
+  {
+   "id": "USC00436335",
+   "name": "PERU, VT",
+   "lat": 43.2628,
+   "lon": -72.9056,
+   "elev_ft": 1700,
+   "mountain": "stratton",
+   "distance_mi": 10.4
+  },
+  {
+   "id": "US1VTBN0025",
+   "name": "PERU 2.8 N, VT",
+   "lat": 43.2691,
+   "lon": -72.9005,
+   "elev_ft": 1873,
+   "mountain": "stratton",
+   "distance_mi": 10.8
+  },
+  {
+   "id": "US1VTWH0045",
+   "name": "LONDONDERRY 3.5 E, VT",
+   "lat": 43.2209,
+   "lon": -72.7403,
+   "elev_ft": 1564,
+   "mountain": "stratton",
+   "distance_mi": 11.3
+  },
+  {
+   "id": "US1VTWH0019",
+   "name": "EAST DOVER 1.8 N, VT",
+   "lat": 42.9766,
+   "lon": -72.7764,
+   "elev_ft": 1705,
+   "mountain": "stratton",
+   "distance_mi": 11.5
+  },
+  {
+   "id": "US1VTBN0003",
+   "name": "LANDGROVE 1.1 NNE, VT",
+   "lat": 43.2909,
+   "lon": -72.8326,
+   "elev_ft": 1809,
+   "mountain": "stratton",
+   "distance_mi": 12.9
+  },
+  {
+   "id": "US1VTWR0041",
+   "name": "WESTON 2.1 SE, VT",
+   "lat": 43.269,
+   "lon": -72.764,
+   "elev_ft": 1816,
+   "mountain": "stratton",
+   "distance_mi": 13.0
+  },
+  {
+   "id": "US1VTWR0040",
+   "name": "ANDOVER 2.5 NW, VT",
+   "lat": 43.298,
+   "lon": -72.7372,
+   "elev_ft": 1766,
+   "mountain": "stratton",
+   "distance_mi": 15.4
+  },
+  {
+   "id": "US1VTWR0034",
+   "name": "CHESTER 3.0 WSW, VT",
+   "lat": 43.2403,
+   "lon": -72.6454,
+   "elev_ft": 1097,
+   "mountain": "stratton",
+   "distance_mi": 15.9
+  },
+  {
+   "id": "US1VTWR0039",
+   "name": "CHESTER 4.1 WNW, VT",
+   "lat": 43.2747,
+   "lon": -72.6748,
+   "elev_ft": 1131,
+   "mountain": "stratton",
+   "distance_mi": 16.2
+  },
+  {
+   "id": "US1VTBN0014",
+   "name": "SHAFTSBURY 0.4 WNW, VT",
+   "lat": 43.0065,
+   "lon": -73.2021,
+   "elev_ft": 1135,
+   "mountain": "stratton",
+   "distance_mi": 16.6
+  },
+  {
+   "id": "US1VTWH0016",
+   "name": "WILMINGTON 0.6 WNW, VT",
+   "lat": 42.8706,
+   "lon": -72.8818,
+   "elev_ft": 1498,
+   "mountain": "stratton",
+   "distance_mi": 16.8
+  },
+  {
+   "id": "US1VTWH0039",
+   "name": "WESTMINSTER 5.5 W, VT",
+   "lat": 43.0603,
+   "lon": -72.567,
+   "elev_ft": 1367,
+   "mountain": "stratton",
+   "distance_mi": 17.6
+  },
+  {
+   "id": "US1VTBN0029",
+   "name": "SHAFTSBURY 2.4 WNW, VT",
+   "lat": 43.0174,
+   "lon": -73.239,
+   "elev_ft": 1185,
+   "mountain": "stratton",
+   "distance_mi": 18.0
+  },
+  {
+   "id": "USC00434942",
+   "name": "MARLBORO, VT",
+   "lat": 42.8847,
+   "lon": -72.7094,
+   "elev_ft": 1482,
+   "mountain": "stratton",
+   "distance_mi": 18.7
+  },
+  {
+   "id": "US1VTWH0026",
+   "name": "WESTMINSTER 5.5 NW, VT",
+   "lat": 43.1257,
+   "lon": -72.5342,
+   "elev_ft": 789,
+   "mountain": "stratton",
+   "distance_mi": 18.9
+  },
+  {
+   "id": "US1VTBN0010",
+   "name": "SOUTH SHAFTSBURY 0.1 W, VT",
+   "lat": 42.9454,
+   "lon": -73.2124,
+   "elev_ft": 696,
+   "mountain": "stratton",
+   "distance_mi": 19.2
+  },
+  {
+   "id": "US1VTBN0031",
+   "name": "NORTH RUPERT 1.7 WNW, VT",
+   "lat": 43.3112,
+   "lon": -73.1757,
+   "elev_ft": 785,
+   "mountain": "stratton",
+   "distance_mi": 19.2
+  },
+  {
+   "id": "US1VTWR0006",
+   "name": "LUDLOW 3.4 S, VT",
+   "lat": 43.3472,
+   "lon": -72.6968,
+   "elev_ft": 1727,
+   "mountain": "stratton",
+   "distance_mi": 19.4
+  },
+  {
+   "id": "US1VTWS0033",
+   "name": "WAITSFIELD 3.5 WNW, VT",
+   "lat": 44.2005,
+   "lon": -72.8942,
+   "elev_ft": 1087,
+   "mountain": "sugarbush",
+   "distance_mi": 4.5
+  },
+  {
+   "id": "US1VTWS0043",
+   "name": "WAITSFIELD 0.7 SSE, VT",
+   "lat": 44.18,
+   "lon": -72.82,
+   "elev_ft": 1141,
+   "mountain": "sugarbush",
+   "distance_mi": 5.1
+  },
+  {
+   "id": "US1VTWS0041",
+   "name": "WARREN 2.8 E, VT",
+   "lat": 44.1121,
+   "lon": -72.7989,
+   "elev_ft": 1821,
+   "mountain": "sugarbush",
+   "distance_mi": 5.4
+  },
+  {
+   "id": "USC00437612",
+   "name": "S LINCOLN, VT",
+   "lat": 44.0725,
+   "lon": -72.9736,
+   "elev_ft": 1341,
+   "mountain": "sugarbush",
+   "distance_mi": 5.6
+  },
+  {
+   "id": "US1VTWS0022",
+   "name": "WARREN 3.3 SSE, VT",
+   "lat": 44.0679,
+   "lon": -72.8336,
+   "elev_ft": 1648,
+   "mountain": "sugarbush",
+   "distance_mi": 5.8
+  },
+  {
+   "id": "USC00438640",
+   "name": "WAITSFIELD 2 SE, VT",
+   "lat": 44.1756,
+   "lon": -72.7961,
+   "elev_ft": 1142,
+   "mountain": "sugarbush",
+   "distance_mi": 6.0
+  },
+  {
+   "id": "US1VTCH0075",
+   "name": "HUNTINGTON 6.5 S, VT",
+   "lat": 44.233,
+   "lon": -72.964,
+   "elev_ft": 1096,
+   "mountain": "sugarbush",
+   "distance_mi": 7.4
+  },
+  {
+   "id": "US1VTAD0032",
+   "name": "STARKSBORO 4.4 ENE, VT",
+   "lat": 44.2446,
+   "lon": -72.9709,
+   "elev_ft": 1089,
+   "mountain": "sugarbush",
+   "distance_mi": 8.2
+  },
+  {
+   "id": "USC00430921",
+   "name": "BRISTOL, VT",
+   "lat": 44.1403,
+   "lon": -73.0872,
+   "elev_ft": 533,
+   "mountain": "sugarbush",
+   "distance_mi": 9.1
+  },
+  {
+   "id": "US1VTAD0019",
+   "name": "NEW HAVEN 2.4 SE, VT",
+   "lat": 44.1006,
+   "lon": -73.1172,
+   "elev_ft": 497,
+   "mountain": "sugarbush",
+   "distance_mi": 10.9
+  },
+  {
+   "id": "US1VTWS0004",
+   "name": "MORETOWN 1.0 ESE, VT",
+   "lat": 44.2462,
+   "lon": -72.742,
+   "elev_ft": 883,
+   "mountain": "sugarbush",
+   "distance_mi": 11.0
+  },
+  {
+   "id": "US1VTAD0038",
+   "name": "BRISTOL 3.9 NNW, VT",
+   "lat": 44.1841,
+   "lon": -73.12,
+   "elev_ft": 825,
+   "mountain": "sugarbush",
+   "distance_mi": 11.3
+  },
+  {
+   "id": "US1VTWS0042",
+   "name": "MORETOWN 2.1 N, VT",
+   "lat": 44.2803,
+   "lon": -72.7565,
+   "elev_ft": 907,
+   "mountain": "sugarbush",
+   "distance_mi": 12.3
+  },
+  {
+   "id": "US1VTAD0030",
+   "name": "RIPTON 1.0 E, VT",
+   "lat": 43.9733,
+   "lon": -73.0145,
+   "elev_ft": 1368,
+   "mountain": "sugarbush",
+   "distance_mi": 12.5
+  },
+  {
+   "id": "US1VTWS0010",
+   "name": "NORTHFIELD 1.5 N, VT",
+   "lat": 44.1699,
+   "lon": -72.652,
+   "elev_ft": 672,
+   "mountain": "sugarbush",
+   "distance_mi": 12.7
+  },
+  {
+   "id": "US1VTWS0037",
+   "name": "NORTHFIELD 1.2 NNE, VT",
+   "lat": 44.1649,
+   "lon": -72.6471,
+   "elev_ft": 799,
+   "mountain": "sugarbush",
+   "distance_mi": 12.8
+  },
+  {
+   "id": "US1VTWS0036",
+   "name": "DUXBURY 2.5 SW, VT",
+   "lat": 44.3051,
+   "lon": -72.7904,
+   "elev_ft": 1221,
+   "mountain": "sugarbush",
+   "distance_mi": 12.9
+  },
+  {
+   "id": "US1VTAD0028",
+   "name": "MONKTON 1.5 NE, VT",
+   "lat": 44.2676,
+   "lon": -73.0994,
+   "elev_ft": 515,
+   "mountain": "sugarbush",
+   "distance_mi": 13.3
+  },
+  {
+   "id": "US1VTCH0007",
+   "name": "HUNTINGTON 1.1 E, VT",
+   "lat": 44.3249,
+   "lon": -72.9657,
+   "elev_ft": 991,
+   "mountain": "sugarbush",
+   "distance_mi": 13.4
+  },
+  {
+   "id": "US1VTWS0005",
+   "name": "BERLIN 4.3 WNW, VT",
+   "lat": 44.2336,
+   "lon": -72.6561,
+   "elev_ft": 851,
+   "mountain": "sugarbush",
+   "distance_mi": 14.0
+  },
+  {
+   "id": "US1VTCH0012",
+   "name": "HINESBURG 5.4 ESE, VT",
+   "lat": 44.2887,
+   "lon": -73.0995,
+   "elev_ft": 752,
+   "mountain": "sugarbush",
+   "distance_mi": 14.4
+  },
+  {
+   "id": "US1VTOG0019",
+   "name": "WILLIAMSTOWN 3.0 WSW, VT",
+   "lat": 44.1134,
+   "lon": -72.6012,
+   "elev_ft": 1565,
+   "mountain": "sugarbush",
+   "distance_mi": 15.0
+  },
+  {
+   "id": "US1VTAD0020",
+   "name": "HANCOCK 0.3 S, VT",
+   "lat": 43.9217,
+   "lon": -72.8404,
+   "elev_ft": 902,
+   "mountain": "sugarbush",
+   "distance_mi": 15.1
+  },
+  {
+   "id": "US1VTAD0021",
+   "name": "MIDDLEBURY 0.4 NE, VT",
+   "lat": 44.0176,
+   "lon": -73.1647,
+   "elev_ft": 420,
+   "mountain": "sugarbush",
+   "distance_mi": 15.4
+  },
+  {
+   "id": "US1VTAD0040",
+   "name": "MIDDLEBURY 0.8 ESE, VT",
+   "lat": 44.0069,
+   "lon": -73.1549,
+   "elev_ft": 378,
+   "mountain": "sugarbush",
+   "distance_mi": 15.4
+  },
+  {
+   "id": "US1VTAD0024",
+   "name": "MIDDLEBURY 0.3 N, VT",
+   "lat": 44.0181,
+   "lon": -73.1684,
+   "elev_ft": 371,
+   "mountain": "sugarbush",
+   "distance_mi": 15.5
+  },
+  {
+   "id": "US1VTCH0013",
+   "name": "RICHMOND 3.4 SSE, VT",
+   "lat": 44.3608,
+   "lon": -72.964,
+   "elev_ft": 733,
+   "mountain": "sugarbush",
+   "distance_mi": 15.8
+  },
+  {
+   "id": "US1VTOG0010",
+   "name": "BRAINTREE 2.8 SW, VT",
+   "lat": 43.9357,
+   "lon": -72.7483,
+   "elev_ft": 1611,
+   "mountain": "sugarbush",
+   "distance_mi": 15.8
+  },
+  {
+   "id": "US1VTWS0019",
+   "name": "WATERBURY 3.0 NW, VT",
+   "lat": 44.3606,
+   "lon": -72.8077,
+   "elev_ft": 458,
+   "mountain": "sugarbush",
+   "distance_mi": 16.2
+  },
+  {
+   "id": "US1VTCH0053",
+   "name": "HINESBURG 1.5 SW, VT",
+   "lat": 44.3166,
+   "lon": -73.1353,
+   "elev_ft": 435,
+   "mountain": "sugarbush",
+   "distance_mi": 17.0
+  },
+  {
+   "id": "USC00438597",
+   "name": "VERGENNES, VT",
+   "lat": 44.1719,
+   "lon": -73.2472,
+   "elev_ft": 196,
+   "mountain": "sugarbush",
+   "distance_mi": 17.2
+  },
+  {
+   "id": "US1VTWR0037",
+   "name": "ROCHESTER 1.7 NNE, VT",
+   "lat": 43.8977,
+   "lon": -72.7952,
+   "elev_ft": 1521,
+   "mountain": "sugarbush",
+   "distance_mi": 17.3
+  },
+  {
+   "id": "USW00094705",
+   "name": "MONTPELIER AP, VT",
+   "lat": 44.205,
+   "lon": -72.5656,
+   "elev_ft": 1105,
+   "mountain": "sugarbush",
+   "distance_mi": 17.4
+  },
+  {
+   "id": "US1VTCH0062",
+   "name": "HINESBURG 0.9 N, VT",
+   "lat": 44.3414,
+   "lon": -73.1117,
+   "elev_ft": 519,
+   "mountain": "sugarbush",
+   "distance_mi": 17.6
+  },
+  {
+   "id": "US1VTWR0017",
+   "name": "ROCHESTER 2.3 NE, VT",
+   "lat": 43.8942,
+   "lon": -72.7699,
+   "elev_ft": 2026,
+   "mountain": "sugarbush",
+   "distance_mi": 18.0
+  },
+  {
+   "id": "US1VTWS0050",
+   "name": "MONTPELIER 0.8 NW, VT",
+   "lat": 44.2681,
+   "lon": -72.5877,
+   "elev_ft": 635,
+   "mountain": "sugarbush",
+   "distance_mi": 18.1
+  },
+  {
+   "id": "US1VTWS0046",
+   "name": "MONTPELIER 1.2 SSE, VT",
+   "lat": 44.2435,
+   "lon": -72.5676,
+   "elev_ft": 789,
+   "mountain": "sugarbush",
+   "distance_mi": 18.2
+  },
+  {
+   "id": "US1VTCH0069",
+   "name": "RICHMOND 1.7 SW, VT",
+   "lat": 44.3906,
+   "lon": -73.0212,
+   "elev_ft": 668,
+   "mountain": "sugarbush",
+   "distance_mi": 18.5
+  },
+  {
+   "id": "US1VTWR0022",
+   "name": "ROCHESTER 0.3 NE, VT",
+   "lat": 43.8782,
+   "lon": -72.8046,
+   "elev_ft": 985,
+   "mountain": "sugarbush",
+   "distance_mi": 18.5
+  },
+  {
+   "id": "US1VTWS0007",
+   "name": "MIDDLESEX 3.1 ENE, VT",
+   "lat": 44.318,
+   "lon": -72.6265,
+   "elev_ft": 1330,
+   "mountain": "sugarbush",
+   "distance_mi": 18.6
+  },
+  {
+   "id": "US1VTWS0045",
+   "name": "WATERBURY 3.6 NE, VT",
+   "lat": 44.3715,
+   "lon": -72.7022,
+   "elev_ft": 833,
+   "mountain": "sugarbush",
+   "distance_mi": 19.1
+  },
+  {
+   "id": "USC00431580",
+   "name": "CORNWALL, VT",
+   "lat": 43.9572,
+   "lon": -73.2106,
+   "elev_ft": 345,
+   "mountain": "sugarbush",
+   "distance_mi": 19.6
+  },
+  {
+   "id": "US1MEFR0028",
+   "name": "CARRABASSETT 1.9 SSE, ME",
+   "lat": 45.052,
+   "lon": -70.1998,
+   "elev_ft": 786,
+   "mountain": "sugarloaf",
+   "distance_mi": 5.7
+  },
+  {
+   "id": "USC00174324",
+   "name": "KINGFIELD, ME",
+   "lat": 44.9594,
+   "lon": -70.1753,
+   "elev_ft": 598,
+   "mountain": "sugarloaf",
+   "distance_mi": 8.4
+  },
+  {
+   "id": "USC00176706",
+   "name": "PHILLIPS 3, ME",
+   "lat": 44.8189,
+   "lon": -70.3867,
+   "elev_ft": 1145,
+   "mountain": "sugarloaf",
+   "distance_mi": 15.1
+  },
+  {
+   "id": "US1MESM0010",
+   "name": "NORTH NEW PORTLAND 0.3 WSW, ME",
+   "lat": 44.9235,
+   "lon": -70.0279,
+   "elev_ft": 394,
+   "mountain": "sugarloaf",
+   "distance_mi": 15.8
+  },
+  {
+   "id": "USC00177037",
+   "name": "RANGELEY, ME",
+   "lat": 44.9675,
+   "lon": -70.6422,
+   "elev_ft": 1530,
+   "mountain": "sugarloaf",
+   "distance_mi": 16.7
+  },
+  {
+   "id": "USC00177039",
+   "name": "RANGELEY 2 NW, ME",
+   "lat": 44.9892,
+   "lon": -70.6722,
+   "elev_ft": 1780,
+   "mountain": "sugarloaf",
+   "distance_mi": 17.8
+  },
+  {
+   "id": "USW00014755",
+   "name": "MT WASHINGTON, NH",
+   "lat": 44.2703,
+   "lon": -71.3033,
+   "elev_ft": 6272,
+   "mountain": "sugarloaf",
+   "distance_mi": 71.6
+  },
+  {
+   "id": "US1MEOX0014",
+   "name": "BETHEL 1.9 SSW, ME",
+   "lat": 44.3774,
+   "lon": -70.8017,
+   "elev_ft": 750,
+   "mountain": "sunday_river",
+   "distance_mi": 7.1
+  },
+  {
+   "id": "USC00177336",
+   "name": "RUMFORD 6SW, ME",
+   "lat": 44.4942,
+   "lon": -70.6564,
+   "elev_ft": 630,
+   "mountain": "sunday_river",
+   "distance_mi": 10.0
+  },
+  {
+   "id": "US1MEOX0034",
+   "name": "ANDOVER 3.8 W, ME",
+   "lat": 44.6416,
+   "lon": -70.8278,
+   "elev_ft": 943,
+   "mountain": "sunday_river",
+   "distance_mi": 11.7
+  },
+  {
+   "id": "USC00170583",
+   "name": "BETHEL 6 SSE, ME",
+   "lat": 44.32,
+   "lon": -70.7567,
+   "elev_ft": 790,
+   "mountain": "sunday_river",
+   "distance_mi": 11.7
+  },
+  {
+   "id": "US1NHCS0006",
+   "name": "BERLIN 3.9 ESE, NH",
+   "lat": 44.4764,
+   "lon": -71.1773,
+   "elev_ft": 1222,
+   "mountain": "sunday_river",
+   "distance_mi": 15.8
+  },
+  {
+   "id": "USC00270690",
+   "name": "BERLIN, NH",
+   "lat": 44.4536,
+   "lon": -71.1856,
+   "elev_ft": 920,
+   "mountain": "sunday_river",
+   "distance_mi": 16.3
+  },
+  {
+   "id": "US1NHCS0021",
+   "name": "GORHAM 1.0 ESE, NH",
+   "lat": 44.3861,
+   "lon": -71.1686,
+   "elev_ft": 790,
+   "mountain": "sunday_river",
+   "distance_mi": 16.5
+  },
+  {
+   "id": "USW00094700",
+   "name": "BERLIN MUNI AP, NH",
+   "lat": 44.5761,
+   "lon": -71.1783,
+   "elev_ft": 1123,
+   "mountain": "sunday_river",
+   "distance_mi": 17.4
+  },
+  {
+   "id": "USW00014755",
+   "name": "MT WASHINGTON, NH",
+   "lat": 44.2703,
+   "lon": -71.3033,
+   "elev_ft": 6272,
+   "mountain": "sunday_river",
+   "distance_mi": 26.1
+  }
+ ]
+}
