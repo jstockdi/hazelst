@@ -52,6 +52,7 @@ table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .fct-note{margin:8px 0 0}
 /* Snow timeline: 3 resort-reported days | now rule | 4 forecast days (palette D, report-page.md). */
 .tl-fig{padding:8px 6px}
+.part+.tl-fig,.part+#fct{margin-top:26px}
 .tl{display:grid;grid-template-columns:70px repeat(3,minmax(0,1fr)) 3px repeat(4,minmax(0,1fr));gap:3px;font-variant-numeric:tabular-nums}
 .tl-row{display:contents}
 .tl-nowh{position:relative}

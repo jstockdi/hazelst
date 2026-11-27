@@ -311,3 +311,13 @@ def test_timeline_markup_fits_390px() -> None:
     # Removed: the stacked chart, the type grid, and the by-day details.
     assert 'class="types"' not in html and "stacked by day" not in html
     assert "<h2>By day</h2>" not in html and "<details" not in html
+
+
+def test_section_labels_lead_straight_into_grid_and_table() -> None:
+    html = page.render_report(recorded())
+    timeline = html[
+        html.index("Snow · reported and forecast</div>") : html.index('<div class="tl"')
+    ]
+    table = html[html.index("Forecast · what falls next</div>") : html.index('<table id="fct">')]
+    for part in (timeline, table):
+        assert "<h2>" not in part and 'class="lead"' not in part

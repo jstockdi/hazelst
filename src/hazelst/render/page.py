@@ -394,7 +394,6 @@ def render_report(payload: ReportPayload, narrative: Narrative | None = None) ->
         "verification": verification_line(payload),
         "runs": [(run_label(r.model, r.issued_at), r.stale) for r in payload.models],
         "offices": [f"{OFFICE_NAMES.get(o, o)}" for o in payload.discussions],
-        "used_names": [MODEL_NAMES.get(m, m) for m in payload.used_models],
         "method_labels": METHOD_LABELS,
     }
     return _env.get_template("report.html").render(**context)
