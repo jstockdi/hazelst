@@ -122,7 +122,6 @@ CREATE TABLE verification (
   for_date DATE, edition TEXT,              -- 0700 | 0815 | 1440
   mountain TEXT, window TEXT, method TEXT,  -- window 1d; method raw_mean | corrected | a model id
   forecast_in REAL, observed_in REAL, observed_source TEXT,  -- resort | resort_llm | snocountry | pns | lsr | ghcn | nohrsc
-  observed_elev_ft INT,                     -- elevation of the observation; NULL for resort / snocountry
   error_in REAL, ratio REAL, result TEXT,   -- HIT | MISS | NO_OBS
   tags JSON,                                -- tags that fired, copied for slicing
   PRIMARY KEY (for_date, edition, mountain, window, method)
