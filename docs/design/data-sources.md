@@ -439,8 +439,33 @@ Rows: one `observation` per mountain per report date, `source = 'snocountry'`,
 - **New snow:** `snowMax` when it is above `snowMin` (a range; resorts quote
   the summit as the max), else `snowMin`.
 - **Zero days:** a date in the base-depth series with no `snowarchive` entry
-  is stored as `new_24h_in = 0` with `raw.inferred_zero = true`. A date in
-  neither stays absent, so a missing report is never scored as zero.
+  is stored as `new_24h_in = 0` with `raw.inferred_zero = true`, but only in
+  a season (July–June) with at least one `snowarchive` entry. Base-depth
+  dates before 2019-20, and in a season the archive is missing (Sugarbush
+  2020-21, Sunday River 2020-21 to 2024-25), are stored with `new_24h_in`
+  NULL. A date in neither series stays absent, so a missing report is never
+  scored as zero.
+- **Current report:** the document's own report (`reportDateTime` in the
+  resort's `timezone`, `newSnowMin` / `newSnowMax`, `avgBaseDepthMax`,
+  `seasonTotal`, `openDownHillTrails`, `maxOpenDownHillTrails`,
+  `openDownHillLifts`) becomes the row for its local date when it has new
+  snow or a base depth and the history has no reported value for that date;
+  `reported_at` is the report time and `raw.current` holds the fields. An
+  empty new-snow field stays NULL, not zero. On 2026-11-26 neither history
+  series held the 2026-27 season yet (Killington open since mid-November), so
+  in-season the current report is what `ingest-obs` adds.
+- **Writes:** migration 0003 adds a unique index on
+  `observation (mountain, source, obs_date)` for `source = 'snocountry'`;
+  writes upsert, so a refetch replaces values without adding rows. An
+  inferred zero never replaces a reported value.
+- **Fetch:** one request per mountain returns the whole history (~200 KB,
+  ~20 KB gzip). The fallback URL is tried when the primary fails or returns
+  a document without `snowarchive`. `ingest-obs` fetches all eight on every
+  run (step `snocountry`, ~0.5 MB a day stored); a failed mountain is
+  reported, and the step fails only when all eight fail.
+- Fixtures: `tests/fixtures/snocountry/2026-11-26/` (one per mountain,
+  `hazelst record snocountry`). Row counts from them: 15,689 rows, 4,879
+  inferred zeros.
 - **Coverage** (new-snow days per season, 2019-20 to 2025-26): Killington
   41–62, Sugarbush 43–70 (2020-21 missing), Pico 27–55, Loon 21–44,
   Sugarloaf 17–43, Stratton 14–40, Cranmore 14–24, Sunday River 21–23 in
@@ -479,6 +504,7 @@ Each `ingest-obs` run for report date D:
 | `pns` | For each office, the api.weather.gov PNS listing (the IEM AFOS listing for D − 1 and D when the live listing fails, or when D is older than yesterday); then each product issued from the start of D − 1 to the end of D (local) that is not stored yet | Text in `discussion` (`kind = 'PNS'`, AFOS product id, so a product is fetched once whichever path found it); reports in `snow_report` |
 | `lsr` | IEM LSR GeoJSON for the same window (UTC) | `snow_report` (`hours` null) |
 | `nohrsc` | The 24 h, 48 h, and season grids ending 12Z on the newest published date (D − 1 during the day; D after 00:30Z on D + 1, which covers the 9 PM `forecast-verify`), plus the grids ending D − 8 once more if they were first read before the 7-day reprocessing window | One `observation` row per mountain per end date: `source = 'nohrsc'`, `obs_date` = the end date, `reported_at` = 12Z on it, `new_24h_in`, `new_48h_in`, `season_in`; `fetch_id` is the 24 h grid and `raw` holds the pixel, grid URLs, and every grid's `fetch` id. A re-read replaces the rows |
+| `snocountry` (J23) | Each mountain's SnoCountry document ([SnoCountry](#snocountry)) | `observation` rows (`source = 'snocountry'`) upserted per mountain and date: the current report and the history |
 
 The 72 h grid has no `observation` column and is not fetched. A step fails
 (and its section shows "source unavailable") when no office listing could be
@@ -527,9 +553,14 @@ live tables, one `season-backfill` job per calendar month, then runs
 | `lsr` | IEM LSR GeoJSON from midnight before D to midnight after the morning of end + 1 | `snow_report` |
 | `pns` | IEM AFOS listing per office per day (D..end + 1), then each new product's text | `discussion` (`PNS`), `snow_report` |
 | `nohrsc` | The 24 h grid ending 12Z on each obs_date (D + 1..end + 1) | `observation` (`nohrsc`) |
+| `snocountry` | One document per mountain, the whole history whatever the range (J23) | `observation` (`snocountry`), upserted |
+
+`--sources` (alias `--steps`) selects steps, e.g. `--sources snocountry`;
+with only whole-history steps the command is a single job run, not one per
+month.
 
 Idempotent: a request already stored with HTTP 200 (same source, URL, and
-query) is not sent again; PNS products are fetched once (`discussion` ids); a
+query) is not sent again (for SnoCountry, either URL); PNS products are fetched once (`discussion` ids); a
 PNS listing is stored only when all its products were fetched, so a failed
 product is retried; NOHRSC dates with stored rows are skipped. Previous
 Runs `previous_day1` is the run from the day before each hour, so backfilled

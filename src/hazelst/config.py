@@ -77,6 +77,7 @@ class Mountain(BaseModel):
     summit_ft: int = Field(gt=0)
     base_ft: int = Field(gt=0)
     nws: NwsRef
+    snocountry_id: str | None = Field(default=None, pattern=r"^\d+$")  # null: no SnoCountry rows
     report_adapter: ReportAdapter | None = None  # null disables the adapter
     wind_hold_mph: WindHold
     season_open: date | None = None

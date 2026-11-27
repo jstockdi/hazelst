@@ -15,9 +15,10 @@ import httpx
 import pytest
 
 from hazelst import backfill, config, db, jobs
-from hazelst.sources import base, iem, nohrsc, pns, previous_runs
+from hazelst.sources import base, iem, nohrsc, pns, previous_runs, snocountry
 from tests.support import FIXTURES
 from tests.unit.test_obs_sources import LSR_FEB, NOHRSC_24H, PNS_IDS, body
+from tests.unit.test_snocountry import SNOCOUNTRY_BODIES
 
 DAY = date(2026, 2, 6)
 SNOW_PER_HOUR = 0.1
@@ -70,6 +71,8 @@ class FakeWeb:
             if url == pns.ARCHIVE_TEXT_URL.format(product_id=pid):
                 path = FIXTURES / "iem" / f"nwstext_{pid}.txt.gz"
                 return httpx.Response(200, content=body(path))
+        if url == snocountry.URL:
+            return httpx.Response(200, content=SNOCOUNTRY_BODIES[query["resortId"]])
         if url == nohrsc.grid_url("24h", date(2026, 2, 7)):
             return httpx.Response(200, content=body(NOHRSC_24H))
         return httpx.Response(404, text="not found")
@@ -135,6 +138,8 @@ def test_backfill_loads_every_source_and_is_idempotent(cfg: config.Config) -> No
     assert first["pns"]["rows"]["discussion"] == 3
     assert first["nohrsc"]["rows"] == {"observation": 8}
     assert first["nohrsc"]["requests"] == 1
+    assert first["snocountry"]["requests"] == 8
+    assert first["snocountry"]["rows"]["observation"] > 8 * 1000  # whole histories
     stored = counts(cfg)
     sent = len(web.requests)
 
@@ -143,7 +148,8 @@ def test_backfill_loads_every_source_and_is_idempotent(cfg: config.Config) -> No
     assert again.requests == []  # every response is already stored
     assert all(second[s]["requests"] == 0 and second[s]["rows"] == {} for s in backfill.STEPS)
     assert counts(cfg) == stored
-    assert sent == 5 + 1 + 2 * 3 + 3 + 1  # leads, LSR, listings for 2 days, texts, NOHRSC
+    # Leads, LSR, listings for 2 days, texts, NOHRSC, one SnoCountry document per mountain.
+    assert sent == 5 + 1 + 2 * 3 + 3 + 1 + 8
 
 
 def test_failed_requests_are_retried_on_the_next_run(cfg: config.Config) -> None:
@@ -175,12 +181,13 @@ def test_backfill_seeds_skill_per_mountain_and_model(cfg: config.Config) -> None
         (m, model) for m in keys for model in ("gfs_seamless", "gem_seamless")
     }
     assert {r[2] for r in cells} == {"1d", "2-3d", "4-5d"}
-    # Lead day N carries 0.1 x N in/h: day 1 forecasts 2.4 in, verified against NOHRSC.
+    # Lead day N carries 0.1 x N in/h: day 1 forecasts 2.4 in, verified against the
+    # resort-reported 6 in from SnoCountry (ahead of NOHRSC's 3.17 in).
     killington = conn.execute(
         "SELECT bias_ratio FROM skill WHERE mountain = 'killington' AND model = 'gfs_seamless'"
         " AND lead_bucket = '1d' AND tag = ''"
     ).fetchone()[0]
-    assert killington == pytest.approx(2.4 / 3.17, abs=0.01)
+    assert killington == pytest.approx(2.4 / 6.0, abs=0.01)
     assert summary["skill"] == len(cells)
 
 

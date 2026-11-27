@@ -196,7 +196,9 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
    grid ending 12Z on X + 1. HIT is within 2″ or 30% of the observation.
    `forecast-verify` runs at 9 PM on X + 1 and scores the newest report
    version of each edition, for the mean and each model; rows are replaced
-   when a date is re-scored.
+   when a date is re-scored. `hazelst forecast-verify --from D --to D`
+   re-scores a range from the stored observations without fetching (after a
+   new observation source is backfilled).
 3. **skill-learn** (2:00 AM nightly, `learn.py`) rebuilds `skill`: bias ratio
    (sum of forecasts / sum of observations), MAE, and hit rate per mountain ×
    model × lead bucket × pattern tag. A sample is one model's summit snow for

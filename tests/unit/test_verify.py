@@ -144,6 +144,10 @@ def insert_editions(conn: sqlite3.Connection, day: date) -> None:
 
 @pytest.fixture
 def snow_day(tmp_path: Path) -> sqlite3.Connection:
+    return build_snow_day(tmp_path)
+
+
+def build_snow_day(tmp_path: Path) -> sqlite3.Connection:
     """The J00 observation fixtures stored as `ingest-obs` stores them, plus resort rows."""
     conn = db.connect(tmp_path / "v.db")
     db.migrate(conn)
