@@ -46,6 +46,7 @@ import httpx
 from hazelst import config, db
 from hazelst.sources import (
     base,
+    elevation,
     ghcn,
     iem,
     nohrsc,
@@ -206,7 +207,15 @@ class Backfill:
             base.store_fetch(self.conn, self.run_id, fetched)
             counts.add("snow_report", snow_report.store(self.conn, rows, "lsr"))
         self._remember(fetched)
+        self._fill_elevations(counts)
         return counts
+
+    def _fill_elevations(self, counts: Counts) -> None:
+        """Open-Meteo elevations for new `snow_report` rows; a failed lookup is counted."""
+        result = elevation.fill(self.conn, self.client)
+        counts.add("elev_ft", result.filled)
+        if result.failed:
+            counts.errors.append(f"elevation: {result.failed} rows without elev_ft")
 
     def pns(self, start: date, end: date) -> Counts:
         """PNS products listed for each office on `start`..`end` + 1."""
@@ -261,6 +270,7 @@ class Backfill:
                 if not failed:
                     self._remember(listing)
             day += timedelta(days=1)
+        self._fill_elevations(counts)
         return counts
 
     def nohrsc(self, start: date, end: date) -> Counts:

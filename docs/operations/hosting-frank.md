@@ -148,6 +148,21 @@ today; if one is added, this is the allowlist.
 
   Measured locally on 2026-11-26: 3 requests and about 2 s per month (132
   stations in batches of 50), about 2,200 `snow_report` rows per winter month.
+- **Report elevations** (J25, manual, once after the J25 deploy): fill
+  `snow_report.elev_ft` for rows stored before J25, re-score the backfilled
+  range, and read the scores by observation elevation:
+
+  ```bash
+  docker exec hazelst hazelst elevations fill
+  docker exec hazelst hazelst forecast-verify --from 2024-01-20 --to 2026-04-30
+  docker exec hazelst hazelst verify summary --by elevation
+  ```
+
+  `elevations fill` prints the rows filled and the rows still without
+  `elev_ft` (failed lookups; a rerun retries them). Days with no stored report
+  are scored as edition `backfill` from the stored Previous Runs forecasts.
+  `verify summary` takes `--from`, `--to`, `--edition`, `--method`, and
+  `--all-days` (default: snow days only, earliest edition per day).
 - **Failure behavior:** a failed source degrades that section (noted in the page
   footer); a failed Claude call publishes the numbers-only page with "report
   delayed" and retries every 15 minutes until 9 AM.

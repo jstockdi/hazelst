@@ -69,7 +69,9 @@ def seed_week(c: config.Config) -> None:
         ("2026-11-20", "0700", "sugarbush", 1.0, 5.0, "MISS", []),  # before the week
     ]
     conn.executemany(
-        "INSERT INTO verification VALUES (?, ?, ?, '1d', 'raw_mean', ?, ?, 'resort', 0, 0, ?, ?)",
+        "INSERT INTO verification (for_date, edition, mountain, window, method, forecast_in,"
+        " observed_in, observed_source, error_in, ratio, result, tags)"
+        " VALUES (?, ?, ?, '1d', 'raw_mean', ?, ?, 'resort', 0, 0, ?, ?)",
         [(d, e, m, f, o, r, json.dumps(t)) for d, e, m, f, o, r, t in verification],
     )
     conn.executemany(

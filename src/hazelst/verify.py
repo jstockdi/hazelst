@@ -20,6 +20,14 @@ order (data-model.md, "How the data compounds"):
 `observation.obs_date` D means "the 24 h ending the morning of D", so day X
 reads obs_date X + 1. HIT is within 2 inches or 30% of the observed value.
 
+Each row also records the observation's elevation (`observed_elev_ft`): the
+report's for a point report, the NOHRSC pixel center's for `nohrsc`, NULL for
+resort-reported values (measurement site unknown). `summary_cells` reads
+the scores per mountain by elevation band.
+
+A day with no stored report (a season backfill) is scored as edition
+`backfill`: each model's lead-day-1 summit forecast from `forecast_hourly`.
+
 The same day-by-day choice fills the accumulation section: snow observed on
 each of the 7 days before the report date, the season total, and base depth.
 """
@@ -44,6 +52,7 @@ HIT_ABS_IN = 2.0
 HIT_REL = 0.30
 WINDOW = "1d"
 RAW_MEAN = "raw_mean"
+BACKFILL_EDITION = "backfill"  # a day with no report: scored from forecast_hourly
 SEASON_LOOKBACK_DAYS = 3  # season and base come from a report at most this old
 DAILY_REPORT_HOURS = (4, 10)  # a 24 h point report ending in this local-hour range
 GHCN_PRODUCT = "GHCN"  # snow_report.product_id of GHCN-Daily station rows
@@ -56,6 +65,7 @@ class Observed:
     snow_in: float
     source: str  # resort | resort_llm | snocountry | pns | lsr | ghcn | nohrsc
     detail: str  # observation id, or snow_report ids
+    elev_ft: int | None = None  # the point report's elevation (snow_report.elev_ft)
 
 
 @dataclass(frozen=True)
@@ -74,6 +84,7 @@ class VerificationRow:
     ratio: float | None
     result: Result
     tags: str  # JSON list
+    observed_elev_ft: int | None = None
 
 
 # --- scoring ---------------------------------------------------------------------
@@ -128,7 +139,7 @@ def _report_source(product_id: str) -> str:
 def _point_reports(conn: sqlite3.Connection, mountain: str, day: date, tz: str) -> Observed | None:
     """The highest qualifying PNS / LSR / GHCN report within 5 mi (see the module docstring)."""
     rows = conn.execute(
-        "SELECT id, product_id, ending_at, snow_in, hours FROM snow_report"
+        "SELECT id, product_id, ending_at, snow_in, hours, elev_ft FROM snow_report"
         " WHERE nearest_mountain = ? AND distance_mi <= ? AND snow_in IS NOT NULL",
         (mountain, NEAR_MI),
     ).fetchall()
@@ -147,7 +158,8 @@ def _point_reports(conn: sqlite3.Connection, mountain: str, day: date, tz: str) 
         return None
     best = max(chosen, key=lambda r: (r[3], r[1] == GHCN_PRODUCT))
     source = _report_source(str(best[1]))
-    return Observed(float(best[3]), source, f"snow_report:{best[0]}")
+    elev = None if best[5] is None else int(best[5])
+    return Observed(float(best[3]), source, f"snow_report:{best[0]}", elev)
 
 
 def _nohrsc(conn: sqlite3.Connection, mountain: str, obs_date: date) -> Observed | None:
@@ -223,22 +235,71 @@ def edition_forecasts(conn: sqlite3.Connection, for_date: date) -> list[EditionF
     return out
 
 
+def backfill_forecasts(
+    conn: sqlite3.Connection, start: date, end: date, tz: str = TIMEZONE
+) -> dict[date, list[EditionForecast]]:
+    """Edition `backfill` for days `start`..`end`: each model's lead-day-1 summit forecast
+    from `forecast_hourly` (a season backfill's Previous Runs, or any stored run), and
+    their mean as `raw_mean`. Used only for days with no stored report edition."""
+    from hazelst.learn import model_forecasts  # learn imports this module
+
+    by_day: dict[date, dict[str, dict[str, float]]] = {}
+    for (mountain, model, lead_day, day), snow_in in model_forecasts(conn, tz, through=end).items():
+        if lead_day == 1 and day >= start:
+            by_day.setdefault(day, {}).setdefault(mountain, {})[model] = round(snow_in, 2)
+    out: dict[date, list[EditionForecast]] = {}
+    for day, mountains in sorted(by_day.items()):
+        out[day] = [
+            EditionForecast(
+                BACKFILL_EDITION,
+                0,
+                mountain,
+                {**models, RAW_MEAN: round(sum(models.values()) / len(models), 2)},
+                [],
+            )
+            for mountain, models in sorted(mountains.items())
+        ]
+    return out
+
+
+POINT_SOURCES = frozenset({"pns", "lsr", "ghcn"})
+
+
+def observed_elev_ft(obs: Observed | None, mountain: Mountain) -> int | None:
+    """The observation's elevation: the report's for a point report, the NOHRSC pixel
+    center's for `nohrsc`, unknown (None) for resort-reported values."""
+    if obs is None:
+        return None
+    if obs.source in POINT_SOURCES:
+        return obs.elev_ft
+    if obs.source == "nohrsc":
+        return mountain.nohrsc_pixel_elev_ft
+    return None
+
+
 def verify_date(
     conn: sqlite3.Connection,
     mountains: Sequence[Mountain],
     for_date: date,
     tz: str = TIMEZONE,
+    forecasts: Sequence[EditionForecast] | None = None,
 ) -> list[VerificationRow]:
-    """Score every edition, mountain, and method for `for_date`'s 1d window."""
-    keys = {m.key for m in mountains}
+    """Score every edition, mountain, and method for `for_date`'s 1d window.
+
+    `forecasts` defaults to the stored report editions (`edition_forecasts`).
+    """
+    by_key = {m.key: m for m in mountains}
     seen: dict[str, Observed | None] = {}
     rows: list[VerificationRow] = []
-    for f in edition_forecasts(conn, for_date):
-        if f.mountain not in keys:
+    if forecasts is None:
+        forecasts = edition_forecasts(conn, for_date)
+    for f in forecasts:
+        if f.mountain not in by_key:
             continue
         if f.mountain not in seen:
             seen[f.mountain] = observed(conn, f.mountain, for_date, tz)
         obs = seen[f.mountain]
+        elev = observed_elev_ft(obs, by_key[f.mountain])
         for method, forecast_in in sorted(f.methods.items()):
             error, ratio, result = score(forecast_in, obs.snow_in if obs else None)
             rows.append(
@@ -255,6 +316,7 @@ def verify_date(
                     ratio=ratio,
                     result=result,
                     tags=json.dumps(f.tags),
+                    observed_elev_ft=elev,
                 )
             )
     return rows
@@ -264,8 +326,8 @@ def store(conn: sqlite3.Connection, rows: Iterable[VerificationRow]) -> int:
     params = [astuple(r) for r in rows]
     conn.executemany(
         "INSERT OR REPLACE INTO verification (for_date, edition, mountain, window, method,"
-        " forecast_in, observed_in, observed_source, error_in, ratio, result, tags)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " forecast_in, observed_in, observed_source, error_in, ratio, result, tags,"
+        " observed_elev_ft) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         params,
     )
     return len(params)
@@ -283,8 +345,8 @@ def summarize(rows: Iterable[VerificationRow]) -> dict[str, dict[str, int]]:
 def latest_summary(conn: sqlite3.Connection, before: date) -> VerificationSummary | None:
     """Result counts (model mean) for the newest verified date before `before`."""
     row = conn.execute(
-        "SELECT max(for_date) FROM verification WHERE for_date < ? AND method = ?",
-        (before.isoformat(), RAW_MEAN),
+        "SELECT max(for_date) FROM verification WHERE for_date < ? AND method = ? AND edition != ?",
+        (before.isoformat(), RAW_MEAN, BACKFILL_EDITION),
     ).fetchone()
     if row is None or row[0] is None:
         return None
@@ -295,13 +357,103 @@ def summary_for(conn: sqlite3.Connection, for_date: date) -> VerificationSummary
     counts: dict[str, dict[str, int]] = {}
     for edition, result, n in conn.execute(
         "SELECT edition, result, count(*) FROM verification WHERE for_date = ? AND method = ?"
-        " GROUP BY 1, 2 ORDER BY 1, 2",
-        (for_date.isoformat(), RAW_MEAN),
+        " AND edition != ? GROUP BY 1, 2 ORDER BY 1, 2",
+        (for_date.isoformat(), RAW_MEAN, BACKFILL_EDITION),
     ):
         counts.setdefault(edition, {})[result] = n
     if not counts:
         return None
     return VerificationSummary(for_date=for_date, editions=counts)
+
+
+# --- summary by elevation --------------------------------------------------------
+
+BANDS: tuple[str, ...] = ("< 1,500 ft", "1,500-2,500 ft", "> 2,500 ft", "unknown")
+ALL_MOUNTAINS = "all"
+
+
+def elevation_band(elev_ft: int | None) -> str:
+    """The band of an observation's elevation; 1,500 and 2,500 ft fall in the middle band."""
+    if elev_ft is None:
+        return BANDS[3]
+    if elev_ft < 1500:
+        return BANDS[0]
+    if elev_ft <= 2500:
+        return BANDS[1]
+    return BANDS[2]
+
+
+@dataclass(frozen=True)
+class SummaryCell:
+    """Scores for one mountain (or `all`) and one group (an elevation band, or `all`)."""
+
+    mountain: str
+    group: str
+    n: int
+    bias_ratio: float | None  # sum of forecasts / sum of observations
+    mae_in: float
+    hit_rate: float
+
+
+def _cell(mountain: str, group: str, rows: Sequence[tuple[float, float, str]]) -> SummaryCell:
+    forecast = sum(r[0] for r in rows)
+    observed_total = sum(r[1] for r in rows)
+    return SummaryCell(
+        mountain=mountain,
+        group=group,
+        n=len(rows),
+        bias_ratio=round(forecast / observed_total, 2) if observed_total > 0 else None,
+        mae_in=round(sum(abs(r[0] - r[1]) for r in rows) / len(rows), 2),
+        hit_rate=round(sum(1 for r in rows if r[2] == "HIT") / len(rows), 2),
+    )
+
+
+def summary_cells(
+    conn: sqlite3.Connection,
+    *,
+    by: Literal["mountain", "elevation"] = "elevation",
+    start: date | None = None,
+    end: date | None = None,
+    edition: str | None = None,
+    method: str = RAW_MEAN,
+    snow_days_only: bool = True,
+) -> list[SummaryCell]:
+    """n, bias ratio, MAE, and hit rate per mountain (and all mountains) per group.
+
+    Scored rows only (not NO_OBS). One row per mountain-day: `edition` if given,
+    else the earliest edition scored that day. Snow days only by default (the
+    observation or the forecast is at least 0.5 inch), as in `skill`.
+    """
+    from hazelst.learn import SNOW_DAY_IN  # learn imports this module
+
+    sql = (
+        "SELECT for_date, edition, mountain, forecast_in, observed_in, result, observed_elev_ft"
+        " FROM verification WHERE window = ? AND method = ? AND result != 'NO_OBS'"
+    )
+    params: list[object] = [WINDOW, method]
+    if start is not None:
+        sql, params = sql + " AND for_date >= ?", [*params, start.isoformat()]
+    if end is not None:
+        sql, params = sql + " AND for_date <= ?", [*params, end.isoformat()]
+    if edition is not None:
+        sql, params = sql + " AND edition = ?", [*params, edition]
+    seen: set[tuple[str, str]] = set()
+    groups: dict[tuple[str, str], list[tuple[float, float, str]]] = {}
+    for for_date, _edition, mountain, forecast_in, observed_in, result, elev in conn.execute(
+        sql + " ORDER BY for_date, mountain, edition", params
+    ):
+        if (for_date, mountain) in seen:
+            continue
+        seen.add((for_date, mountain))
+        if snow_days_only and max(forecast_in, observed_in) < SNOW_DAY_IN:
+            continue
+        group = elevation_band(elev) if by == "elevation" else ALL_MOUNTAINS
+        row = (float(forecast_in), float(observed_in), str(result))
+        groups.setdefault((mountain, group), []).append(row)
+        groups.setdefault((ALL_MOUNTAINS, group), []).append(row)
+    order = {g: i for i, g in enumerate((*BANDS, ALL_MOUNTAINS))}
+    keys = sorted(groups, key=lambda k: (k[0] == ALL_MOUNTAINS, k[0], order[k[1]]))
+    return [_cell(m, g, groups[(m, g)]) for m, g in keys]
 
 
 # --- accumulation ----------------------------------------------------------------
