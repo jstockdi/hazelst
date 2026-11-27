@@ -24,7 +24,6 @@ p b{color:var(--sea)}
 .part{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mist);font-weight:700;margin:34px 0 -18px;padding-top:14px;border-top:1px solid var(--line)}
 .lead{font-size:13px;color:var(--mist);margin:-4px 0 10px}
 figure{margin:0 0 12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
-figcaption{font-size:12px;color:var(--mist);margin-top:6px}
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 #fct{background:var(--card);border-radius:12px;overflow:hidden;border:1px solid var(--line);font-size:14px}
 #fct th,#fct td{padding:8px 10px;text-align:right}
@@ -33,7 +32,6 @@ table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 #fct tr+tr td{border-top:1px solid var(--line-2)}
 #fct td b{color:var(--deep)}
 #fct td small{color:var(--mist);font-size:11px;display:block;line-height:1.1}
-.empty{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:14px;font-size:14px;color:var(--mist)}
 .foot{font-size:12px;color:var(--mist);border-top:1px solid var(--line);margin-top:26px;padding-top:12px}
 #fct td.name{white-space:nowrap}
 #fct td.name small{white-space:normal}
@@ -56,7 +54,6 @@ table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .tl-h{font-size:10px;color:var(--ink);text-align:center;line-height:1.15;font-weight:600}
 .tl-h-past{color:var(--mist)}
 .tl-n{display:flex;flex-direction:column;justify-content:center;font:600 12.5px/1.15 Fraunces,Georgia,serif;color:var(--deep);min-width:0;overflow-wrap:anywhere}
-.tl-n small{font:500 10px/1.2 Inter,sans-serif;color:var(--mist)}
 .tl .c{min-width:0;min-height:36px;border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;line-height:1.1;padding:2px 0;overflow:hidden}
 .tl .c b{font-size:14px;font-weight:700}
 .tl .c .w{font-size:10px;font-weight:700}

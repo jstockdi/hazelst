@@ -53,7 +53,6 @@ def test_sections_in_order() -> None:
         'class="tl"',
         "Forecast · what falls next",
         'id="fct"',
-        "Accumulation · snow that has fallen",
         'class="foot"',
     ]
     positions = [html.index(m) for m in marks]
@@ -106,33 +105,6 @@ def test_edition_label_in_footer_not_band() -> None:
     assert '<p>Thu 26 Nov 2026 · 2:40 PM</p>\n    <p><a href="/archive">Archive</a>' in html
 
 
-def with_accumulation(p: ReportPayload, last7: list[float | None]) -> ReportPayload:
-    mountains = [
-        m.model_copy(
-            update={
-                "accumulation": Accumulation(
-                    source="resort", last7_in=last7, season_in=12, base_in=18
-                )
-            }
-        )
-        for m in p.mountains
-    ]
-    return p.model_copy(update={"mountains": mountains})
-
-
-def test_accumulation_empty_states() -> None:
-    p = recorded()
-    assert page.accumulation_state(p)[0] == "empty"
-    assert "Thu 19 \N{EN DASH} Wed 25" in page.accumulation_state(p)[1]
-    quiet = with_accumulation(p, [0, 0.2, 0, 0, 0, 0.1, 0])
-    state, text = page.accumulation_state(quiet)
-    assert state == "empty" and text.startswith("No mountain reported 0.5″")
-    snowy = with_accumulation(p, [0, 2, 3, 1, 0, 0, 2])
-    assert page.accumulation_state(snowy)[0] == "chart"
-    html = page.render_report(snowy, recorded_narrative())
-    assert "Observed season snowfall" in html and "18″ base" in html
-
-
 def test_closed_mountain_listed() -> None:
     p = recorded()
     closed = p.model_copy(
@@ -142,7 +114,8 @@ def test_closed_mountain_listed() -> None:
     )
     html = page.render_report(closed, recorded_narrative())
     assert "Pico<small>model mean</small><small>closed</small>" in html
-    assert '<div role="rowheader" class="tl-n">Pico<small>closed</small></div>' in html
+    # The timeline shows only the name; "closed" is in the forecast table.
+    assert '<div role="rowheader" class="tl-n">Pico</div>' in html
 
 
 @pytest.mark.parametrize(

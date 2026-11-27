@@ -18,7 +18,7 @@
       <div class="tl-now" style="grid-row:2 / span {{ t.rows | length }}"></div>
       <div role="row" class="tl-row"><div role="columnheader"></div>{% for a, b in t.past_days %}<div role="columnheader" class="tl-h tl-h-past">{{ a }}<br>{{ b }}</div>{% endfor %}<div role="columnheader" class="tl-nowh"><span>Now</span></div>{% for a, b in t.days %}<div role="columnheader" class="tl-h">{{ a }}<br>{{ b }}</div>{% endfor %}</div>
 {% for r in t.rows %}
-      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">{{ r.name }}{% if not r.is_open %}<small>closed</small>{% endif %}</div>
+      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">{{ r.name }}</div>
 {%- for c in r.past + r.days %}<div role="cell" class="c {{ c.kind }}"{% if c.background %} style="background:{{ c.background }};color:{{ c.color }}"{% endif %} title="{{ c.title }}">{% if c.text %}<b>{{ c.text }}</b>{% endif %}{% if c.word %}<span class="w" style="color:{{ c.word_color }}">{{ c.word }}</span>{% endif %}</div>{% endfor %}</div>
 {% endfor %}
     </div>
@@ -35,15 +35,6 @@
     </tbody>
   </table>
   <p class="lead fct-note">Model mean: Open-Meteo snowfall (7:1), mean of the models. Resort ratio: each model's snow water times the ratio fitted to that resort's reports, shown where its average 1-day error beat the mean's by at least 0.05″ on the last complete season (fitted on earlier seasons), or on this season's verified snow days once a mountain has 20. Corrected, where shown, passed the same test.</p>
-
-  <div class="part">Accumulation · snow that has fallen</div>
-  <h2>Last 7 days</h2>
-{% if accumulation_state == "chart" %}
-  <p class="lead">Reported snowfall this season; the dark segment is the last 7 days.</p>
-  <figure>{{ accumulation_chart }}<figcaption>Season total (in) · last 7 days highlighted · base depth at right.</figcaption></figure>
-{% else %}
-  <div class="empty">{{ accumulation_empty }}</div>
-{% endif %}
 
   <div class="foot">
     <p>Forecast: Open-Meteo ({% for label, stale in runs %}{{ label }}{% if stale %} (stale, not in the average){% endif %}{{ ", " if not loop.last }}{% endfor %}) at summit and base elevation; NWS gridpoints and alerts{% if offices %}; NWS forecast discussions ({{ offices | join(", ") }}){% endif %}.</p>

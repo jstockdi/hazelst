@@ -410,20 +410,14 @@ def _with_accumulation(snow_day: sqlite3.Connection, for_date: date):  # type: i
     )
 
 
-def test_accumulation_chart_renders(snow_day: sqlite3.Connection) -> None:
+def test_footer_names_sources_and_verification(snow_day: sqlite3.Connection) -> None:
     with db.transaction(snow_day):
         verify.store(snow_day, verify.verify_date(snow_day, MOUNTAINS, DAY))
     payload = _with_accumulation(snow_day, date(2026, 2, 7)).model_copy(
         update={"verification": verify.latest_summary(snow_day, date(2026, 2, 7))}
     )
-    assert page.accumulation_state(payload)[0] == "chart"
     html = page.render_report(payload, recorded_narrative())
-    assert 'aria-label="Observed season snowfall by mountain"' in html
-    # Only mountains with a resort number are charted.
-    chart = html[html.index('aria-label="Observed season snowfall') :]
-    chart = chart[: chart.index("</svg>")]
-    assert "Killington</text>" in chart and "Sugarbush</text>" in chart
-    assert "Cranmore</text>" not in chart
+    assert "Accumulation · snow that has fallen" not in html and "<svg" not in html
     assert "Accumulation: resort reports, resort report pages read by Claude." in html
     assert (
         "Not resort-reported, in the JSON only: NWS snowfall reports, NWS local storm reports,"
@@ -449,15 +443,15 @@ def test_timeline_past_is_resort_reported_only(snow_day: sqlite3.Connection) -> 
     assert "NOHRSC 1" not in html  # context stays in the JSON
 
 
-def test_accumulation_empty_without_resort_reports(snow_day: sqlite3.Connection) -> None:
+def test_timeline_without_resort_reports(snow_day: sqlite3.Connection) -> None:
     with db.transaction(snow_day):
         snow_day.execute("DELETE FROM observation WHERE source IN ('resort', 'resort_llm')")
-    payload = _with_accumulation(snow_day, date(2026, 2, 7))
-    state, text = page.accumulation_state(payload)
-    assert state == "empty"
-    assert text.startswith("No resort snow reports for the last 7 days")
-    html = page.render_report(payload, recorded_narrative())
-    assert "no resort report" in html
+    payload = _with_accumulation(snow_day, date(2026, 2, 7)).model_copy(
+        update={"date": date(2026, 2, 7)}
+    )
+    killington = next(r for r in page.snow_timeline(payload).rows if r.name == "Killington")
+    assert killington.past[-1].kind == "nr"
+    assert "no resort report" in page.render_report(payload, recorded_narrative())
 
 
 def test_accumulation_empty_without_observations(tmp_path: Path) -> None:
