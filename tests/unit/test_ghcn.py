@@ -7,6 +7,7 @@ Stratton, Lonesome Lake Hut near Loon, and Mount Washington.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -106,21 +107,32 @@ def test_rerun_leaves_counts_unchanged(conn: sqlite3.Connection) -> None:
     assert first[0] == 15
 
 
-def test_verification_reports_ghcn(conn: sqlite3.Connection) -> None:
+def test_ghcn_is_context_never_truth(conn: sqlite3.Connection) -> None:
     with db.transaction(conn):
         ghcn.store(conn, rows())
         insert_editions(conn, DAY)
-    found = {m.key: verify.observed(conn, m.key, DAY) for m in MOUNTAINS}
-    # Within 5 mi: North Conway CoCoRaHS (1.5 in, the higher of two) and Bondville.
-    assert (found["cranmore"].snow_in, found["cranmore"].source) == (1.5, "ghcn")  # type: ignore[union-attr]
-    assert (found["stratton"].snow_in, found["stratton"].source) == (1.9, "ghcn")  # type: ignore[union-attr]
-    # Lonesome Lake Hut is 8.2 mi from Loon: context, not truth.
-    assert found["loon"] is None
+    assert all(verify.observed(conn, m.key, DAY) is None for m in MOUNTAINS)
+    by_key = {m.key: m for m in MOUNTAINS}
+    cranmore = verify.context(conn, by_key["cranmore"], DAY)
+    assert [(c.source, c.place, c.snow_in, c.elev_ft, c.distance_mi) for c in cranmore] == [
+        ("ghcn", "N CONWAY, NH", 1.0, 522, 0.9),
+        ("ghcn", "NORTH CONWAY 1.8 SSE, NH", 1.5, 561, 1.8),
+    ]
+    # Lonesome Lake Hut (2,746 ft) is 8.2 mi from Loon: listed beside the score.
+    (hut,) = verify.context(conn, by_key["loon"], DAY)
+    assert (hut.place, hut.snow_in, hut.elev_ft, hut.distance_mi) == (
+        "LONESOME LAKE HUT, NH",
+        4.2,
+        2746,
+        8.2,
+    )
     scored = verify.verify_date(conn, MOUNTAINS, DAY)
-    assert {r.observed_source for r in scored if r.mountain in ("cranmore", "stratton")} == {"ghcn"}
+    assert {r.result for r in scored} == {"NO_OBS"}
+    stratton = next(r for r in scored if r.mountain == "stratton")
+    assert json.loads(stratton.context)[0]["place"] == "BONDVILLE 2.4 WNW, VT"
 
 
-def test_ghcn_named_on_a_tie_with_a_pns_copy(conn: sqlite3.Connection) -> None:
+def test_ghcn_and_a_pns_copy_are_both_listed(conn: sqlite3.Connection) -> None:
     pns_copy = snow_report.make_row(
         product_id="202602071335-KGYX-NOUS41-PNSGYX",
         place="North Conway 1.8 SSE, NH",
@@ -134,16 +146,19 @@ def test_ghcn_named_on_a_tie_with_a_pns_copy(conn: sqlite3.Connection) -> None:
     with db.transaction(conn):
         snow_report.store(conn, [pns_copy], "pns")
         ghcn.store(conn, rows())
-    obs = verify.observed(conn, "cranmore", DAY)
-    assert obs is not None and (obs.snow_in, obs.source) == (1.5, "ghcn")
+    cranmore = next(m for m in MOUNTAINS if m.key == "cranmore")
+    assert verify.observed(conn, "cranmore", DAY) is None
+    found = [(c.source, c.snow_in) for c in verify.context(conn, cranmore, DAY)]
+    assert ("ghcn", 1.5) in found and ("pns", 1.5) in found
 
 
-def test_calendar_day_station_is_never_truth(conn: sqlite3.Connection) -> None:
+def test_calendar_day_station_is_outside_the_window(conn: sqlite3.Connection) -> None:
     """Mount Washington's day ends at midnight, outside the 4-10 AM window, even if near."""
     near = {"USW00014755": ghcn.Station(**{**BY_ID["USW00014755"].__dict__, "distance_mi": 1.0})}
     with db.transaction(conn):
         ghcn.store(conn, ghcn.normalize(base.read_fixture(GHCN_FEB), near))
-    assert all(verify.observed(conn, "cranmore", d) is None for d in (DAY, date(2026, 2, 7)))
+    cranmore = next(m for m in MOUNTAINS if m.key == "cranmore")
+    assert all(verify.context(conn, cranmore, d) == [] for d in (DAY, date(2026, 2, 7)))
 
 
 def test_ingest_obs_reads_the_last_10_days(tmp_path: Path) -> None:

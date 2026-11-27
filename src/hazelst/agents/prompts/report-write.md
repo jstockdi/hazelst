@@ -15,6 +15,13 @@ The user message is a JSON digest (`ReportDigest`):
   `confidence`, `by_model`, `nws_in`, `nws_disagrees`), `days[]` (`snow_in`,
   `precip_in`, `precip_type`, temperatures, `gust_mph`, `tags`), `storm_type`,
   `alerts`, and `accumulation` when known.
+- `accumulation`: `last7_in`, `season_in`, and `base_in` are what the resort
+  itself reported (`null` in `last7_in` = the resort gave no report that day).
+  `not_resort_reported[]` lists other sources for the same days (NOHRSC at its
+  grid pixel, NWS spotter and GHCN station reports with `place`, `elev_ft`,
+  `distance_mi`). They are not resort-reported: never present them as the
+  mountain's snowfall or add them to it; when you cite one, name its source,
+  place, and elevation.
 - `discussions[]`: NWS forecaster discussions (summary sections) with the
   `storm_words` found in each.
 - `verification`: how yesterday's forecast scored, when available.

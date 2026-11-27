@@ -15,7 +15,9 @@ from markupsafe import Markup
 
 from hazelst.config import TIMEZONE
 from hazelst.models import (
+    AccumulationDay,
     BestBet,
+    ContextReport,
     MountainReport,
     Narrative,
     PrecipType,
@@ -148,15 +150,17 @@ def type_cells(m: MountainReport) -> list[TypeCell]:
     return cells
 
 
+def _resort_rows(payload: ReportPayload) -> list[MountainReport]:
+    """Mountains whose resort reported anything (only resort numbers make the chart)."""
+    return [m for m in payload.mountains if m.accumulation and m.accumulation.has_resort_data]
+
+
 def accumulation_state(payload: ReportPayload) -> tuple[str, str]:
     """("chart" | "empty", empty-state sentence) for the accumulation section."""
     span = f"{payload.past_days[0]} \u2013 {payload.past_days[-1]}" if payload.past_days else ""
-    with_data = [m for m in payload.mountains if m.accumulation is not None]
+    with_data = _resort_rows(payload)
     if not with_data:
-        return "empty", (
-            f"No snowfall reports are connected yet for the last 7 days ({span}); "
-            "resort reports and NWS snowfall reports fill this section."
-        )
+        return "empty", f"No resort snow reports for the last 7 days ({span})."
     recent = [sum(v or 0 for v in m.accumulation.last7_in) for m in with_data if m.accumulation]
     if max(recent) < ACCUMULATION_MIN_IN:
         return (
@@ -170,17 +174,106 @@ def accumulation_state(payload: ReportPayload) -> tuple[str, str]:
 ACCUMULATION_SOURCE_NAMES = {
     "resort": "resort reports",
     "resort_llm": "resort report pages read by Claude",
+    "snocountry": "SnoCountry (resort-reported history)",
+}
+CONTEXT_SOURCE_NAMES = {
     "pns": "NWS snowfall reports",
     "lsr": "NWS local storm reports",
+    "ghcn": "GHCN-Daily stations",
     "nohrsc": "NOHRSC snowfall analysis",
 }
-RESULT_WORDS = (("HIT", "HIT"), ("MISS", "MISS"), ("NO_OBS", "no report"))
+CONTEXT_LABELS = {"nohrsc": "NOHRSC", "pns": "PNS", "lsr": "LSR", "ghcn": "GHCN"}
+RESORT_LABELS = {"resort": "resort", "resort_llm": "resort page", "snocountry": "SnoCountry"}
+CONTEXT_SHOWN = 3  # point reports shown per day on the page (all are in the JSON)
+NO_REPORT = "no report"
+RESULT_WORDS = (("HIT", "HIT"), ("MISS", "MISS"), ("NO_OBS", NO_REPORT))
 
 
 def accumulation_sources(payload: ReportPayload) -> list[str]:
-    """Names of every observation source behind the accumulation section."""
+    """Names of the resort-reported sources behind the accumulation section."""
     used = {s for m in payload.mountains if m.accumulation for s in m.accumulation.sources}
     return [name for key, name in ACCUMULATION_SOURCE_NAMES.items() if key in used]
+
+
+def context_sources(payload: ReportPayload) -> list[str]:
+    """Names of the non-resort sources shown beside the accumulation."""
+    used = {
+        c.source
+        for m in payload.mountains
+        if m.accumulation
+        for d in m.accumulation.days
+        for c in d.context
+    }
+    return [name for key, name in CONTEXT_SOURCE_NAMES.items() if key in used]
+
+
+def context_label(c: ContextReport) -> str:
+    """ "GHCN Stowe 2.1 SSE 3″ (720 ft, 4.2 mi)"; NOHRSC: "NOHRSC 2.1″ (pixel 2,150 ft)"."""
+    name = CONTEXT_LABELS.get(c.source, c.source.upper())
+    amount = f"{charts.num(c.snow_in)}\u2033"
+    if c.source == "nohrsc":
+        where = f" (pixel {c.elev_ft:,} ft)" if c.elev_ft is not None else ""
+        return f"{name} {amount}{where}"
+    detail = [f"{c.elev_ft:,} ft" if c.elev_ft is not None else "elevation unknown"]
+    if c.distance_mi is not None:
+        detail.append(f"{charts.num(c.distance_mi)} mi")
+    return f"{name} {c.place} {amount} ({', '.join(detail)})"
+
+
+def context_shown(day: AccumulationDay) -> tuple[list[str], int]:
+    """Labels for the page: NOHRSC, then the highest point reports; and how many are left out."""
+    grid = [c for c in day.context if c.source == "nohrsc"]
+    points = sorted(
+        (c for c in day.context if c.source != "nohrsc"),
+        key=lambda c: (c.elev_ft is None, -(c.elev_ft or 0), c.distance_mi or 0),
+    )
+    shown = [*grid, *points[:CONTEXT_SHOWN]]
+    return [context_label(c) for c in shown], max(len(points) - CONTEXT_SHOWN, 0)
+
+
+@dataclass(frozen=True)
+class AccumulationDayRow:
+    label: str  # "Sat 7"
+    resort: str  # "3″ resort" | "no report"
+    context: list[str]
+    more: int
+
+
+@dataclass(frozen=True)
+class AccumulationByDay:
+    name: str
+    summary: str  # "3″ resort-reported in 7 days · 6 days no report"
+    days: list[AccumulationDayRow]
+
+
+def accumulation_by_day(payload: ReportPayload) -> list[AccumulationByDay]:
+    """Per mountain, each day's resort number ("no report" without one) and the context."""
+    out: list[AccumulationByDay] = []
+    for m in payload.mountains:
+        acc = m.accumulation
+        if acc is None or not acc.days:
+            continue
+        rows = []
+        for d in acc.days:
+            if d.snow_in is None:
+                resort = NO_REPORT
+            else:
+                resort = (
+                    f"{charts.num(d.snow_in)}\u2033 {RESORT_LABELS.get(d.source or '', d.source)}"
+                )
+            labels, more = context_shown(d)
+            rows.append(AccumulationDayRow(f"{d.date:%a} {d.date.day}", resort, labels, more))
+        reported = [d.snow_in for d in acc.days if d.snow_in is not None]
+        missing = len(acc.days) - len(reported)
+        parts = [
+            f"{charts.num(round(sum(reported), 1))}\u2033 resort-reported"
+            if reported
+            else NO_REPORT
+        ]
+        if reported and missing:
+            parts.append(f"{missing} {'day' if missing == 1 else 'days'} no report")
+        out.append(AccumulationByDay(m.name, " · ".join(parts), rows))
+    return out
 
 
 def verification_counts(summary: VerificationSummary) -> str:
@@ -226,7 +319,7 @@ def render_report(payload: ReportPayload, narrative: Narrative | None = None) ->
     rows = sorted_by_5d(payload.mountains)
     state, empty_text = accumulation_state(payload)
     accumulation_rows = sorted(
-        (m for m in payload.mountains if m.accumulation is not None),
+        _resort_rows(payload),
         key=lambda m: -((m.accumulation.season_in or 0) if m.accumulation else 0),
     )
     context: dict[str, Any] = {
@@ -245,6 +338,8 @@ def render_report(payload: ReportPayload, narrative: Narrative | None = None) ->
         else Markup(""),
         "cautions": cautions(payload),
         "accumulation_sources": accumulation_sources(payload),
+        "context_sources": context_sources(payload),
+        "accumulation_days": accumulation_by_day(payload),
         "verification": verification_line(payload),
         "runs": [(run_label(r.model, r.issued_at), r.stale) for r in payload.models],
         "offices": [f"{OFFICE_NAMES.get(o, o)}" for o in payload.discussions],

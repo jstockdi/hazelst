@@ -10,8 +10,8 @@ Selected design: `mockups/c-brief.html`. One page per day at
 | 0 | **Band** | Kicker "HAZEL ST FORECAST"; headline (Fraunces 18px, one to three lines); issue time (small) | Front matter |
 | 1 | **The report** | Best-bet card (mountain + day + one-line why) → The storm → Mountain by mountain → Cautions | Narrative markdown in `report` |
 | 2 | **Forecast** | Label "Forecast · what falls next"; (a) stacked bar chart of new snow per mountain by day, y-axis at least 6″; (b) **What falls** grid: mountains × 5 days, each cell the summit `precip_type` (Snow / Ice / Rain / Mix / —) with liquid inches and a 💨 mark on lift-hold wind days; (c) table: Next 24 h / Next 3 days / Next 5 days — mean, model range (hidden when zero-width), NWS value (1d, 3d) | `forecast` in JSON |
-| 3 | **Accumulation** | Label "Accumulation · snow that has fallen"; horizontal bars of season total with last 7 days highlighted; base depth at right ("closed" if not open). **Empty state** when no mountain has ≥ 0.5″ in 7 days: one sentence saying so, with the date range | `accumulation` in JSON |
-| 4 | **Footer** | Sources used (forecast and accumulation); the newest verification: `HIT` / `MISS` / no-report counts for the model mean's next-24 h forecast, per edition. At 7 AM that is the day before yesterday, since yesterday is scored at 9 PM tonight | Fixed text + `verification` |
+| 3 | **Accumulation** | Label "Accumulation · snow that has fallen". Resort-reported values only (the resort's live report, else SnoCountry for the same date; decisions row 24). (a) Horizontal bars of season total with last 7 days highlighted, base depth at right ("closed" if not open), for mountains with a resort value. **Empty state** when no mountain has ≥ 0.5″ of resort-reported snow in 7 days: one sentence saying so, with the date range. (b) **By day**: one collapsible row per mountain (summary: resort-reported 7-day total and days with no report); inside, each of the 7 days shows the resort's number or "no report", and beside it, under "Not resort-reported", NOHRSC at its pixel elevation and the three highest PNS / LSR / GHCN reports within 20 mi, each labelled with source, place, elevation, and distance ("GHCN STOWE 2.1 SSE 3″ (720 ft, 4.2 mi)"; "+n more in the JSON" for the rest). Context is never summed into the resort value | `accumulation` in JSON (`last7_in`, `days[].context`) |
+| 4 | **Footer** | Sources used (forecast; accumulation's resort-reported sources; the context sources, as "Beside it, not resort-reported: …"); the newest verification: `HIT` / `MISS` / no-report counts for the model mean's next-24 h forecast, per edition. At 7 AM that is the day before yesterday, since yesterday is scored at 9 PM tonight | Fixed text + `verification` |
 
 ## Rules
 
@@ -41,9 +41,9 @@ page keeps every data section and replaces section 1:
 The issue line reads "Thu 26 Nov 2026 · 7:00 AM edition", adding "issued
 8:47 AM" when an edition publishes late (ECMWF 06Z gate).
 
-Until ground truth is connected (J14), the accumulation section shows its
-empty state: "No snowfall reports are connected yet for the last 7 days
-(<range>) …".
+When no mountain has a resort-reported value in the 7 days, the
+accumulation section shows its empty state: "No resort snow reports for the
+last 7 days (<range>)." The by-day rows still list the context.
 
 Implementation: `render/` (Jinja templates, `charts.py` SVG, `page.css`,
 fonts under `render/static/fonts` with their OFL licenses); golden pages in

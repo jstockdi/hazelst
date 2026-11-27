@@ -287,6 +287,7 @@ def snow_values(mountain: DigestMountain) -> tuple[list[float], list[tuple[float
     acc = mountain.accumulation
     if acc is not None:
         values += [v for v in (*acc.last7_in, acc.season_in, acc.base_in) if v is not None]
+        values += [c.snow_in for c in acc.not_resort_reported]
     return values, ranges
 
 

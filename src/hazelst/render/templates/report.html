@@ -57,6 +57,23 @@
 {% else %}
   <div class="empty">{{ accumulation_empty }}</div>
 {% endif %}
+{% if accumulation_days %}
+  <h2>By day</h2>
+  <p class="lead">Each day is what the resort reported; other reports are listed beside it and never added in.</p>
+{% for m in accumulation_days %}
+  <details class="acc">
+    <summary><b>{{ m.name }}</b> <small>{{ m.summary }}</small></summary>
+    <table>
+      <thead><tr><th>Day</th><th>Resort</th><th>Not resort-reported</th></tr></thead>
+      <tbody>
+{% for d in m.days %}
+        <tr><td>{{ d.label }}</td><td{% if d.resort == "no report" %} class="none"{% endif %}>{{ d.resort }}</td><td>{% for c in d.context %}<small>{{ c }}</small>{% endfor %}{% if d.more %}<small>+{{ d.more }} more in the JSON</small>{% endif %}{% if not d.context %}<small>—</small>{% endif %}</td></tr>
+{% endfor %}
+      </tbody>
+    </table>
+  </details>
+{% endfor %}
+{% endif %}
 
   <div class="foot">
     <p>Forecast: Open-Meteo ({% for label, stale in runs %}{{ label }}{% if stale %} (stale, not in the average){% endif %}{{ ", " if not loop.last }}{% endfor %}) at summit and base elevation; NWS gridpoints and alerts{% if offices %}; NWS forecast discussions ({{ offices | join(", ") }}){% endif %}.</p>
@@ -68,6 +85,9 @@
 {% endif %}
 {% if accumulation_sources %}
     <p>Accumulation: {{ accumulation_sources | join(", ") }}.</p>
+{% endif %}
+{% if context_sources %}
+    <p>Beside it, not resort-reported: {{ context_sources | join(", ") }}.</p>
 {% endif %}
     <p>{{ verification }}</p>
     <p><a href="/archive">Archive</a> · <a href="/api/report/{{ p.date.isoformat() }}.json">JSON</a></p>

@@ -105,12 +105,39 @@ class BestBet(_Model):
     why: str
 
 
-class Accumulation(_Model):
-    """Snow that has fallen (observations), chosen by `verify.accumulation`.
+class ContextReport(_Model):
+    """A snow value for a mountain-day that the resort did not report (decisions row 24).
 
-    `last7_in` holds the 7 days before the report date (6 AM to 6 AM, oldest
-    first); `source` is where the season total and base came from, and
-    `sources` every source used.
+    NOHRSC at the mountain's pixel, or a PNS / LSR / GHCN report within 20 mi.
+    Shown and stored beside the resort's number, never in place of it.
+    """
+
+    source: str  # nohrsc | pns | lsr | ghcn
+    place: str
+    snow_in: float
+    elev_ft: int | None = None  # report elevation; NOHRSC: the pixel center's
+    distance_mi: float | None = None  # from the mountain's point; None for NOHRSC
+    hours: int | None = None  # 24, or None for an unknown span (LSR, storm total)
+    ending_at: str | None = None  # UTC ISO time the report's span ends
+
+
+class AccumulationDay(_Model):
+    """One 6 AM -> 6 AM day: the resort-reported value, and the other sources beside it."""
+
+    date: date
+    snow_in: float | None = None  # resort-reported; None = no report
+    source: str | None = None  # resort | resort_llm | snocountry
+    context: list[ContextReport] = []
+
+
+class Accumulation(_Model):
+    """Snow that has fallen, as the resort reports it, chosen by `verify.accumulation`.
+
+    `last7_in` holds the resort-reported value for each of the 7 days before
+    the report date (6 AM to 6 AM, oldest first; None = no report); `days`
+    holds the same values with the non-resort context for each day. `source`
+    is where the season total and base came from, and `sources` every
+    resort-reported source used.
     """
 
     source: str
@@ -118,6 +145,16 @@ class Accumulation(_Model):
     season_in: float | None = None
     base_in: float | None = None
     sources: list[str] = []
+    days: list[AccumulationDay] = []
+
+    @property
+    def has_resort_data(self) -> bool:
+        """True when the resort reported anything: a season total, base, or a day's snow."""
+        return (
+            self.season_in is not None
+            or self.base_in is not None
+            or any(v is not None for v in self.last7_in)
+        )
 
 
 class VerificationSummary(_Model):

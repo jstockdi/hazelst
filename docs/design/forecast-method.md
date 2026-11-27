@@ -52,19 +52,27 @@ days. The mean stays the headline, so the chart and the table still agree.
 
 ## Accumulation (observed)
 
-Per mountain: new snow observed on each of the 7 days before the report date,
-season total, and base depth (`verify.accumulation`).
+Per mountain: the new snow the resort reported on each of the 7 days before
+the report date, season total, and base depth (`verify.accumulation`), with
+the other sources beside each day (decisions row 24).
 
-- Each day (6 AM to 6 AM) takes the best observation by the verification
-  priority: resort 24 h (non-stale; `resort_llm` only without an adapter
-  value) > PNS / LSR within 5 mi > NOHRSC 24 h > none (`null`). A day D reads
-  `observation.obs_date` D + 1 (the 24 h ending the morning after).
+- Each day (6 AM to 6 AM) takes the resort-reported value the verification
+  uses: resort 24 h (non-stale; `resort_llm` only without an adapter value),
+  else SnoCountry for the same date, else none (`null`, shown as "no report").
+  A day D reads `observation.obs_date` D + 1 (the 24 h ending the morning
+  after). `last7_in` holds these values; `days[]` holds each day's value,
+  `source`, and `context`: the NOHRSC 24 h value at the pixel and each PNS /
+  LSR / GHCN report within 20 mi (`source`, `place`, `snow_in`, `elev_ft`,
+  `distance_mi`, `hours`, `ending_at`), the same list `verification.context`
+  stores. Context is never summed into the resort value.
 - Season total and base depth come from the newest non-stale resort report of
-  the last 3 days; without one, the NOHRSC season-to-date grid (no base depth),
-  and `source` is `"nohrsc"`. `sources` lists every source used; the footer
-  names them.
-- A mountain with no observation at all has no accumulation; the section shows
-  its empty state when no mountain has 0.5″ or more in the 7 days.
+  the last 3 days; without one they are `null` (no NOHRSC fallback).
+  `sources` lists every resort-reported source used; the footer names them,
+  and names the context sources separately.
+- A mountain with neither a resort value nor any context has no accumulation;
+  the chart shows only mountains with a resort value, and the section shows
+  its empty state when no mountain has 0.5″ or more of resort-reported snow
+  in the 7 days.
 
 ## Pattern tags
 

@@ -9,6 +9,12 @@ Sugarloaf win the holiday weekend") is produced by Claude from three inputs:
 2. **Pattern tags** from `tags.py` — deterministic checks on the model data
    (upslope, mixing, freezing rain, wind holds, storm type).
 3. **Per-mountain numbers** — 1d / 3d / 5d forecast, ranges, accumulation.
+   The digest's accumulation is what each resort reported (`last7_in`,
+   `season_in`, `base_in`; `null` = no report). Other sources for the same
+   days (NOHRSC at its pixel, then the three highest PNS / LSR / GHCN reports
+   within 20 mi per day, each with place, elevation, and distance) travel in
+   `accumulation.not_resort_reported`, labelled as not resort-reported
+   (decisions row 24).
 
 ## Feasibility check (2026-11-25)
 
@@ -30,6 +36,10 @@ week's weather. The full sample run is in [the sample run](../experiments/2026-1
 - Normalize whitespace in discussion text before any keyword match (line wraps
   split phrases).
 - Every snow number in prose must match the JSON (summit unless stated).
+- Observed snow at a mountain is the resort's own number. A non-resort value
+  (`not_resort_reported`) is never presented as the mountain's snowfall or
+  added to it; when cited, it names its source, place, and elevation ("the
+  Stowe co-op at 720 ft had 3″").
 - When `nws_disagrees` is set, say which source the report leans on and why.
 - When models spread wide (low confidence), say so in the storm section.
 - Explain mountain-to-mountain differences with tags and `favored_by`

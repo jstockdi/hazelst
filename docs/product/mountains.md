@@ -58,4 +58,6 @@ narrative uses it to explain why totals differ (see narrative.md).
 ```
 
 Set `"report_adapter": null` to disable a mountain's adapter (build-plan
-Fallbacks); its accumulation then comes from PNS, LSR, and NOHRSC.
+Fallbacks); its accumulation and verification then use SnoCountry's copy of
+the resort number, else show "no report"; PNS, LSR, GHCN, and NOHRSC stay
+beside it as context.
