@@ -206,6 +206,11 @@ def test_cli_method_choose(
     assert cli.main(["method", "choose", "--date", AS_OF.isoformat(), "--dry-run"]) == 0
     out = capsys.readouterr().out
     assert "loon" in out and "dry run" in out
+    lines = out.splitlines()
+    header = next(line for line in lines if line.startswith("mountain"))
+    assert header.split()[-1] == "role" and "chosen" not in header
+    loon = {line.split()[1]: line.split()[7:] for line in lines if line.startswith("loon ")}
+    assert loon == {"raw_mean": [], "resort_ratio": ["headline"]}
     assert conn.execute("SELECT count(*) FROM method_gate").fetchone()[0] == 0
     assert cli.main(["method", "choose", "--date", AS_OF.isoformat()]) == 0
     chosen = conn.execute("SELECT method FROM method_gate WHERE mountain = 'loon' AND chosen = 1")
@@ -231,6 +236,12 @@ def test_a_fine_winner_takes_day_1_and_the_global_rule_keeps_days_2_to_5() -> No
         set(),
         "nbm_raw",
     )
+    assert [method.role(m) for m in ("resort_ratio", "corrected", "fine_ratio", "raw_mean")] == [
+        "headline",
+        "beneath",
+        "day1",
+        "headline",
+    ]
     assert method.decide_day1({"raw_mean": 2.0, "resort_ratio": 1.0, "hrrr_ratio": 1.5}) == (
         "resort_ratio",
         set(),
@@ -261,6 +272,7 @@ def test_choose_takes_fine_candidates_and_leaves_thin_ones_out(conn: sqlite3.Con
     assert "nbm_raw" not in rows and "nbm_ratio" not in rows and "ifs9_ratio" not in rows
     assert rows["hrrr_ratio"].mae_in == 2.4  # 5:1 fitted on 2024-25 vs 20:1 observed
     assert rows["hrrr_ratio"].chosen and rows["raw_mean"].chosen  # day 1 + days 2-5
+    assert (rows["hrrr_ratio"].role, rows["raw_mean"].role) == ("day1", "headline")
     with db.transaction(conn):
         method.store(conn, rows.values(), datetime(2026, 11, 27, tzinfo=UTC))
     choice = method.load(conn)

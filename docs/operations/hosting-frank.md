@@ -91,19 +91,22 @@ today; if one is added, this is the allowlist.
 - **Logs:** stdout, one line per job step with source timings and failures
   (picked up by the Phase 5 log pipeline when it lands).
 - **Backups:** `/srv/hazelst/hazelst.db` is the product's memory (all raw data,
-  verification, learned skill, knowledge). The `backup` job runs at 4:00 AM in the
-  in-process schedule: Python's `sqlite3` online backup API (frank has no
-  `sqlite3` CLI) writes `/srv/hazelst/backups/hazelst-<date>.db` through a
-  `.partial` file and a rename, and keeps the newest 14. Run one by hand with
-  `docker exec hazelst hazelst run backup`. The copies share the LV with the live
-  database; an off-host copy belongs to the frank backup set (frank doc 03 §7),
-  not yet built. Size < 1 GB per season.
+  verification, learned skill, knowledge). The `backup` job runs weekly, Sunday
+  4:00 AM, in the in-process schedule: Python's `sqlite3` online backup API (frank
+  has no `sqlite3` CLI) writes `/srv/hazelst/backups/hazelst-<date>.db` through a
+  `.partial` file and a rename, then keeps the newest 4 (decisions row 31). Run
+  one by hand with `docker exec hazelst hazelst run backup` (it prunes the same
+  way). The copies share the 10 GB LV with the live database; an off-host copy
+  belongs to the frank backup set (frank doc 03 §7), not yet built. Growth is
+  about 10 MB/day (data-model.md, Size); a full copy was 523 MB on 2026-11-27.
+  List the copies inside the container (`docker exec hazelst ls -l
+  /data/backups`); the host path needs `sudo`.
 - **Alerts:** `/metrics` exports `hazelst_report_published_timestamp_seconds`
   and `hazelst_backup_last_success_timestamp_seconds`, read from the database at
   scrape time. frank's Prometheus (frank-monitoring, on `edge`) scrapes
   `hazelst:8080` and evaluates `rules/hazelst.rules.yml`:
   `HazelstReportStale` (newest report older than 26 h for 15 min),
-  `HazelstBackupStale` (newest backup older than 26 h for 30 min), and
+  `HazelstBackupStale` (newest backup older than 8 days for 30 min; backups are weekly), and
   `HazelstScrapeDown` (`up == 0` for 10 min). Like frank's other rules they
   surface in Prometheus `/alerts` and Grafana; no Alertmanager pages yet.
 - **Season backfill** (manual, once after the first deploy): loads the

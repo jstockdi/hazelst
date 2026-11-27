@@ -65,7 +65,7 @@ job lock, and a failed step does not stop the next one.
 | 9:00 PM | `forecast-verify` |
 | 2:00 AM | `skill-learn` (on the day DST starts, 2:00 AM does not exist and the slot runs at 3:00 AM EDT) |
 | Monday 3:00 AM | `knowledge-review` (a slot's optional `day_of_week`; DST changes fall on Sundays, so the slot always exists) |
-| 4:00 AM | `backup` |
+| Sunday 4:00 AM | `backup` (weekly; DST changes at 2:00 AM, so 4:00 AM always exists) |
 
 - **Editions**: each report version records its edition in `payload.edition`.
   A scheduled report job for an edition already published that day is skipped
@@ -85,14 +85,14 @@ job lock, and a failed step does not stop the next one.
 
 | Job | When | Steps | Claude roles |
 |-----|------|-------|--------------|
-| `ingest-forecast` | 6:45 AM, 8:10 AM, 2:30 PM | Open-Meteo (summit, base), NWS grids, alerts, discussions → `fetch` → normalize | — |
+| `ingest-forecast` | 6:45 AM, 8:10 AM, 2:30 PM | Open-Meteo (summit, base), NWS grids, alerts, discussions → `fetch` → normalize (`forecast_hourly` from 6 AM local on the ingest date) | — |
 | `ingest-obs` | 6:50 AM, 8:10 AM, 2:30 PM | Resort adapters, PNS, LSR, NOHRSC → `fetch` → `observation`, `snow_report` | `conditions-extract`, only when an adapter fails |
 | `report-build` | 7:00 AM | derive → digest → `report-write` → `report-check` → (`report-revise` → `report-check`) → `report` | `report-write`, `report-revise` |
 | `report-refresh` | 8:15 AM, 2:40 PM | re-derive from the latest ingest; update numbers, alerts, conditions; re-run `report-check` against the newest checked draft of the day (the `agent_call` output that passed); with no checked draft the edition is `numbers_only` | `report-revise` only if the check now fails |
 | `forecast-verify` | 9:00 PM | read the NOHRSC grid ending 12Z today (published ~7:30 PM), then score yesterday's 1d forecast from each edition (7:00, 8:15, 2:40) against observations → `verification`; re-score the date a week before that (NOHRSC re-read) | — |
 | `skill-learn` | 2:00 AM nightly | rebuild `skill` from `verification` + `forecast_hourly`; refit `snow_ratio`; re-choose each mountain's method (`method_gate`) | — |
 | `knowledge-review` | Monday 3:00 AM | gather the week's evidence (days D − 8 … D − 2, the days scored since the last review) → `knowledge-propose` → validate → proposed `knowledge` / `config_change` rows; skipped without skill cells or misses, or when agents are off | `knowledge-propose` |
-| `backup` | 4:00 AM nightly | online copy of the database to `backups/hazelst-<date>.db`; keeps 14 | — |
+| `backup` | Sunday 4:00 AM weekly | online copy of the database to `backups/hazelst-<date>.db`; keeps the newest 4, removing older ones after the new copy is complete | — |
 | `season-backfill` | manual (`hazelst season-backfill --from D --to D`) | Open-Meteo Previous Runs (GFS, GEM, lead days 1–5), IEM LSR and PNS, NOHRSC 24 h grids into the same tables, one job per month; then `skill-learn` ([data-sources.md](data-sources.md#season-backfill-j22)) | — |
 
 ## Claude roles

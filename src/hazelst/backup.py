@@ -1,9 +1,10 @@
-"""Nightly database backup with SQLite's online backup API (no `sqlite3` CLI on frank).
+"""Weekly database backup with SQLite's online backup API (no `sqlite3` CLI on frank).
 
 A backup is a consistent copy of the live database, written next to it under
 `backups/` as `hazelst-<date>.db`. The copy is written to a temporary name and
-renamed, so a backup file that exists is always complete. The newest `KEEP`
-backups are kept; older ones are removed.
+renamed, so a backup file that exists is always complete. After each new
+backup, the newest `KEEP` are kept and older ones removed (decisions row 31:
+weekly, four kept, about a month).
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-KEEP = 14
+KEEP = 4
 NAME = re.compile(r"^hazelst-\d{4}-\d{2}-\d{2}\.db$")
 
 

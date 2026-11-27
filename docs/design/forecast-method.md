@@ -122,7 +122,9 @@ rows 28–29; `method.py`), stored in `method_gate`, and read by `report-build`:
   candidates alone picks the method for the windows and days 2–5; both rows
   are chosen (decisions row 30).
 - **When**: `hazelst method choose [--date D] [--dry-run]` prints the
-  table and writes `method_gate`; `skill-learn` re-runs the choice nightly
+  table (column `role`: `headline` for the windows and days, `beneath` for
+  `corrected` under the headline, `day1` for a finer-model candidate; blank
+  when not chosen) and writes `method_gate`; `skill-learn` re-runs the choice nightly
   after refitting `snow_ratio`. Without a `method_gate` row a mountain
   uses `raw_mean` and shows no corrected value.
 

@@ -29,6 +29,25 @@ def test_snapshot_is_a_complete_copy(tmp_path: Path) -> None:
     copy.close()
 
 
+def test_snapshot_keeps_the_newest_four(tmp_path: Path) -> None:
+    src = tmp_path / "h.db"
+    conn = db.connect(src)
+    db.migrate(conn)
+    dest = backup.backup_dir(src)
+    dest.mkdir()
+    for day in (1, 8, 15, 22, 29):  # five weekly copies already there
+        (dest / f"hazelst-2026-10-{day:02d}.db").write_bytes(b"x")
+    result = backup.snapshot(conn, dest, date(2026, 11, 5))
+    assert backup.KEEP == 4
+    assert result.pruned == ["hazelst-2026-10-01.db", "hazelst-2026-10-08.db"]
+    assert sorted(p.name for p in dest.iterdir()) == [
+        "hazelst-2026-10-15.db",
+        "hazelst-2026-10-22.db",
+        "hazelst-2026-10-29.db",
+        "hazelst-2026-11-05.db",
+    ]
+
+
 def test_prune_keeps_newest(tmp_path: Path) -> None:
     for day in range(1, 6):
         (tmp_path / f"hazelst-2026-11-0{day}.db").write_bytes(b"x")

@@ -64,6 +64,22 @@ def test_weekly_slot_fires_monday_across_dst(after: date, monday: date, utc_offs
     assert fire.astimezone(UTC).replace(tzinfo=None) == expected_utc
 
 
+@pytest.mark.parametrize(
+    ("after", "sunday", "utc_offset_h"),
+    [
+        (date(2026, 11, 27), date(2026, 11, 29), 5),  # Friday -> Sunday, EST
+        (date(2026, 10, 26), date(2026, 11, 1), 5),  # DST ends at 2 AM; 4 AM is EST
+        (date(2027, 3, 9), date(2027, 3, 14), 4),  # DST starts at 2 AM; 4 AM is EDT
+    ],
+)
+def test_backup_fires_sunday_at_4_am(after: date, sunday: date, utc_offset_h: int) -> None:
+    (slot,) = [s for s in scheduler.SLOTS if s.steps == (scheduler.Step("backup"),)]
+    fire = scheduler.trigger(slot).get_next_fire_time(None, datetime.combine(after, dtime(0), ET))
+    assert fire.astimezone(ET).date() == sunday
+    expected_utc = datetime.combine(sunday, dtime(4, 0)) + timedelta(hours=utc_offset_h)
+    assert fire.astimezone(UTC).replace(tzinfo=None) == expected_utc
+
+
 def test_slots_follow_agent_runs_schedule() -> None:
     table = [(s.at.strftime("%H:%M"), [st.kind for st in s.steps]) for s in scheduler.SLOTS]
     assert table == [
@@ -78,7 +94,10 @@ def test_slots_follow_agent_runs_schedule() -> None:
         ("04:00", ["backup"]),
         ("03:00", ["knowledge-review"]),
     ]
-    assert [s.day_of_week for s in scheduler.SLOTS if s.day_of_week] == ["mon"]
+    assert [(s.id, s.day_of_week) for s in scheduler.SLOTS if s.day_of_week] == [
+        ("backup-sun-0400", "sun"),
+        ("knowledge-review-mon-0300", "mon"),
+    ]
     morning = scheduler.SLOTS[3].steps
     assert morning[0].ecmwf_gate_until == dtime(8, 45)
     assert (morning[2].edition, morning[2].not_before) == ("0815", dtime(8, 15))

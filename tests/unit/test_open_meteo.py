@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -141,16 +141,20 @@ def test_ingest_forecast_fills_forecast_hourly(
     tmp_path: Path, recorded: list[base.Fetched]
 ) -> None:
     cfg = config.load({"HAZELST_DB": str(tmp_path / "h.db")})
-    summary = jobs.run_job(cfg, "ingest-forecast", client=replay_client(recorded))
+    summary = jobs.run_job(
+        cfg, "ingest-forecast", date(2026, 11, 26), client=replay_client(recorded)
+    )
     assert summary["open_meteo"]["status"] == "ok"
-    assert summary["open_meteo"]["forecast_hourly"] == 2 * 8 * 3 * 336
+    # 336 hours requested (7 past days, 7 forecast days); stored from 6 AM EST (11Z) on
+    # the ingest date: 13 hours of 26 Nov and 6 forecast days (decisions row 31).
+    assert summary["open_meteo"]["forecast_hourly"] == 2 * 8 * 3 * 157
     conn = db.connect(cfg.settings.db_path)
     run = conn.execute("SELECT kind, status FROM run").fetchone()
     assert tuple(run) == ("ingest-forecast", "ok")
     counts = conn.execute(
         "SELECT elevation, count(*) FROM forecast_hourly GROUP BY elevation ORDER BY elevation"
     ).fetchall()
-    assert [tuple(r) for r in counts] == [("base", 8064), ("summit", 8064)]
+    assert [tuple(r) for r in counts] == [("base", 3768), ("summit", 3768)]
     sources = conn.execute(
         "SELECT source, count(*) FROM fetch WHERE source LIKE 'open_meteo%' GROUP BY source"
     ).fetchall()

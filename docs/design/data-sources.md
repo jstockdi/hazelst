@@ -22,7 +22,8 @@ All sources below are free and keyless (NWS requires a `User-Agent` header).
   `models=gfs_seamless,ecmwf_ifs025,gem_seamless`, `past_days=7`,
   `forecast_days=7`, `temperature_unit=fahrenheit`, `wind_speed_unit=mph`,
   `precipitation_unit=inch`. The same hourly variables are requested at summit
-  and base.
+  and base. The raw response keeps every hour; `forecast_hourly` stores hours
+  from 6 AM local on the ingest date onward (decisions row 31).
 - Units follow `hourly_units`, which normalize reads per variable: with these
   options `snowfall` and `precipitation` are inches, but `snow_depth` and
   `freezing_level_height` are **feet** (stored as inches and feet).

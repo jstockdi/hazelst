@@ -98,9 +98,22 @@ def today(cfg: config.Config) -> date:
 # --- ingest-forecast ------------------------------------------------------------
 
 
+def keep_from(for_date: date, tz: str) -> str:
+    """The first hour an ingest for `for_date` stores, as `valid_at` text: 6 AM local.
+
+    No reader of a live ingest's rows starts earlier (decisions row 31): a report
+    for `for_date` reads from its 6 AM anchor, and skill-learn, the snow ratio,
+    and the backfill edition read whole 6 AM days starting at or after the run.
+    The raw responses in `fetch` keep every hour.
+    """
+    return open_meteo.isoformat(derive.anchor_for(for_date, tz))
+
+
 def ingest_open_meteo(ctx: JobContext) -> dict[str, Any]:
-    """Fetch summit and base forecasts plus model run times; store raw and normalized rows."""
+    """Fetch summit and base forecasts plus model run times; store raw responses, and
+    normalized rows from 6 AM local on the ingest date onward (`keep_from`)."""
     fetched = open_meteo.fetch(ctx.client, ctx.cfg.mountains)
+    since = keep_from(ctx.for_date, ctx.cfg.timezone)
     for f in fetched:
         if (
             f.source == open_meteo.SOURCE
@@ -118,13 +131,15 @@ def ingest_open_meteo(ctx: JobContext) -> dict[str, Any]:
             if f.source != open_meteo.SOURCE:
                 continue
             if not open_meteo.is_fine_fetch(f):
-                rows += open_meteo.store(ctx.conn, fetch_id, open_meteo.normalize(f, runs))
+                kept = open_meteo.normalize(f, runs, since=since)
+                rows += open_meteo.store(ctx.conn, fetch_id, kept)
                 continue
             # The finer models compete for day 1 only: a failure leaves the global forecast.
             try:
                 if f.http_status != 200:
                     raise open_meteo.NormalizeError(f"HTTP {f.http_status}")
-                fine_rows += open_meteo.store(ctx.conn, fetch_id, open_meteo.normalize(f, runs))
+                kept = open_meteo.normalize(f, runs, since=since)
+                fine_rows += open_meteo.store(ctx.conn, fetch_id, kept)
             except (open_meteo.NormalizeError, KeyError, ValueError) as exc:
                 fine_errors.append(f"{f.meta.get('elevation')}: {exc}")
     return {
@@ -677,6 +692,12 @@ def build_report(ctx: JobContext, kind: str) -> None:
     inputs = derive.load_inputs(ctx.conn, ingest_run, now)
     if not inputs.hourly:
         raise JobError(f"ingest run {ingest_run} has no forecast rows")
+    first = keep_from(ctx.for_date, ctx.cfg.timezone)
+    if min(r.valid_at for r in inputs.hourly) > first:
+        # An ingest stores hours from 6 AM on its own date (decisions row 31).
+        raise JobError(
+            f"ingest run {ingest_run} has no hours from {first}; ingest for {ctx.for_date} first"
+        )
     raw = derive.derive(ctx.cfg.mountains, inputs, for_date=ctx.for_date, as_of=now)
     corrections = corrected.correct(raw, corrected.load_cells(ctx.conn))
     ratios = ratio.Ratios.load(ctx.conn)
@@ -855,7 +876,7 @@ def rescore_range(ctx: JobContext, start: date, end: date) -> None:
 
 
 def backup(ctx: JobContext) -> None:
-    """Online copy of the database to `backups/hazelst-<date>.db`; keeps the newest 14."""
+    """Online copy of the database to `backups/hazelst-<date>.db`; keeps the newest 4."""
     dest = db_backup.backup_dir(ctx.cfg.settings.db_path)
     started = time.monotonic()
     result = db_backup.snapshot(ctx.conn, dest, ctx.for_date)
