@@ -77,6 +77,21 @@ def test_lookup_converts_metres_to_feet_in_batches_of_100() -> None:
     assert found[(44.1, -72.0)] == round(100 * elevation.FT_PER_M)  # 100 m = 328 ft
 
 
+def test_lookup_paces_batches_and_stops_at_a_rate_limit(
+    no_elevation_pacing: list[float], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("hazelst.sources.base.time.sleep", lambda _s: None)  # retry backoff
+    points = [(44.0 + i / 1000, -72.0) for i in range(250)]
+    api = FakeElevation()
+    elevation.lookup(api.client(), points)
+    assert no_elevation_pacing == [elevation.BATCH_INTERVAL_S] * 2  # 3 batches
+
+    limited = FakeElevation(status=429)
+    found = elevation.lookup(limited.client(), points)
+    assert len(limited.queries) == 3  # the first batch and its 2 retries, then stop
+    assert set(found.values()) == {None} and len(found) == 250
+
+
 def test_lookup_failure_is_none_not_an_error() -> None:
     found = elevation.lookup(FakeElevation(status=400).client(), [(44.5, -72.0)])
     assert found == {(44.5, -72.0): None}

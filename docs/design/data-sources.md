@@ -411,6 +411,11 @@ configured point (43.6045, -72.8201) is 1,257 m (4,124 ft).
   resolution); a key already known from another `snow_report` row is not
   requested again. A PNS row that replaces the LSR copy of the same observation
   keeps the stored elevation.
+- Rate limit: Open-Meteo counts each point as one call (600 per minute,
+  5,000 per hour, 10,000 per day on the free tier). The first fill on frank
+  (2026-11-27, 4,634 points in 47 unpaced requests) left 10,353 of 26,004 rows
+  NULL after HTTP 429s. Batches are now sent at least 12 s apart (500 points a
+  minute), and a 429 stops the fill; a later run continues where it stopped.
 - A failed lookup leaves `elev_ft` NULL, is counted in the step summary
   (`elev_ft.failed`), and is retried by the next fill. Requests are not stored
   in `fetch` (reference data, rebuildable from coordinates).
