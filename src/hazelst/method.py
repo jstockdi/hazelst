@@ -47,6 +47,19 @@ LIVE_DAYS = 20
 EPSILON = 1e-9
 # Methods shown beside the headline, never as it.
 BESIDE: frozenset[str] = frozenset({corrected.METHOD})
+# What a chosen `method_gate` row does on the page (`hazelst method choose`, column `role`).
+HEADLINE, BENEATH, DAY1 = "headline", "beneath", "day1"
+
+
+def role(method: str) -> str:
+    """The page role of `method` when its row is chosen: `day1` for a finer-model
+    candidate (day 1 only), `beneath` for `corrected` (shown under the headline),
+    else `headline` (the windows and days; days 2-5 when a `day1` row is chosen)."""
+    if method in ratio.FINE_METHODS:
+        return DAY1
+    if method in BESIDE:
+        return BENEATH
+    return HEADLINE
 
 
 @dataclass(frozen=True)
@@ -61,6 +74,11 @@ class GateRow:
     mae_in: float | None
     raw_mean_mae_in: float | None
     chosen: bool
+
+    @property
+    def role(self) -> str:
+        """`headline`, `beneath`, or `day1` when chosen (`role()`); "" otherwise."""
+        return role(self.method) if self.chosen else ""
 
 
 @dataclass(frozen=True)
@@ -308,9 +326,10 @@ def load(conn: sqlite3.Connection) -> Choice:
     for mountain, method in conn.execute(
         "SELECT mountain, method FROM method_gate WHERE chosen = 1"
     ):
-        if method in BESIDE:
+        kind = role(method)
+        if kind == BENEATH:
             beside[mountain].add(method)
-        elif method in ratio.FINE_METHODS:
+        elif kind == DAY1:
             day1[mountain] = method
         else:
             headline[mountain] = method

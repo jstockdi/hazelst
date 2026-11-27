@@ -347,14 +347,16 @@ def _valid_at(time: str) -> datetime:
     return datetime.fromisoformat(time).replace(tzinfo=UTC)
 
 
-def normalize(fetched: Fetched, runs: Mapping[str, RunTime]) -> list[HourlyRow]:
+def normalize(
+    fetched: Fetched, runs: Mapping[str, RunTime], *, since: str | None = None
+) -> list[HourlyRow]:
     """Rows for every mountain, model, and hour with at least one value.
 
     `fetched` is one forecast response (one elevation; its models are
     `meta.models`, else the global `MODELS`); `runs` maps each model to its
     run time (a model missing from `runs` gets `issued_at` NULL). A single-run
     response names its model and run in `fetched.meta` and has unsuffixed
-    variable names.
+    variable names. `since` (`valid_at` text) drops earlier hours.
     """
     data = fetched.json()
     locations: list[dict[str, Any]] = data if isinstance(data, list) else [data]
@@ -394,6 +396,8 @@ def normalize(fetched: Fetched, runs: Mapping[str, RunTime]) -> list[HourlyRow]:
             for i, valid in enumerate(times):
                 values_at = {c: series[i] for c, series in columns.items()}
                 if all(v is None for v in values_at.values()):
+                    continue
+                if since is not None and isoformat(valid) < since:
                     continue
                 lead = round((valid - run.initialised_at).total_seconds() / 3600) if run else None
                 rows.append(

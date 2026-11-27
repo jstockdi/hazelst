@@ -528,7 +528,7 @@ def _cmd_ratio_backtest(args: argparse.Namespace) -> int:
 
 def _cmd_method_choose(args: argparse.Namespace) -> int:
     """Choose each mountain's method (held-out season, or live days) and write `method_gate`."""
-    from hazelst import method, ratio
+    from hazelst import method
 
     cfg = config.load()
     as_of = args.date or jobs.today(cfg)
@@ -545,20 +545,25 @@ def _cmd_method_choose(args: argparse.Namespace) -> int:
         f"method choice as of {as_of}: held-out season {season[0]}..{season[1]} (fit through"
         f" {season[0].year}-04-30), or the current season's live days where a mountain has"
         f" >= {method.LIVE_DAYS}; a method is chosen when its 1d MAE is >= {method.MARGIN_IN} in"
-        " below raw_mean's and lowest; corrected is shown beneath the headline, never as it"
+        " below raw_mean's and lowest"
+    )
+    print(
+        f"role: {method.HEADLINE} = the page's method for the windows and days"
+        f" (days 2-5 where a mountain has a {method.DAY1} row); {method.BENEATH} = shown"
+        f" beneath the headline, never as it; {method.DAY1} = a finer-model candidate for"
+        " day 1 only; blank = not chosen"
     )
     header = (
         f"{'mountain':<14} {'method':<14} {'test_from':<10} {'test_to':<10} {'n':>4}"
-        f" {'mae_in':>7} {'raw_mae':>7} {'chosen':>6}"
+        f" {'mae_in':>7} {'raw_mae':>7}  {'role':<8}"
     )
     print(header)
     print("-" * len(header))
     for r in rows:
-        mark = ("day 1" if r.method in ratio.FINE_METHODS else "yes") if r.chosen else ""
         print(
             f"{r.mountain:<14} {r.method:<14} {r.test_from or '-'!s:<10}"
             f" {r.test_to or '-'!s:<10} {r.n:>4} {_fmt(r.mae_in, '.3f'):>7}"
-            f" {_fmt(r.raw_mean_mae_in, '.3f'):>7} {mark:>6}"
+            f" {_fmt(r.raw_mean_mae_in, '.3f'):>7}  {r.role:<8}".rstrip()
         )
     print("(dry run: method_gate unchanged)" if args.dry_run else "method_gate written")
     return 0

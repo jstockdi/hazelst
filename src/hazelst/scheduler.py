@@ -16,8 +16,8 @@ Each slot runs its steps in order in one scheduler thread; a step waits up to
 | 7:15 to 9:00, every 15 min | report-build rebuild: rewrites today's newest edition |
 |      | while it is `numbers_only` (no-op otherwise) |
 | 2:00 AM | skill-learn (rebuilds `skill`) |
-| 4:00 AM | backup (after the overnight jobs, before the morning ingest) |
-| Monday 3:00 AM | knowledge-review (after skill-learn, before the backup) |
+| Sunday 4:00 AM | backup (weekly, after the overnight jobs, before the morning ingest) |
+| Monday 3:00 AM | knowledge-review (after skill-learn) |
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ class Slot:
     id: str
     at: dtime
     steps: tuple[Step, ...] = field(default_factory=tuple)
-    day_of_week: str | None = None  # cron day_of_week ("mon"); None = every day
+    day_of_week: str | None = None  # cron day_of_week ("mon", "sun"); None = every day
 
 
 SLOTS: tuple[Slot, ...] = (
@@ -75,7 +75,7 @@ SLOTS: tuple[Slot, ...] = (
     Slot("report-refresh-1440", dtime(14, 40), (Step("report-refresh", edition="1440"),)),
     Slot("forecast-verify-2100", dtime(21, 0), (Step("forecast-verify"),)),
     Slot("skill-learn-0200", dtime(2, 0), (Step("skill-learn"),)),
-    Slot("backup-0400", dtime(4, 0), (Step("backup"),)),
+    Slot("backup-sun-0400", dtime(4, 0), (Step("backup"),), day_of_week="sun"),
     Slot("knowledge-review-mon-0300", dtime(3, 0), (Step("knowledge-review"),), day_of_week="mon"),
 )
 # A failed narrative is retried every 15 minutes until 9 AM (agent-runs.md, Failure behavior).

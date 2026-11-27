@@ -200,8 +200,11 @@ CREATE INDEX snow_report_ending_at ON snow_report (ending_at);  -- migration 000
 
 ## How the data compounds
 
-1. **Every day** adds ~3 forecast issues × 8 mountains × 3 models × 2 elevations ×
-   168 h to `forecast_hourly`, plus observations from up to four sources.
+1. **Every day** adds ~3 forecast issues × 8 mountains × 2 elevations × (3 global
+   models × ~157 h + 5 finer models × up to 61 h) to `forecast_hourly`: each
+   ingest stores hours from 6 AM local on its date onward (decisions row 31;
+   the raw response in `fetch` keeps the API's past days). Plus observations
+   from up to four sources.
 2. **forecast-verify** scores each mountain's 1d forecast from each edition
    (7:00, 8:15, 2:40; raw mean and each model)
    against the resort's own reported snow and nothing else (decisions row 24):
@@ -298,11 +301,14 @@ with `verify.observed`.
 
 ## Size
 
-Raw bodies gzip to well under 1 MB per run. ~170 days × ~4 runs ≈ < 1 GB per
-season — trivial on frank. No pruning; the history is the point.
+Measured on frank 2026-11-27 (J30): raw bodies add about 3.4 MB/day (ingest-obs
+2.6 MB, ingest-forecast 0.8 MB), `forecast_hourly` about 6 MB/day (11,872 rows
+per ingest at ~174 B/row with its index; 12 MB/day before decisions row 31).
+About 1.6 GB per 170-day season. No pruning; the history is the point.
 
 ## Backup
 
-The DB is the product's memory. The nightly `backup` job copies it with
-Python's `sqlite3` online backup API to `/srv/hazelst/backups/hazelst-<date>.db`
-and keeps the newest 14 ([hosting-frank.md](../operations/hosting-frank.md#operations)).
+The DB is the product's memory. The weekly `backup` job (Sunday 4:00 AM)
+copies it with Python's `sqlite3` online backup API to
+`/srv/hazelst/backups/hazelst-<date>.db` and keeps the newest 4 (decisions
+row 31, [hosting-frank.md](../operations/hosting-frank.md#operations)).

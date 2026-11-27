@@ -348,7 +348,7 @@ def test_load_derive_store_from_ingest(tmp_path: Path) -> None:
     run_id = derive.latest_ingest_run(conn)
     assert run_id is not None and run_id == summary["run_id"]
     inputs = derive.load_inputs(conn, run_id, as_of)
-    assert len(inputs.hourly) == 16128
+    assert len(inputs.hourly) == 2 * 8 * 3 * 157  # from 6 AM EST
     assert set(inputs.discussions) == {"BTV", "ALY", "GYX"}
     forecast = derive.derive(cfg.mountains, inputs, for_date=date(2026, 11, 26), as_of=as_of)
     assert forecast.used_models == list(MODELS)
