@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, ValidationInfo, model_validator
 WindowKey = Literal["1d", "3d", "5d"]
 Confidence = Literal["high", "medium", "low"]
 PrecipType = Literal["snow", "ice", "rain", "mix", "dry"]
+Elevation = Literal["summit", "base"]
 StormType = Literal["clipper", "coastal", "inland_runner", "none"]
 
 
@@ -59,6 +60,10 @@ class ForecastDay(_Model):
     gust_mph: int | None
     freezing_level_ft: int | None
     tags: list[str]
+    # The same day at the base, and the elevations with freezing rain (tags.day_precip).
+    # None / empty on payloads stored before J33.
+    base_precip_type: PrecipType | None = None
+    freezing_rain_at: list[Elevation] = []
 
 
 ForecastMethod = Literal["raw_mean", "resort_ratio"]
@@ -106,7 +111,9 @@ class Forecast(_Model):
 
 # --- report payload (stored in report.payload, served at /api/report/<date>.json) ---------
 
-ReportStatus = Literal["published", "numbers_only", "failed"]
+# Every report row is a checked narrative (J33). Rows written before J33 may say
+# `numbers_only`; they are kept for history and never shown.
+ReportStatus = Literal["published"]
 
 
 class BestBet(_Model):
@@ -202,7 +209,8 @@ class ReportPayload(_Model):
     date: date
     issued: datetime
     edition: str | None = None  # 0700 | 0815 | 1440
-    status: ReportStatus
+    # Always "published"; kept so an image from before J33 can still read new rows.
+    status: ReportStatus = "published"
     anchor: datetime
     days: list[str]  # day labels, 6 AM -> 6 AM, "Wed 25"
     past_days: list[str]  # the 7 days before the anchor, oldest first

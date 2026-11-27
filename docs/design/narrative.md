@@ -30,9 +30,15 @@ week's weather. The full sample run is in [the sample run](../experiments/2026-1
 
 - Name a storm type only if `storm_type` or a discussion names it. Otherwise
   describe what happens ("snow Thursday, drying Sunday").
-- Precip type words (snow, ice, freezing rain, rain, mix) must match
-  `precip_type` for that mountain and day. `report-write` never infers type from
+- Precip type words (snow, ice, freezing rain, rain, mix) must match the
+  mountain-day's type at the elevation the phrase names: `precip_type`
+  (summit) or `base_precip_type` (base); freezing rain matches where
+  `freezing_rain_at` lists it. `report-write` never infers type from
   elevation or temperature on its own.
+- The headline is a text alert, at most 12 words: amount, resorts by name,
+  day; then the one catch ("4–5″ for Killington, Pico and Sugarbush Saturday;
+  rain Monday"). No colon setups, no "X is the day", no regions in place of
+  resort names, no adjectives.
 - Normalize whitespace in discussion text before any keyword match (line wraps
   split phrases).
 - Every snow number in prose must match the JSON (summit unless stated).
@@ -70,7 +76,9 @@ not written by Claude.
 
 ## Quality loop
 
-Before publish, `report-check` ([agent-runs.md](agent-runs.md)) validates names,
-numbers, precip types, best bet, and cautions against the JSON.
+Before publish, `report-check` ([agent-runs.md](agent-runs.md)) validates the
+headline, names, numbers, precip types, best bet, and cautions against the
+JSON. A draft that fails gets up to three `report-revise` rounds; if it still
+fails, nothing is published and the job fails (decisions row 33).
 `forecast-verify` scores the 24 h numbers. Weekly, review the MISSes against the tags
 that fired and tune thresholds in forecast-method.md.

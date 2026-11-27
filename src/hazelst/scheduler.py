@@ -13,8 +13,8 @@ Each slot runs its steps in order in one scheduler thread; a step waits up to
 | 2:30 PM | ingest-forecast, ingest-obs |
 | 2:40 PM | report-refresh (1440) |
 | 9:00 PM | forecast-verify (scores yesterday's editions) |
-| 7:15 to 9:00, every 15 min | report-build rebuild: rewrites today's newest edition |
-|      | while it is `numbers_only` (no-op otherwise) |
+| 7:15 to 9:00, every 15 min | report-build rebuild: retries the newest due edition |
+|      | when its report job failed (no-op otherwise) |
 | 2:00 AM | skill-learn (rebuilds `skill`) |
 | Sunday 4:00 AM | backup (weekly, after the overnight jobs, before the morning ingest) |
 | Monday 3:00 AM | knowledge-review (after skill-learn) |
@@ -47,7 +47,7 @@ class Step:
     edition: str | None = None
     ecmwf_gate_until: dtime | None = None  # local time; ingest waits for ECMWF 06Z until then
     not_before: dtime | None = None  # local time; the step starts no earlier
-    rebuild: bool = False  # report-build: rewrite the newest edition if it is numbers_only
+    rebuild: bool = False  # report-build: retry the newest due edition if its job failed
 
 
 @dataclass(frozen=True)

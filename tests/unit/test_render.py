@@ -9,7 +9,7 @@ import pytest
 
 from hazelst.models import Accumulation, AccumulationDay, MountainReport, ReportPayload
 from hazelst.render import charts, page
-from tests.pages import recorded_payload, sample_narrative, sample_payload
+from tests.pages import recorded_narrative, recorded_payload, sample_narrative, sample_payload
 
 GOLDEN = Path(__file__).resolve().parents[1] / "golden"
 UPDATE = os.environ.get("HAZELST_UPDATE_GOLDEN") == "1"
@@ -37,9 +37,9 @@ def test_golden_sample_run_page() -> None:
     check_golden("2026-11-25.html", page.render_report(sample(), sample_narrative()))
 
 
-def test_golden_numbers_only_page() -> None:
-    """2026-11-26 7:00 AM edition without a narrative: notice, cautions from alerts."""
-    check_golden("2026-11-26-numbers-only.html", page.render_report(recorded()))
+def test_golden_recorded_page() -> None:
+    """2026-11-26 7:00 AM edition from recorded data, with a short narrative."""
+    check_golden("2026-11-26.html", page.render_report(recorded(), recorded_narrative()))
 
 
 def test_sections_in_order() -> None:
@@ -82,7 +82,7 @@ def test_parse_narrative() -> None:
 
 def test_forecast_table_sorted_by_5d_and_hides_zero_ranges() -> None:
     p = recorded()
-    html = page.render_report(p)
+    html = page.render_report(p, recorded_narrative())
     table = html[html.index('id="fct"') :]
     order = [m.name for m in page.sorted_by_5d(p.mountains)]
     assert [table.index(f'class="name">{n}') for n in order] == sorted(
@@ -101,8 +101,8 @@ def test_edition_label_in_footer_not_band() -> None:
     )
     assert page.edition_label(later) == "Thu 26 Nov 2026 · 2:40 PM"  # no issue time
     assert page.edition_label(p.model_copy(update={"edition": None})) == "Thu 26 Nov 2026 · 7:00 AM"
-    html = page.render_report(later)
-    assert 'class="when"' not in html and "numbers only" not in html
+    html = page.render_report(later, recorded_narrative())
+    assert 'class="when"' not in html
     assert '<p>Thu 26 Nov 2026 · 2:40 PM</p>\n    <p><a href="/archive">Archive</a>' in html
 
 
@@ -129,7 +129,7 @@ def test_accumulation_empty_states() -> None:
     assert state == "empty" and text.startswith("No mountain reported 0.5″")
     snowy = with_accumulation(p, [0, 2, 3, 1, 0, 0, 2])
     assert page.accumulation_state(snowy)[0] == "chart"
-    html = page.render_report(snowy)
+    html = page.render_report(snowy, recorded_narrative())
     assert "Observed season snowfall" in html and "18″ base" in html
 
 
@@ -140,7 +140,7 @@ def test_closed_mountain_listed() -> None:
             "mountains": [m.model_copy(update={"is_open": m.key != "pico"}) for m in p.mountains]
         }
     )
-    html = page.render_report(closed)
+    html = page.render_report(closed, recorded_narrative())
     assert "Pico<small>model mean</small><small>closed</small>" in html
     assert '<div role="rowheader" class="tl-n">Pico<small>closed</small></div>' in html
 
@@ -248,7 +248,7 @@ def test_timeline_past_always_shown_with_no_report_and_zero() -> None:
     assert all(len(r.past) == 3 for r in t.rows)
     other = next(r for r in t.rows if r.name == "Killington")
     assert {c.kind for c in other.past} == {"nr"}
-    html = page.render_report(p.model_copy(update={"mountains": mountains}))
+    html = page.render_report(p.model_copy(update={"mountains": mountains}), recorded_narrative())
     assert 'class="c nr"' in html and "No resort reported snow" not in html
 
 
@@ -285,7 +285,7 @@ def test_timeline_day1_method_in_title() -> None:
 
 
 def test_now_rule_is_plain_with_vertical_header() -> None:
-    html = page.render_report(recorded())
+    html = page.render_report(recorded(), recorded_narrative())
     assert '<div role="columnheader" class="tl-nowh"><span>Now</span></div>' in html
     rule = html[html.index('<div class="tl-now"') :]
     assert rule.startswith('<div class="tl-now" style="grid-row:2 / span 8"></div>')
@@ -300,7 +300,7 @@ def test_timeline_markup_fits_390px() -> None:
     ) in css
     assert "min-width:0;min-height:36px;" in css
     p = recorded()
-    html = page.render_report(p)
+    html = page.render_report(p, recorded_narrative())
     grid = html[
         html.index('<div class="tl"') : html.index("</figure>", html.index('<div class="tl"'))
     ]
@@ -314,7 +314,7 @@ def test_timeline_markup_fits_390px() -> None:
 
 
 def test_section_labels_lead_straight_into_grid_and_table() -> None:
-    html = page.render_report(recorded())
+    html = page.render_report(recorded(), recorded_narrative())
     timeline = html[
         html.index("Snow · reported and forecast</div>") : html.index('<div class="tl"')
     ]

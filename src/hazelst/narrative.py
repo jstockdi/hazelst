@@ -1,9 +1,10 @@
-"""The checked narrative: `report-write` -> `report-check` -> (`report-revise` -> `report-check`).
+"""The checked narrative: report-write, report-check, then up to 3 rounds of report-revise.
 
-A narrative is published only when `report_check` passes. Any agent failure
-(disabled, cap reached, call failed) or a second failed check yields
-`numbers_only`, and the caller publishes the page without prose
-(agent-runs.md, Failure behavior).
+A narrative is published only when `report_check` passes. A draft that fails is
+revised up to `MAX_REVISIONS` times, each round sent the exact errors of the
+draft before it. When a Claude call fails or the last revision still fails the
+check, `NarrativeError` is raised: the job fails and the previously published
+edition stays (agent-runs.md, Failure behavior). There is no page without prose.
 """
 
 from __future__ import annotations
@@ -11,7 +12,6 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Literal
 
 from hazelst.agents.client import AgentClient, AgentError
 from hazelst.agents.report_revise import revise_report
@@ -22,17 +22,27 @@ from hazelst.models import BestBet as PageBestBet
 from hazelst.models import Narrative as PageNarrative
 from hazelst.report_check import check
 
-NarrativeStatus = Literal["published", "numbers_only"]
+MAX_REVISIONS = 3
 
 
 @dataclass(frozen=True)
 class Narrative:
-    status: NarrativeStatus
-    draft: ReportDraft | None = None
-    page: PageNarrative | None = None
-    reason: str | None = None  # why the page is numbers_only
-    errors: list[str] = field(default_factory=list)  # the last report-check errors
+    """A draft that passed `report-check`, and the page narrative made from it."""
+
+    draft: ReportDraft
+    page: PageNarrative
     call_ids: list[int] = field(default_factory=list)
+    revisions: int = 0
+
+
+class NarrativeError(Exception):
+    """No checked narrative: a Claude call failed or the checks still fail."""
+
+    def __init__(self, reason: str, errors: Sequence[str] = (), call_ids: Sequence[int] = ()):
+        super().__init__(reason if not errors else f"{reason}: {'; '.join(errors)}")
+        self.reason = reason
+        self.errors = list(errors)
+        self.call_ids = list(call_ids)
 
 
 def accepted_knowledge(conn: sqlite3.Connection) -> list[str]:
@@ -51,8 +61,10 @@ def _checked(
     return errors
 
 
-def _published(digest: ReportDigest, draft: ReportDraft, call_ids: list[int]) -> Narrative:
-    return Narrative("published", draft, page_narrative(draft, digest), call_ids=call_ids)
+def _published(
+    digest: ReportDigest, draft: ReportDraft, call_ids: list[int], revisions: int
+) -> Narrative:
+    return Narrative(draft, page_narrative(draft, digest), call_ids, revisions)
 
 
 def revise_until_checked(
@@ -65,20 +77,18 @@ def revise_until_checked(
     run_id: int | None,
     call_ids: list[int],
 ) -> Narrative:
-    """One `report-revise` call and a second check; numbers_only if either fails."""
-    try:
-        revised = revise_report(client, digest, draft, errors, knowledge, run_id=run_id)
-    except AgentError as exc:
-        return Narrative(
-            "numbers_only", reason=f"report-revise: {exc}", errors=errors, call_ids=call_ids
-        )
-    call_ids = [*call_ids, revised.call_id]
-    errors = _checked(client, revised.call_id, revised.output, digest)
-    if not errors:
-        return _published(digest, revised.output, call_ids)
-    return Narrative(
-        "numbers_only", reason="report-check failed twice", errors=errors, call_ids=call_ids
-    )
+    """Up to `MAX_REVISIONS` `report-revise` rounds, each with the previous draft's errors."""
+    for revision in range(1, MAX_REVISIONS + 1):
+        try:
+            revised = revise_report(client, digest, draft, errors, knowledge, run_id=run_id)
+        except AgentError as exc:
+            raise NarrativeError(f"report-revise: {exc}", errors, call_ids) from exc
+        call_ids = [*call_ids, revised.call_id]
+        draft = revised.output
+        errors = _checked(client, revised.call_id, draft, digest)
+        if not errors:
+            return _published(digest, draft, call_ids, revision)
+    raise NarrativeError(f"report-check failed after {MAX_REVISIONS} revisions", errors, call_ids)
 
 
 def build_narrative(
@@ -88,14 +98,14 @@ def build_narrative(
     *,
     run_id: int | None = None,
 ) -> Narrative:
-    """`report-build`: write, check, and revise once if needed."""
+    """`report-build`: write, check, and revise until the check passes (at most 3 rounds)."""
     try:
         written = write_report(client, digest, knowledge, run_id=run_id)
     except AgentError as exc:
-        return Narrative("numbers_only", reason=f"report-write: {exc}")
+        raise NarrativeError(f"report-write: {exc}") from exc
     errors = _checked(client, written.call_id, written.output, digest)
     if not errors:
-        return _published(digest, written.output, [written.call_id])
+        return _published(digest, written.output, [written.call_id], 0)
     return revise_until_checked(
         client,
         digest,
@@ -115,10 +125,10 @@ def recheck_narrative(
     *,
     run_id: int | None = None,
 ) -> Narrative:
-    """`report-refresh`: re-check the morning draft on new numbers; revise only if it fails."""
+    """`report-refresh`: re-check the morning draft on new numbers; revise it if it fails."""
     errors = [str(e) for e in check(draft, digest)]
     if not errors:
-        return _published(digest, draft, [])
+        return _published(digest, draft, [], 0)
     return revise_until_checked(
         client, digest, draft, errors, knowledge, run_id=run_id, call_ids=[]
     )

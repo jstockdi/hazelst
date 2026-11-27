@@ -36,17 +36,21 @@ Selected design: `mockups/c-brief.html`. One page per day at
   dark bins the word is white. Mountain names never wrap in tables.
 - Reference implementation: `prototype/render.py` + `prototype/page.css`.
 
-## Numbers-only page
+## Every page has the written report
 
-When a report has no checked narrative (`report.status = numbers_only`), the
-page keeps every data section and replaces section 1:
+There is no page without prose (J33, decisions row 33). An edition is
+published only when its narrative passes `report-check`; when writing fails
+(a Claude call fails, or the checks still fail after three revisions), the
+job fails, an alert fires, and the page keeps showing the previous edition
+until the failure is fixed. Rows stored before J33 with
+`report.status = numbers_only` stay in the database for history and are never
+shown.
 
-- Band headline from the numbers: "Most snow in the next 5 days: <mountain>,
-  <n>″ at the summit." (or "No significant snow in the next 5 days." below
-  0.5″).
-- A notice card "The written report is delayed."
-- Cautions straight from the data: each active NWS alert with its mountains,
-  and each `wind_hold_likely` day.
+The band headline is a ski forecaster's text alert, at most 12 words: the
+amount, the resorts by name, the day; then the one catch that changes plans
+("4–5″ for Killington, Pico and Sugarbush Saturday; rain Monday"; "No new snow
+through Tuesday at any of the eight"). `report-check` holds it to that length,
+to naming a resort (or "all eight"), and to forecast days.
 
 The footer's date line reads "Thu 26 Nov 2026 · 7:00 AM" even when the
 edition publishes late (ECMWF 06Z gate); the issue time stays in the JSON.

@@ -6,7 +6,7 @@ import json
 from datetime import UTC, date, datetime
 
 from hazelst import config, derive
-from hazelst.models import Narrative, ReportPayload
+from hazelst.models import BestBet, Narrative, ReportPayload
 from hazelst.render import page
 from hazelst.render.payload import build_payload
 from hazelst.sources import discussions, nws, open_meteo
@@ -29,9 +29,7 @@ def sample_payload() -> ReportPayload:
     forecast = derive.derive(
         MOUNTAINS, derive.Inputs(rows, [], texts), for_date=date(2026, 11, 25), as_of=as_of
     )
-    return build_payload(
-        forecast, MOUNTAINS, issued=as_of, status="published", discussion_texts=texts
-    )
+    return build_payload(forecast, MOUNTAINS, issued=as_of, discussion_texts=texts)
 
 
 def sample_narrative() -> Narrative:
@@ -39,7 +37,7 @@ def sample_narrative() -> Narrative:
 
 
 def recorded_payload() -> ReportPayload:
-    """2026-11-26 7:00 AM edition, numbers only, from that morning's recorded fixtures."""
+    """2026-11-26 7:00 AM edition from that morning's recorded fixtures."""
     om = load_fixtures(FIXTURES / "open_meteo" / "2026-11-26")
     runs = open_meteo.run_times(f for f in om if f.source == open_meteo.META_SOURCE)
     rows = [r for f in om if f.source == open_meteo.SOURCE for r in open_meteo.normalize(f, runs)]
@@ -68,8 +66,20 @@ def recorded_payload() -> ReportPayload:
         forecast,
         MOUNTAINS,
         issued=as_of,
-        status="numbers_only",
         edition="0700",
         alerts=alerts,
         discussion_texts=texts,
+    )
+
+
+def recorded_narrative() -> Narrative:
+    """A short checked narrative for pages built on `recorded_payload` (2026-11-26)."""
+    return Narrative(
+        headline="Freezing rain today, a wet Friday, and a quiet weekend",
+        best_bet=BestBet(mountain="Sugarloaf", day="Sat 28", why="Light snow on the summit."),
+        body_md=(
+            "## The storm\n\nA coastal low brings freezing rain today.\n\n"
+            "## Mountain by mountain\n\n**Killington.** Freezing rain today.\n\n"
+            "## Cautions\n\nWind Advisory at Stratton.\n"
+        ),
     )

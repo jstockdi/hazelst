@@ -176,7 +176,7 @@ applied ids (`"step": "config"`); `hazelst config` prints them as
 | `GET /d/{date}` | Report for a date (latest version) | Immutable after the day ends |
 | `GET /archive` | Dates, headlines, verification results | Until next commit |
 | `GET /api/report/{date}.json` | `ReportPayload` | Same as page |
-| `GET /health` | `200` if DB opens and the last `report-build` did not fail | none |
+| `GET /health` | `200` if DB opens and the last report job (`report-build` or `report-refresh`) did not fail | none |
 | `GET /metrics` | Prometheus metrics | none |
 
 Public and read-only. No cookies, no analytics, no third-party requests.
@@ -201,22 +201,22 @@ Summarized from [agent-runs.md](agent-runs.md):
   one string and cached by the CLI; digest after it.
 - Every call logged in `agent_call` with prompt SHA, input, output, tokens,
   and the SDK's cost estimate.
-- Daily call cap (`HAZELST_AGENT_DAILY_CALLS`, default 10); at the cap the page
-  is `numbers_only`.
-- `HAZELST_ENABLE_AGENTS=false` produces `numbers_only` pages (used in CI and
-  local runs without a token).
+- Daily call cap (`HAZELST_AGENT_DAILY_CALLS`, default 10); at the cap the
+  report job fails and the published edition stays.
+- `HAZELST_ENABLE_AGENTS=false` makes report jobs fail (no page without prose,
+  decisions row 33); tests and CI publish through `StubBackend`.
 
 ## 10. Testing
 
 | Layer | What | How |
 |-------|------|-----|
 | Unit | Window/day math (daily buckets sum to windows), tags, precip type, NWS proration, confidence | `pytest`, small hand-built series |
-| Regression | The three precip-type errors from the sample run must fail `report-check` | Fixture drafts |
+| Regression | The three precip-type errors from the sample run must fail `report-check`; every production draft in `agent_call` must pass, and morning drafts re-checked on later numbers fail only on the pinned genuine errors | Fixture drafts; `tests/fixtures/report/corpus/` |
 | Normalize | Each source's parser on recorded responses | `tests/fixtures/<source>/<date>/*.json.gz` from `hazelst record <source>` |
 | Contract | Each resort adapter on saved pages; alert when a live page stops parsing | Fixture HTML + nightly live check in `ingest-obs` |
 | Golden | Rendered HTML for a fixture day (text diff) | `tests/golden/` |
 | Agents | Schema round-trip and `report-check` on stubbed outputs; no live calls in CI | Stub client |
-| Smoke | Container starts read-only, migrates, `/health` 200, builds a `numbers_only` page from fixtures | CI job on the built image |
+| Smoke | Container starts read-only, migrates, `/health` 200 | CI job on the built image |
 
 ## 11. CI/CD
 
@@ -251,7 +251,9 @@ Summarized from [agent-runs.md](agent-runs.md):
   Claude calls, tokens, and estimated cost, report age, verification hit rate.
 - Health: `/health` drives the Docker healthcheck; report age > 26 h is an alert
   condition for frank monitoring (`hazelst_report_published_timestamp_seconds`,
-  alert `HazelstReportStale` in frank's Prometheus).
+  alert `HazelstReportStale` in frank's Prometheus), and so is a report job
+  that published nothing (`hazelst_report_job_failed`, alert
+  `HazelstReportFailed`; J33).
 
 ## 14. Security
 

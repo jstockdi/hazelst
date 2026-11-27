@@ -31,11 +31,19 @@ from hazelst.models import READ_STORED, BestBet, Narrative, ReportPayload
 from hazelst.render import page
 
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-PAGE_STATUSES = ("published", "numbers_only")
+# Report rows the site shows. Rows written before J33 may be `numbers_only`; they
+# are kept for history and never shown.
+SHOWN = "status = 'published'"
+
+
+LAST_REPORT_JOB = (
+    "SELECT status FROM run WHERE kind IN ('report-build', 'report-refresh')"
+    " AND status != 'running' ORDER BY id DESC LIMIT 1"
+)
 
 
 def health_status(db_path: Path) -> tuple[bool, dict[str, object]]:
-    """Healthy when the database opens, is migrated, and the last `report-build` did not fail."""
+    """Healthy when the database opens, is migrated, and the last report job did not fail."""
     try:
         conn = db.connect(db_path, readonly=True)
     except sqlite3.Error as exc:
@@ -44,29 +52,27 @@ def health_status(db_path: Path) -> tuple[bool, dict[str, object]]:
         version = db.user_version(conn)
         if version < 1:
             return False, {"status": "error", "error": "database not migrated", "user_version": 0}
-        row = conn.execute(
-            "SELECT status FROM run WHERE kind = 'report-build' AND status != 'running'"
-            " ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        row = conn.execute(LAST_REPORT_JOB).fetchone()
     except sqlite3.Error as exc:
         return False, {"status": "error", "error": f"database query failed: {exc}"}
     finally:
         conn.close()
-    last_build = row["status"] if row else None
-    healthy = last_build != "failed"
+    last_report = row["status"] if row else None
+    healthy = last_report != "failed"
     body: dict[str, object] = {
         "status": "ok" if healthy else "error",
         "user_version": version,
-        "last_report_build": last_build,
+        "last_report_job": last_report,
     }
     return healthy, body
 
 
 class FreshnessCollector(Collector):
-    """Report and backup freshness, read from the database at scrape time.
+    """Report and backup freshness, and the last report job's outcome, read from the
+    database at scrape time.
 
-    frank's Prometheus alerts on these (report age > 26 h, technical-design §13).
-    A metric is omitted while its row does not exist yet.
+    frank's Prometheus alerts on these (report age > 26 h, a failed report job,
+    technical-design §13). A metric is omitted while its row does not exist yet.
     """
 
     def __init__(self, db_path: Path) -> None:
@@ -78,12 +84,13 @@ class FreshnessCollector(Collector):
         except sqlite3.Error:
             return
         try:
-            report = conn.execute(
-                "SELECT max(published_at) FROM report WHERE status IN (?, ?)", PAGE_STATUSES
-            ).fetchone()[0]
+            report = conn.execute(f"SELECT max(published_at) FROM report WHERE {SHOWN}").fetchone()[
+                0
+            ]
             backup = conn.execute(
                 "SELECT max(finished_at) FROM run WHERE kind = 'backup' AND status = 'ok'"
             ).fetchone()[0]
+            last_job = conn.execute(LAST_REPORT_JOB).fetchone()
         except sqlite3.Error:
             return
         finally:
@@ -102,6 +109,13 @@ class FreshnessCollector(Collector):
         ):
             if value:
                 yield GaugeMetricFamily(name, doc, value=datetime.fromisoformat(value).timestamp())
+        if last_job is not None:
+            yield GaugeMetricFamily(
+                "hazelst_report_job_failed",
+                "1 when the newest finished report-build or report-refresh run failed"
+                " (no checked narrative was published), else 0",
+                value=1.0 if last_job[0] == "failed" else 0.0,
+            )
 
 
 # --- reports -----------------------------------------------------------------------
@@ -109,9 +123,8 @@ class FreshnessCollector(Collector):
 
 def _latest(conn: sqlite3.Connection, for_date: str | None) -> sqlite3.Row | None:
     """The newest version of a date's report (or of the newest date when `for_date` is None)."""
-    marks = ",".join("?" for _ in PAGE_STATUSES)
-    where = f"status IN ({marks})"
-    params: list[str] = list(PAGE_STATUSES)
+    where = SHOWN
+    params: list[str] = []
     if for_date is not None:
         where += " AND for_date = ?"
         params.append(for_date)
@@ -123,10 +136,8 @@ def _latest(conn: sqlite3.Connection, for_date: str | None) -> sqlite3.Row | Non
     return row
 
 
-def narrative_of(row: sqlite3.Row) -> Narrative | None:
-    """The written report, when the row has one (`numbers_only` rows do not)."""
-    if row["status"] != "published" or not row["narrative_md"]:
-        return None
+def narrative_of(row: sqlite3.Row) -> Narrative:
+    """The checked written report a published row carries."""
     best = json.loads(row["best_bet"]) if row["best_bet"] else None
     return Narrative(
         headline=row["headline"] or "",
@@ -141,29 +152,22 @@ def render_row(row: sqlite3.Row) -> str:
 
 
 def archive_entries(conn: sqlite3.Connection) -> list[page.ArchiveEntry]:
-    marks = ",".join("?" for _ in PAGE_STATUSES)
     rows = conn.execute(
-        "SELECT r.for_date, r.headline, r.status, r.payload FROM report r"
+        "SELECT r.for_date, r.headline FROM report r"
         " JOIN (SELECT for_date, max(version) AS version FROM report"
-        f"       WHERE status IN ({marks}) GROUP BY for_date) latest"
+        f"       WHERE {SHOWN} GROUP BY for_date) latest"
         " ON latest.for_date = r.for_date AND latest.version = r.version"
-        " ORDER BY r.for_date DESC",
-        PAGE_STATUSES,
+        " ORDER BY r.for_date DESC"
     ).fetchall()
     entries = []
     for r in rows:
         headline = r["headline"]
-        if not headline:
-            headline = page.numbers_only_headline(
-                ReportPayload.model_validate_json(r["payload"], context=READ_STORED)
-            )
         day = date.fromisoformat(r["for_date"])
         summary = verify.summary_for(conn, day)
         entries.append(
             page.ArchiveEntry(
                 date=day,
                 headline=headline,
-                status=r["status"],
                 verification=page.verification_counts(summary) if summary else None,
             )
         )

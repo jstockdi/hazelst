@@ -115,7 +115,7 @@ CREATE TABLE forecast_day (
   run_id INT, mountain TEXT, day DATE,
   snow_in REAL, precip_in REAL, precip_type TEXT,
   hi_f REAL, lo_f REAL, gust_mph REAL, freezing_level_ft REAL,
-  tags JSON,                                -- nw_upslope, mixing_base, freezing_rain, ...
+  tags JSON,                                -- nw_upslope, mixing_base, freezing_rain, ... (base_precip_type and freezing_rain_at live in the page JSON, J33)
   resort_ratio_in REAL,                     -- migration 0006: the day's resort_ratio snow (snow_in is the model mean)
   PRIMARY KEY (run_id, mountain, day)
 );
@@ -156,7 +156,7 @@ CREATE TABLE report (
   for_date DATE, version INT, run_id INT,
   headline TEXT, best_bet JSON, narrative_md TEXT,
   payload JSON,                             -- the page JSON (forecast-method.md shape)
-  status TEXT,                              -- published | numbers_only | failed
+  status TEXT,                              -- published (rows before J33 may say numbers_only: kept, never shown)
   published_at TEXT,
   PRIMARY KEY (for_date, version)
 );

@@ -19,7 +19,7 @@ from hazelst import config, db, jobs, verify, web
 from hazelst.models import Accumulation, ContextReport
 from hazelst.render import page
 from hazelst.sources import base, iem, nohrsc, pns, snow_report
-from tests.pages import recorded_payload
+from tests.pages import recorded_narrative, recorded_payload
 from tests.unit.test_obs_sources import (
     LSR_FEB,
     MOUNTAINS,
@@ -114,7 +114,7 @@ def insert_editions(conn: sqlite3.Connection, day: date) -> None:
             version += 1
             conn.execute(
                 "INSERT INTO report (for_date, version, run_id, headline, payload, status)"
-                " VALUES (?, ?, ?, ?, ?, 'numbers_only')",
+                " VALUES (?, ?, ?, ?, ?, 'published')",
                 (
                     day.isoformat(),
                     version,
@@ -417,7 +417,7 @@ def test_accumulation_chart_renders(snow_day: sqlite3.Connection) -> None:
         update={"verification": verify.latest_summary(snow_day, date(2026, 2, 7))}
     )
     assert page.accumulation_state(payload)[0] == "chart"
-    html = page.render_report(payload)
+    html = page.render_report(payload, recorded_narrative())
     assert 'aria-label="Observed season snowfall by mountain"' in html
     # Only mountains with a resort number are charted.
     chart = html[html.index('aria-label="Observed season snowfall') :]
@@ -445,7 +445,7 @@ def test_timeline_past_is_resort_reported_only(snow_day: sqlite3.Connection) -> 
     assert killington[-1].text == "3\u2033"
     assert killington[-1].title == "Fri 6 · resort reported 3\u2033 (resort)"
     assert [c.kind for c in killington[:2]] == ["nr", "nr"]
-    html = page.render_report(payload)
+    html = page.render_report(payload, recorded_narrative())
     assert "NOHRSC 1" not in html  # context stays in the JSON
 
 
@@ -456,7 +456,7 @@ def test_accumulation_empty_without_resort_reports(snow_day: sqlite3.Connection)
     state, text = page.accumulation_state(payload)
     assert state == "empty"
     assert text.startswith("No resort snow reports for the last 7 days")
-    html = page.render_report(payload)
+    html = page.render_report(payload, recorded_narrative())
     assert "no resort report" in html
 
 

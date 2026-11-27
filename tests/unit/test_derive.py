@@ -228,17 +228,44 @@ def test_tag_wind_hold() -> None:
 
 
 @pytest.mark.parametrize(
-    ("snow", "precip", "day_tags", "expected"),
+    ("snow", "precip", "rain", "freezing", "expected"),
     [
-        (0.1, 0.04, ["mixing_base"], "dry"),
-        (2.0, 0.3, ["rain_summit"], "snow"),
-        (0.5, 0.4, ["rain_summit", "freezing_rain"], "rain"),
-        (0.0, 0.9, ["mixing_base", "freezing_rain"], "ice"),
-        (0.9, 0.24, ["mixing_base"], "mix"),
+        (0.1, 0.04, True, False, "dry"),
+        (2.0, 0.3, True, False, "snow"),
+        (0.5, 0.4, True, True, "rain"),
+        (0.0, 0.9, False, True, "ice"),
+        (0.9, 0.24, False, False, "mix"),
     ],
 )
-def test_precip_type(snow: float, precip: float, day_tags: list[str], expected: str) -> None:
-    assert tags.precip_type(snow, precip, day_tags) == expected
+def test_precip_type(snow: float, precip: float, rain: bool, freezing: bool, expected: str) -> None:
+    assert tags.precip_type(snow, precip, rain=rain, freezing=freezing) == expected
+
+
+def precip(hours: list[tags.Hour], snow: float = 0.0, base_snow: float = 0.0, **kw: float):  # type: ignore[no-untyped-def]
+    total = sum(h.precip_in or 0 for h in hours)
+    return tags.day_precip(hours, snow_in=snow, base_snow_in=base_snow, precip_in=total, **kw)
+
+
+def test_day_precip_summit_rain_with_freezing_rain_at_the_base() -> None:
+    # Cold air at the base under a warm layer: rain up top, freezing rain below.
+    hours = day(precip_in=0.03, temp_f=35.0, base_temp_f=30.0, t850_f=38.0)
+    assert precip(hours) == tags.DayPrecip("rain", "ice", ("base",))
+
+
+def test_day_precip_freezing_rain_needs_a_wet_day_at_that_elevation() -> None:
+    # One wet hour of freezing drizzle on an otherwise dry day: dry, no freezing rain.
+    hours = [tags.Hour(precip_in=0.02, temp_f=30.0, base_temp_f=30.0, t850_f=35.0), *day()[1:]]
+    assert precip(hours) == tags.DayPrecip("dry", "dry", ())
+
+
+def test_day_precip_snow_up_top_mix_at_the_base() -> None:
+    hours = day(precip_in=0.02, temp_f=28.0, base_temp_f=35.0, t850_f=25.0)
+    assert precip(hours, snow=4.8, base_snow=0.6) == tags.DayPrecip("snow", "rain", ())
+
+
+def test_day_precip_nws_ice_counts_at_both_elevations() -> None:
+    hours = day(precip_in=0.01, temp_f=31.0, base_temp_f=31.0, t850_f=20.0)
+    assert precip(hours, nws_ice_in=0.05) == tags.DayPrecip("ice", "ice", ("summit", "base"))
 
 
 def test_storm_type_from_mountain_office() -> None:

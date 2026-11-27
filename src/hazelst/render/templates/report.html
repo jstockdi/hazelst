@@ -6,22 +6,10 @@
   <h1>{{ headline }}</h1>
 </div>
 <main>
-{% if narrative and narrative.best_bet %}
+{% if narrative.best_bet %}
   <div class="call"><small>Best bet</small><b>{{ narrative.best_bet.mountain }}, {{ narrative.best_bet.day }}</b><span>{{ narrative.best_bet.why }}</span></div>
 {% endif %}
-{% if narrative %}
 {{ body }}
-{% else %}
-  <div class="call notice"><small>Numbers only</small><b>The written report is delayed.</b><span>The forecast numbers below are current; the report text follows when it passes its checks.</span></div>
-{% if cautions %}
-  <h2>Cautions</h2>
-  <div class="caution">
-{% for line in cautions %}
-    <p>{{ line }}</p>
-{% endfor %}
-  </div>
-{% endif %}
-{% endif %}
 
   <div class="part">Snow · reported and forecast</div>
 {% set t = timeline %}

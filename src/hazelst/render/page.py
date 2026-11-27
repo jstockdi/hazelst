@@ -115,16 +115,6 @@ def sorted_by_5d(mountains: Sequence[MountainReport]) -> list[MountainReport]:
     return sorted(mountains, key=lambda m: -m.forecast.windows["5d"].snow_in)
 
 
-def numbers_only_headline(payload: ReportPayload) -> str:
-    """A factual headline for a page without a written report."""
-    top = sorted_by_5d(payload.mountains)
-    if not top or top[0].forecast.windows["5d"].snow_in < ACCUMULATION_MIN_IN:
-        return "No significant snow in the next 5 days."
-    best = top[0]
-    total = best.forecast.windows["5d"].snow_in
-    return f"Most snow in the next 5 days: {best.name}, {charts.num(total)}″ at the summit."
-
-
 def _resort_rows(payload: ReportPayload) -> list[MountainReport]:
     """Mountains whose resort reported anything (only resort numbers make the chart)."""
     return [m for m in payload.mountains if m.accumulation and m.accumulation.has_resort_data]
@@ -198,22 +188,6 @@ def verification_line(payload: ReportPayload) -> str:
         f"Verification, {day} (next 24 h, model mean, within 2″ or 30% is a HIT):"
         f" {verification_counts(summary)}."
     )
-
-
-def cautions(payload: ReportPayload) -> list[str]:
-    """Numbers-only cautions: active alerts and lift-hold wind days, straight from the data."""
-    lines: list[str] = []
-    by_alert: dict[str, list[str]] = {}
-    for m in payload.mountains:
-        for event in m.alerts:
-            by_alert.setdefault(event, []).append(m.name)
-    for event, names in sorted(by_alert.items()):
-        lines.append(f"{event}: {', '.join(names)}.")
-    for m in payload.mountains:
-        days = [d.label for d in m.forecast.days if "wind_hold_likely" in d.tags]
-        if days:
-            lines.append(f"Lift holds likely on wind at {m.name}: {', '.join(days)}.")
-    return lines
 
 
 # --- snow timeline ---------------------------------------------------------------------
@@ -368,7 +342,8 @@ def snow_timeline(payload: ReportPayload) -> Timeline:
 # --- pages -----------------------------------------------------------------------------
 
 
-def render_report(payload: ReportPayload, narrative: Narrative | None = None) -> str:
+def render_report(payload: ReportPayload, narrative: Narrative) -> str:
+    """The report page: every page carries a checked narrative (J33)."""
     rows = sorted_by_5d(payload.mountains)
     state, empty_text = accumulation_state(payload)
     accumulation_rows = sorted(
@@ -378,8 +353,8 @@ def render_report(payload: ReportPayload, narrative: Narrative | None = None) ->
     context: dict[str, Any] = {
         "p": payload,
         "narrative": narrative,
-        "headline": narrative.headline if narrative else numbers_only_headline(payload),
-        "body": md_to_html(narrative.body_md) if narrative else Markup(""),
+        "headline": narrative.headline,
+        "body": md_to_html(narrative.body_md),
         "edition": edition_label(payload),
         "rows": rows,
         "timeline": snow_timeline(payload),
@@ -388,7 +363,6 @@ def render_report(payload: ReportPayload, narrative: Narrative | None = None) ->
         "accumulation_chart": charts.accumulation_chart(accumulation_rows)
         if state == "chart"
         else Markup(""),
-        "cautions": cautions(payload),
         "accumulation_sources": accumulation_sources(payload),
         "context_sources": context_sources(payload),
         "verification": verification_line(payload),
@@ -403,7 +377,6 @@ def render_report(payload: ReportPayload, narrative: Narrative | None = None) ->
 class ArchiveEntry:
     date: date
     headline: str
-    status: str
     verification: str | None = None
 
 

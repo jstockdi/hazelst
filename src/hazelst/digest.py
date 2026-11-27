@@ -15,9 +15,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from hazelst.models import Accumulation, ReportPayload
+from hazelst.models import Accumulation, Elevation, PrecipType, ReportPayload
 
-PrecipType = Literal["snow", "ice", "rain", "mix", "dry"]
 WindowKey = Literal["1d", "3d", "5d"]
 StormType = Literal["clipper", "coastal", "inland_runner", "none"]
 
@@ -38,16 +37,31 @@ class DigestWindow(_Model):
     nws_disagrees: bool = False
 
 
+# Day tags the digest carries. The precip tags (`mixing_base`, `rain_summit`,
+# `freezing_rain`) are not passed on: `precip_type`, `base_precip_type`, and
+# `freezing_rain_at` state the same facts per elevation, so the writer never sees a
+# tag that disagrees with a type.
+DIGEST_TAGS = ("nw_upslope", "wind_hold_watch", "wind_hold_likely")
+
+
 class DigestDay(_Model):
+    """One mountain-day. `precip_type` is at the summit, `base_precip_type` at the base;
+    `freezing_rain_at` lists the elevations where freezing rain falls that day."""
+
     date: dt.date
     snow_in: float
     precip_in: float
     precip_type: PrecipType
+    base_precip_type: PrecipType
+    freezing_rain_at: list[Elevation] = Field(default_factory=list)
     hi_f: float | None = None
     lo_f: float | None = None
     gust_mph: float | None = None
     freezing_level_ft: float | None = None
     tags: list[str] = Field(default_factory=list)
+
+    def type_at(self, elevation: Elevation) -> PrecipType:
+        return self.precip_type if elevation == "summit" else self.base_precip_type
 
 
 class DigestAlert(_Model):
@@ -164,6 +178,12 @@ def digest_accumulation(acc: Accumulation) -> DigestAccumulation:
     )
 
 
+def _required(value: PrecipType | None, mountain: str, day: dt.date) -> PrecipType:
+    if value is None:
+        raise ValueError(f"{mountain} {day}: payload has no base_precip_type (derived before J33)")
+    return value
+
+
 def from_payload(
     payload: ReportPayload, verification: Sequence[DigestVerification] = ()
 ) -> ReportDigest:
@@ -198,11 +218,13 @@ def from_payload(
                     snow_in=d.snow_in,
                     precip_in=d.precip_in,
                     precip_type=d.precip_type,
+                    base_precip_type=_required(d.base_precip_type, m.key, d.date),
+                    freezing_rain_at=list(d.freezing_rain_at),
                     hi_f=d.hi_f,
                     lo_f=d.lo_f,
                     gust_mph=d.gust_mph,
                     freezing_level_ft=d.freezing_level_ft,
-                    tags=list(d.tags),
+                    tags=[t for t in d.tags if t in DIGEST_TAGS],
                 )
                 for d in m.forecast.days
             ],

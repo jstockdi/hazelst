@@ -114,7 +114,7 @@ def test_published_stratton_wording_also_fails() -> None:
         ("dry until afternoon", []),
         ("dry through Thursday midday", []),
         ("dry Saturday", [("dry", "dry")]),
-        ("rain at the base, snow up top", []),
+        ("rain at the base, snow up top", [("rain", "rain"), ("snow", "snow")]),
     ],
 )
 def test_precip_words(text: str, expected: list[tuple[str, str]]) -> None:
@@ -228,7 +228,9 @@ def test_best_bet_must_be_open() -> None:
 
 
 def test_storm_type_needs_support() -> None:
-    errors = check(with_draft(headline="An Alberta clipper brings ice Thursday"), digest())
+    errors = check(
+        with_draft(headline="An Alberta clipper brings ice to Killington Thursday"), digest()
+    )
     assert [e.rule for e in errors] == ["storm_type"]
     assert "clipper" in errors[0].message
 
@@ -291,3 +293,103 @@ def test_errors_are_strings_for_revise() -> None:
     errors = check(draft("draft-first.json"), digest())
     assert all(str(e).startswith("precip_type: ") for e in errors)
     assert date(2026, 11, 26) in digest().days
+
+
+# --- phrases and elevations (J33) --------------------------------------------------------
+# Fixture days used below (digest.json, re-derived with per-elevation types):
+#   Fri 27: Killington ice (base rain, freezing rain at the summit); Stratton rain
+#           (freezing rain at the summit); Loon rain (no freezing rain).
+#   Sat 28: Loon snow at the summit, rain at the base.
+
+
+def with_storm(text: str) -> ReportDraft:
+    return with_draft(storm=text)
+
+
+def test_with_binds_each_type_to_its_own_mountains() -> None:
+    # Run 181's sentence shape: the "with" phrase names its own mountains.
+    text = (
+        "Friday brings freezing rain to Killington, Pico, Sunday River, and Sugarloaf,"
+        " with rain at Loon."
+    )
+    assert check(with_storm(text), digest()) == []
+
+
+def test_with_split_stays_strict() -> None:
+    errors = check(
+        with_storm("Friday brings rain to Killington, with freezing rain at Loon."), digest()
+    )
+    assert [str(e) for e in errors] == [
+        "precip_type: Killington Fri 27: storm says 'rain' (rain); precip_type is ice",
+        "precip_type: Loon Fri 27: storm says 'freezing rain' (ice); precip_type is rain;"
+        " freezing_rain_at is []",
+    ]
+
+
+def test_snow_number_after_with_may_follow_the_list_before_it() -> None:
+    # "2.7″ at Killington with a 0.7–6.3″ range and 0.1–4.5″ at Pico" (run 8): the range
+    # follows Killington. Killington's 5d range in the fixture is 0–2″.
+    text = "Up to 1.5″ at Killington with a 0–2″ range, and 0.5″ at Pico."
+    assert check(with_storm(text), digest()) == []
+
+
+def test_list_items_bind_their_own_day() -> None:
+    # Each word is checked on its own day, not on any day of the sentence.
+    errors = check(draft(killington="Dry Thursday, freezing rain Saturday."), digest())
+    assert [e.message.split(":")[0] for e in errors] == ["Killington Thu 26", "Killington Sat 28"]
+    ok = "Freezing rain Thursday, a mix Saturday, and dry Wednesday."
+    assert check(draft(killington=ok), digest()) == []
+
+
+def test_and_splits_days_with_their_own_claims() -> None:
+    errors = check(draft(loon="Light snow Saturday and freezing rain Friday."), digest())
+    assert [str(e) for e in errors] == [
+        "precip_type: Loon Fri 27: mountains.loon says 'freezing rain' (ice); precip_type is"
+        " rain; freezing_rain_at is []"
+    ]
+
+
+def test_claim_matches_its_stated_elevation() -> None:
+    assert check(draft(loon="Snow up top Saturday and rain at the base."), digest()) == []
+    (error,) = check(draft(loon="Rain Saturday."), digest())
+    assert error.message.endswith("precip_type is snow")
+    (error,) = check(draft(loon="Snow at the base Saturday."), digest())
+    assert "at the base; base_precip_type is rain" in error.message
+
+
+def test_freezing_rain_holds_where_the_digest_has_it() -> None:
+    # Run 147: summit rain with freezing-rain hours ("Freezing rain Monday at Sugarloaf").
+    assert check(with_draft(cautions=["Freezing rain Friday at Stratton."]), digest()) == []
+    assert check(draft(stratton="Freezing rain at the summit Friday."), digest()) == []
+    (error,) = check(draft(stratton="Freezing rain at the base Friday."), digest())
+    assert "at the base; base_precip_type is rain; freezing_rain_at is [summit]" in error.message
+    (error,) = check(with_draft(cautions=["Freezing rain Friday at Loon."]), digest())
+    assert error.message.endswith("freezing_rain_at is []")
+
+
+# --- headline ------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "headline",
+    [
+        "Freezing rain Thursday at all eight; no new snow through Sunday",
+        "No new snow through Sunday at any of the eight",
+        "Up to 1″ for Killington Saturday; freezing rain Thursday",
+    ],
+)
+def test_headline_in_alert_shape_passes(headline: str) -> None:
+    assert check(with_draft(headline=headline), digest()) == []
+
+
+def test_headline_rules() -> None:
+    long = "Ski the cold, quiet Thanksgiving morning; a coastal storm brings ice Thursday night"
+    assert [str(e) for e in check(with_draft(headline=long), digest())] == [
+        "headline: 13 words; at most 12",
+        'headline: names no resort (name them, or say "all eight")',
+    ]
+    (error,) = check(with_draft(headline="Freezing rain at Sugarloaf Tuesday"), digest())
+    assert str(error) == "headline: 'Tuesday' is not a forecast day in the digest"
+    # Amounts and precip words in the headline go through the same checks as the prose.
+    errors = check(with_draft(headline="6″ for Killington Saturday; rain Thursday"), digest())
+    assert [e.rule for e in errors] == ["snow_number", "precip_type"]

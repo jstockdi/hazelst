@@ -272,6 +272,13 @@ def derive_mountain(
         )
         snow_in = _total(snow_mean[a:z])
         precip_in = _total(precip[a:z])
+        kinds = tagging.day_precip(
+            hourly,
+            snow_in=snow_in,
+            base_snow_in=_total(base_snow_mean[a:z]),
+            precip_in=precip_in,
+            nws_ice_in=ice,
+        )
         temps = [v for v in temp[a:z] if v is not None]
         gusts = [v for v in gust[a:z] if v is not None]
         levels = [v for v in freezing[a:z] if v is not None]
@@ -282,12 +289,14 @@ def derive_mountain(
                 label=f"{local:%a} {local.day:02d}",
                 snow_in=round(snow_in, 1),
                 precip_in=round(precip_in, 2),
-                precip_type=tagging.precip_type(snow_in, precip_in, day_tags),
+                precip_type=kinds.precip_type,
                 hi_f=_round_int(max(temps)) if temps else None,
                 lo_f=_round_int(min(temps)) if temps else None,
                 gust_mph=_round_int(max(gusts)) if gusts else None,
                 freezing_level_ft=_round_int(max(levels)) if levels else None,
                 tags=day_tags,
+                base_precip_type=kinds.base_precip_type,
+                freezing_rain_at=list(kinds.freezing_rain_at),
             )
         )
     return MountainForecast(

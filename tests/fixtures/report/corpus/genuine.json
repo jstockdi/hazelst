@@ -1,0 +1,39 @@
+{
+ "2": [
+  "precip_type: Pico Sun 29: mountains.pico says 'dry' (dry); precip_type is ice",
+  "precip_type: Stratton Sun 29: mountains.stratton says 'freezing rain' (ice); precip_type is mix; freezing_rain_at is []",
+  "precip_type: Loon Sun 29: mountains.loon says 'dry' (dry); precip_type is ice",
+  "storm_type: storm names 'coastal storm', but no storm_type or a discussion supports coastal",
+  "cautions: active alert 'High Wind Warning' is not in cautions"
+ ],
+ "4": [
+  "precip_type: Sugarbush Fri 27: mountains.sugarbush says 'Rain' (rain); precip_type is ice"
+ ],
+ "5": [
+  "snow_number: storm: '1.7–3.6″' matches no snow value for Stratton (± 0.5″ or a window range)",
+  "precip_type: Pico Fri 27: mountains.pico says 'Rain' (rain); precip_type is ice",
+  "precip_type: Pico Sat 28: mountains.pico says 'rain' (rain); precip_type is snow",
+  "precip_type: Pico Sat 28: mountains.pico says 'mixed' (mix); precip_type is snow",
+  "precip_type: Sugarbush Sat 28: mountains.sugarbush says 'mix' (mix); precip_type is snow",
+  "precip_type: Loon Sun 29: mountains.loon says 'freezing rain' (ice); precip_type is dry; freezing_rain_at is []",
+  "precip_type: Sunday River Sun 29: mountains.sunday_river says 'freezing rain' (ice); precip_type is dry; freezing_rain_at is []",
+  "precip_type: Loon Sun 29: cautions[1] says 'Freezing rain' (ice); precip_type is dry; freezing_rain_at is []",
+  "precip_type: Sunday River Sun 29: cautions[1] says 'Freezing rain' (ice); precip_type is dry; freezing_rain_at is []"
+ ],
+ "6": [
+  "precip_type: Pico Fri 27: mountains.pico says 'Rain' (rain); precip_type is ice",
+  "precip_type: Pico Sat 28: mountains.pico says 'rain' (rain); precip_type is snow",
+  "precip_type: Pico Sat 28: mountains.pico says 'mixed' (mix); precip_type is snow",
+  "precip_type: Sugarbush Sat 28: mountains.sugarbush says 'mix' (mix); precip_type is snow",
+  "precip_type: Sugarbush Sun 29: mountains.sugarbush says 'freezing rain' (ice); precip_type is dry; freezing_rain_at is []",
+  "precip_type: Loon Sat 28: mountains.loon says 'mix' (mix); precip_type is snow",
+  "precip_type: Loon Sun 29: mountains.loon says 'freezing rain' (ice); precip_type is dry; freezing_rain_at is []",
+  "precip_type: Cranmore Fri 27: mountains.cranmore says 'Rain' (rain); precip_type is ice",
+  "precip_type: Cranmore Sat 28: mountains.cranmore says 'mix' (mix); precip_type is dry",
+  "precip_type: Sunday River Sat 28: mountains.sunday_river says 'dry' (dry); precip_type is mix",
+  "precip_type: Sunday River Sun 29: mountains.sunday_river says 'freezing rain' (ice); precip_type is dry; freezing_rain_at is []",
+  "precip_type: Sugarbush Sun 29: cautions[1] says 'Freezing rain' (ice); precip_type is dry; freezing_rain_at is []",
+  "precip_type: Loon Sun 29: cautions[1] says 'Freezing rain' (ice); precip_type is dry; freezing_rain_at is []",
+  "precip_type: Sunday River Sun 29: cautions[1] says 'Freezing rain' (ice); precip_type is dry; freezing_rain_at is []"
+ ]
+}

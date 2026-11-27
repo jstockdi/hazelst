@@ -25,19 +25,22 @@ def test_health_ok_on_fresh_db(db_path: Path) -> None:
     resp = client(db_path).get("/health")
     assert resp.status_code == 200
     latest = len(db.load_migrations())
-    assert resp.json() == {"status": "ok", "user_version": latest, "last_report_build": None}
+    assert resp.json() == {"status": "ok", "user_version": latest, "last_report_job": None}
 
 
-def test_health_fails_after_failed_report_build(db_path: Path) -> None:
+@pytest.mark.parametrize("kind", ["report-build", "report-refresh"])
+def test_health_and_metric_fail_after_a_failed_report_job(db_path: Path, kind: str) -> None:
     conn = db.connect(db_path)
-    with pytest.raises(RuntimeError), db.job(conn, db_path, "report-build", date(2026, 11, 26)):
-        raise RuntimeError("no data")
+    with pytest.raises(RuntimeError), db.job(conn, db_path, kind, date(2026, 11, 26)):
+        raise RuntimeError("report-check failed after 3 revisions")
     resp = client(db_path).get("/health")
     assert resp.status_code == 503
-    assert resp.json()["last_report_build"] == "failed"
-    with db.job(conn, db_path, "report-build", date(2026, 11, 26)):
+    assert resp.json()["last_report_job"] == "failed"
+    assert "hazelst_report_job_failed 1.0" in client(db_path).get("/metrics").text
+    with db.job(conn, db_path, kind, date(2026, 11, 26)):
         pass
     assert client(db_path).get("/health").status_code == 200
+    assert "hazelst_report_job_failed 0.0" in client(db_path).get("/metrics").text
 
 
 def test_health_fails_without_db(tmp_path: Path) -> None:
@@ -74,11 +77,11 @@ def test_metrics_report_and_backup_freshness(db_path: Path) -> None:
     conn = db.connect(db_path)
     conn.execute(
         "INSERT INTO report (for_date, version, status, published_at)"
-        " VALUES ('2026-11-26', 1, 'numbers_only', '2026-11-26T12:00:00+00:00')"
+        " VALUES ('2026-11-26', 1, 'published', '2026-11-26T12:00:00+00:00')"
     )
-    conn.execute(
+    conn.execute(  # a row from before J33 without prose is not a page
         "INSERT INTO report (for_date, version, status, published_at)"
-        " VALUES ('2026-11-26', 2, 'failed', '2026-11-26T13:00:00+00:00')"
+        " VALUES ('2026-11-26', 2, 'numbers_only', '2026-11-26T13:00:00+00:00')"
     )
     with db.job(conn, db_path, "backup", date(2026, 11, 26)):
         pass

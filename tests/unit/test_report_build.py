@@ -6,47 +6,20 @@ import json
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from hazelst import config, db, jobs
-from hazelst.agents.client import AgentClient, AgentRequest
-from hazelst.agents.report_revise import ReviseInput
-from hazelst.agents.schemas import BestBet, ReportDraft
+from hazelst.agents.client import AgentRequest
+from hazelst.agents.schemas import ReportDraft
 from hazelst.agents.stub import Responder, StubBackend
-from hazelst.digest import ReportDigest
-from hazelst.report_check import check
 from hazelst.sources import base
+from tests.drafts import passing_draft, request_digest, stub_agents
 from tests.support import FIXTURES, load_fixtures, replay_client
 
 DAY = date(2026, 11, 26)
 NOON = datetime(2026, 11, 26, 12, 0, tzinfo=UTC)
-
-
-def request_digest(request: AgentRequest) -> ReportDigest:
-    if request.role == "report-revise":
-        return ReviseInput.model_validate_json(request.prompt).digest
-    return ReportDigest.model_validate_json(request.prompt)
-
-
-def passing_draft(request: AgentRequest) -> ReportDraft:
-    """A minimal draft that satisfies report-check for whatever digest it is given."""
-    digest = request_digest(request)
-    cautions = sorted({a.event for m in digest.mountains for a in m.alerts})
-    for m in digest.mountains:
-        for d in m.days:
-            if "wind_hold_likely" in d.tags:
-                cautions.append(f"Wind holds likely at {m.name} {d.date:%A}.")
-    first = digest.mountains[0]
-    draft = ReportDraft(
-        headline="Forecast numbers for the next five days",
-        best_bet=BestBet(mountain=first.key, day=digest.days[0], why="Closest to home."),
-        storm="The table below has the model mean and range for each mountain.",
-        mountains={m.key: "See the table for each day." for m in digest.mountains},
-        cautions=cautions,
-    )
-    assert check(draft, digest) == []
-    return draft
 
 
 def failing_draft(request: AgentRequest) -> ReportDraft:
@@ -79,13 +52,7 @@ def cfg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> config.Config:
 def use_stub(
     monkeypatch: pytest.MonkeyPatch, responses: dict[str, Responder | list[Responder]]
 ) -> StubBackend:
-    backend = StubBackend(responses)
-    monkeypatch.setattr(
-        jobs,
-        "make_agents",
-        lambda ctx: AgentClient(ctx.conn, ctx.cfg.settings, backend, clock=jobs.clock),
-    )
-    return backend
+    return stub_agents(monkeypatch, responses)
 
 
 def reports(c: config.Config) -> list[tuple[Any, ...]]:
@@ -123,7 +90,7 @@ def test_build_publishes_a_checked_narrative(
     headline, best, body, payload = conn.execute(
         "SELECT headline, best_bet, narrative_md, payload FROM report"
     ).fetchone()
-    assert headline == "Forecast numbers for the next five days"
+    assert headline == "Forecast numbers for all eight"
     assert json.loads(best) == {
         "mountain": "Killington",
         "day": "Thu 26",
@@ -147,42 +114,85 @@ def test_revise_fixes_a_failed_check(cfg: config.Config, monkeypatch: pytest.Mon
     assert json.loads(calls(cfg)[0][3]) == ["mountains: unknown mountain 'stowe'"]
 
 
-def test_two_failed_checks_publish_numbers_only(
+def runs(c: config.Config) -> list[tuple[Any, ...]]:
+    conn = db.connect(c.settings.db_path)
+    return [
+        tuple(r)
+        for r in conn.execute(
+            "SELECT kind, status, error FROM run WHERE kind LIKE 'report-%' ORDER BY id"
+        )
+    ]
+
+
+def at_local(monkeypatch: pytest.MonkeyPatch, hour: int, minute: int) -> None:
+    when = datetime(2026, 11, 26, hour, minute, tzinfo=ZoneInfo("America/New_York"))
+    monkeypatch.setattr(jobs, "clock", lambda: when.astimezone(UTC))
+
+
+def test_failed_checks_fail_the_job_and_publish_nothing(
     cfg: config.Config, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     use_stub(monkeypatch, {"report-write": failing_draft, "report-revise": failing_draft})
-    summary = jobs.run_job(cfg, "report-build", DAY)
-    assert summary["status"] == "numbers_only"
-    assert summary["narrative"]["reason"] == "report-check failed twice"
-    assert reports(cfg) == [(1, "numbers_only", "0700", 0)]
+    with pytest.raises(jobs.JobError, match="report-check failed after 3 revisions"):
+        jobs.run_job(cfg, "report-build", DAY)
+    assert reports(cfg) == []
+    assert [c[0] for c in calls(cfg)] == ["report-write"] + ["report-revise"] * 3
+    ((kind, status, error),) = runs(cfg)
+    assert (kind, status) == ("report-build", "failed")
+    assert "unknown mountain 'stowe'" in error
 
 
-def test_agents_disabled_publish_numbers_only(
+def test_failed_refresh_keeps_the_published_edition(
     cfg: config.Config, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    use_stub(monkeypatch, {"report-write": passing_draft, "report-revise": RuntimeError("down")})
+    jobs.run_job(cfg, "report-build", DAY)
+    conn = db.connect(cfg.settings.db_path)
+    conn.execute(
+        "INSERT INTO alert (id, mountain, event, headline, onset, expires)"
+        " VALUES ('x1', 'loon', 'Winter Storm Warning', 'h', NULL, NULL)"
+    )
+    with pytest.raises(jobs.JobError, match="report-revise"):
+        jobs.run_job(cfg, "report-refresh", DAY, options={"edition": "0815"})
+    assert reports(cfg) == [(1, "published", "0700", 1)]
+
+
+def test_agents_disabled_fail_the_job(cfg: config.Config, monkeypatch: pytest.MonkeyPatch) -> None:
     off = cfg.model_copy(
         update={"settings": cfg.settings.model_copy(update={"enable_agents": False})}
     )
     backend = use_stub(monkeypatch, {"report-write": passing_draft})
-    summary = jobs.run_job(off, "report-build", DAY)
-    assert summary["status"] == "numbers_only"
-    assert "disabled" in summary["narrative"]["reason"]
-    assert backend.requests == []
+    with pytest.raises(jobs.JobError, match="disabled"):
+        jobs.run_job(off, "report-build", DAY)
+    assert backend.requests == [] and reports(cfg) == []
     again = jobs.run_job(off, "report-build", DAY, options={"rebuild": True})
     assert again["status"] == "skipped (agents disabled)"
 
 
-def test_rebuild_rewrites_a_numbers_only_edition(
+def test_rebuild_retries_a_failed_edition(
     cfg: config.Config, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     use_stub(monkeypatch, {"report-write": [RuntimeError("busy"), passing_draft]})
-    first = jobs.run_job(cfg, "report-build", DAY, options={"edition": "0700"})
-    assert first["status"] == "numbers_only"
+    with pytest.raises(jobs.JobError, match="busy"):
+        jobs.run_job(cfg, "report-build", DAY, options={"edition": "0700"})
     rebuilt = jobs.run_job(cfg, "report-build", DAY, options={"rebuild": True})
     assert (rebuilt["edition"], rebuilt["status"]) == ("0700", "published")
     done = jobs.run_job(cfg, "report-build", DAY, options={"rebuild": True})
-    assert done["status"] == "skipped (0700 already has a checked narrative)"
-    assert reports(cfg) == [(1, "numbers_only", "0700", 0), (2, "published", "0700", 1)]
+    assert done["status"] == "skipped (0700 is published)"
+    assert reports(cfg) == [(1, "published", "0700", 1)]
+
+
+def test_rebuild_leaves_an_edition_to_its_own_slot(
+    cfg: config.Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = use_stub(monkeypatch, {"report-write": passing_draft})
+    at_local(monkeypatch, 6, 59)
+    early = jobs.run_job(cfg, "report-build", DAY, options={"rebuild": True})
+    assert early["status"] == "skipped (no edition due yet)"
+    at_local(monkeypatch, 7, 15)
+    waiting = jobs.run_job(cfg, "report-build", DAY, options={"rebuild": True})
+    assert waiting["status"] == "skipped (0700 has not failed)"
+    assert backend.requests == []
 
 
 def test_rebuild_stops_at_the_daily_cap(
@@ -192,20 +202,48 @@ def test_rebuild_stops_at_the_daily_cap(
         update={"settings": cfg.settings.model_copy(update={"agent_daily_calls": 1})}
     )
     use_stub(monkeypatch, {"report-write": RuntimeError("busy")})
-    jobs.run_job(capped, "report-build", DAY)
+    with pytest.raises(jobs.JobError):
+        jobs.run_job(capped, "report-build", DAY)
     again = jobs.run_job(capped, "report-build", DAY, options={"rebuild": True})
     assert again["status"] == "skipped (daily call cap reached)"
 
 
-def test_rebuild_targets_the_newest_edition(
+def test_refresh_without_a_checked_draft_writes_one(
     cfg: config.Config, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     use_stub(monkeypatch, {"report-write": [RuntimeError("busy"), passing_draft]})
-    jobs.run_job(cfg, "report-build", DAY)
+    with pytest.raises(jobs.JobError):
+        jobs.run_job(cfg, "report-build", DAY)
     refresh = jobs.run_job(cfg, "report-refresh", DAY, options={"edition": "0815"})
-    assert refresh["narrative"]["reason"] == "no checked narrative today"
+    assert refresh["narrative"]["from"] == "report-write"
+    assert reports(cfg) == [(1, "published", "0815", 1)]
+
+
+def test_rebuild_retries_a_failed_refresh_as_a_refresh(
+    cfg: config.Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    use_stub(
+        monkeypatch,
+        {"report-write": passing_draft, "report-revise": [RuntimeError("busy"), passing_draft]},
+    )
+    jobs.run_job(cfg, "report-build", DAY)
+    conn = db.connect(cfg.settings.db_path)
+    conn.execute(
+        "INSERT INTO alert (id, mountain, event, headline, onset, expires)"
+        " VALUES ('x1', 'loon', 'Winter Storm Warning', 'h', NULL, NULL)"
+    )
+    at_local(monkeypatch, 8, 20)
+    with pytest.raises(jobs.JobError):
+        jobs.run_job(cfg, "report-refresh", DAY, options={"edition": "0815"})
     rebuilt = jobs.run_job(cfg, "report-build", DAY, options={"rebuild": True})
     assert (rebuilt["edition"], rebuilt["status"]) == ("0815", "published")
+    assert rebuilt["narrative"]["from"] == "morning draft"
+    roles = [c[:2] for c in calls(cfg)]
+    assert roles == [
+        ("report-write", "report-build"),
+        ("report-revise", "report-refresh"),
+        ("report-revise", "report-build"),
+    ]
 
 
 def test_refresh_rechecks_the_morning_draft_without_a_call(
@@ -233,6 +271,6 @@ def test_refresh_revises_when_the_check_now_fails(
     )
     summary = jobs.run_job(cfg, "report-refresh", DAY, options={"edition": "0815"})
     assert summary["status"] == "published"
-    assert summary["narrative"]["check_errors"] == []
+    assert summary["narrative"]["revisions"] == 1
     roles = [c[:2] for c in calls(cfg)]
     assert roles == [("report-write", "report-build"), ("report-revise", "report-refresh")]

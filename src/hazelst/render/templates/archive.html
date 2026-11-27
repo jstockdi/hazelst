@@ -10,7 +10,7 @@
 {% if entries %}
   <ul class="archive">
 {% for e in entries %}
-    <li><a href="/d/{{ e.date.isoformat() }}"><time datetime="{{ e.date.isoformat() }}">{{ e.date.strftime("%a %d %b %Y") }}</time></a><span>{{ e.headline }}</span>{% if e.status == "numbers_only" %}<small>numbers only</small>{% endif %}{% if e.verification %}<small>{{ e.verification }}</small>{% endif %}</li>
+    <li><a href="/d/{{ e.date.isoformat() }}"><time datetime="{{ e.date.isoformat() }}">{{ e.date.strftime("%a %d %b %Y") }}</time></a><span>{{ e.headline }}</span>{% if e.verification %}<small>{{ e.verification }}</small>{% endif %}</li>
 {% endfor %}
   </ul>
 {% else %}

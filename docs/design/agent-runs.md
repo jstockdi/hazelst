@@ -78,17 +78,19 @@ job lock, and a failed step does not stop the next one.
 - **Startup catch-up**: when the container starts, the latest edition due
   today (by its publish time) is run if it has no report: ingest-forecast,
   ingest-obs, then the report job.
-- A refresh carries the latest written report for the day forward
-  (`report-check` re-runs against it once J11 lands); without one it is
-  `numbers_only`. Until `report-write` exists every edition is `numbers_only`.
+- A refresh carries the day's newest checked draft forward: `report-check`
+  re-runs against it on the new numbers, and `report-revise` fixes it if it
+  now fails. With no checked draft today, the refresh writes one
+  (`report-write`). Every published edition has a checked narrative (J33,
+  decisions row 33).
 - `hazelst schedule` prints each slot's next run.
 
 | Job | When | Steps | Claude roles |
 |-----|------|-------|--------------|
 | `ingest-forecast` | 6:45 AM, 8:10 AM, 2:30 PM | Open-Meteo (summit, base), NWS grids, alerts, discussions → `fetch` → normalize (`forecast_hourly` from 6 AM local on the ingest date) | — |
 | `ingest-obs` | 6:50 AM, 8:10 AM, 2:30 PM | Resort adapters, PNS, LSR, NOHRSC → `fetch` → `observation`, `snow_report` | `conditions-extract`, only when an adapter fails |
-| `report-build` | 7:00 AM | derive → digest → `report-write` → `report-check` → (`report-revise` → `report-check`) → `report` | `report-write`, `report-revise` |
-| `report-refresh` | 8:15 AM, 2:40 PM | re-derive from the latest ingest; update numbers, alerts, conditions; re-run `report-check` against the newest checked draft of the day (the `agent_call` output that passed); with no checked draft the edition is `numbers_only` | `report-revise` only if the check now fails |
+| `report-build` | 7:00 AM | derive → digest → `report-write` → `report-check` → (`report-revise` → `report-check`, up to 3 rounds) → `report` | `report-write`, `report-revise` |
+| `report-refresh` | 8:15 AM, 2:40 PM | re-derive from the latest ingest; update numbers, alerts, conditions; re-run `report-check` against the newest checked draft of the day (the `agent_call` output that passed) and revise it (up to 3 rounds) if it now fails; with no checked draft today, write one as `report-build` does | `report-revise` only if the check now fails; `report-write` only without a checked draft |
 | `forecast-verify` | 9:00 PM | read the NOHRSC grid ending 12Z today (published ~7:30 PM), then score yesterday's 1d forecast from each edition (7:00, 8:15, 2:40) against observations → `verification`; re-score the date a week before that (NOHRSC re-read) | — |
 | `skill-learn` | 2:00 AM nightly | rebuild `skill` from `verification` + `forecast_hourly`; refit `snow_ratio`; re-choose each mountain's method (`method_gate`) | — |
 | `knowledge-review` | Monday 3:00 AM | gather the week's evidence (days D − 8 … D − 2, the days scored since the last review) → `knowledge-propose` → validate → proposed `knowledge` / `config_change` rows; skipped without skill cells or misses, or when agents are off | `knowledge-propose` |
@@ -108,8 +110,8 @@ without code changes — that is an owner decision, not a default.
 
 | Role | Effort | Input | Output (Pydantic schema) | Guard |
 |------|--------|-------|--------------------------|-------|
-| **`report-write`** | `high` | Digest: windows, days with `precip_type` and tags, discussions (Key Messages + Discussion), alerts, accepted `knowledge`, yesterday's verification | `ReportDraft {headline, best_bet{mountain, day, why}, storm, mountains{key: text}, cautions}` | `report-check` |
-| **`report-revise`** | `medium` | The draft + digest + the `report-check` error list | `ReportDraft` | `report-check` again; on a second failure publish `numbers_only` ("report delayed") and retry the build every 15 min until 9 AM |
+| **`report-write`** | `high` | Digest: windows, days with `precip_type` (summit), `base_precip_type`, `freezing_rain_at`, and the non-precip tags, discussions (Key Messages + Discussion), alerts, accepted `knowledge`, yesterday's verification | `ReportDraft {headline, best_bet{mountain, day, why}, storm, mountains{key: text}, cautions}` | `report-check` |
+| **`report-revise`** | `medium` | The draft + digest + the `report-check` errors of that draft | `ReportDraft` | `report-check` again; up to 3 rounds, each sent the exact errors of the draft before it. If the third still fails, the job fails (see Failure behavior) |
 | **`conditions-extract`** | `low` | Text of one resort report page whose adapter failed (never for Loon, Sunday River, Sugarloaf — see data-sources.md) | `ConditionsExtract {new_24h_in, base_in, trails_open, trails_total, lifts_open, confidence}` | Stored with `source=resort_llm` (`reported_at` = fetch time); never overrides an adapter value. Skipped for a non-200 or near-empty page (a bot challenge); at most once per resort per day |
 | **`knowledge-propose`** | `high` | `skill` cells with n ≥ 3 and each cell's values at the previous call, the week's 1d raw-mean MISSes with tags and the discussion the 7:00 report used, current `knowledge`, the threshold paths and values | `KnowledgeProposals {knowledge[], config_changes[]}` with evidence keys | Owner approval required; nothing proposed takes effect on its own. The job drops an item that cites no input key, names an unknown mountain, repeats a current statement, or (config) names a non-threshold path, keeps the value, or breaks the roster |
 
@@ -183,30 +185,48 @@ Verified by the J01 spike ([spikes/agent_sdk/](../../spikes/agent_sdk/README.md)
 - Every mountain is mentioned exactly once in `mountains`.
 - Every snow number in prose matches the JSON (± 0.5″ or the stated range).
 - Every precip-type word (snow, ice, freezing rain, rain, mix, dry) used for a
-  mountain/day matches `forecast_day.precip_type` for that day.
+  mountain/day matches that day's type at the elevation the phrase names
+  (`precip_type` at the summit, `base_precip_type` at the base); freezing rain
+  also matches where `freezing_rain_at` has it.
 - Best bet names an open mountain (`season_open` ≤ day) and a day in the window.
 - A storm type is named only if `storm_type` or a discussion names it.
 - Cautions mention every active alert and every `wind_hold_likely` day.
 
 How `report_check.py` reads the prose (so a draft can be written to pass):
 
-- Text is split into sentences and clauses (`;`, `—`, "while", "but",
-  "then"). A clause is about the mountains it names; one that names none is
-  about the mountains named earlier in its sentence, else the entry's own
-  mountain (`mountains[key]`, `best_bet.why`). It is about the days it names
-  (weekday names, today / tonight / tomorrow, weekend); one that names no day
-  keeps the previous clause's days. Clauses about no mountain (regional) are
-  not precip-checked; their snow numbers must match some mountain.
+- Text is split into sentences, clauses (`;`, `:`, `—`, " – ", "while",
+  "but", "then", "with"), and phrases. Inside a clause, a comma or "and"
+  starts a new phrase only when the part after it makes its own claim (a
+  precip word or snow amount) about its own mountain or day; a bare name or
+  day joins its list. So "freezing rain to Killington, Pico, and Sugarloaf,
+  with rain at Stratton and Loon" binds freezing rain to the first three and
+  rain to the last two, and "rain today, a mix Saturday, and dry Sunday"
+  binds each word to its own day.
+- A phrase is about the mountains it names; one that names none is about the
+  mountains named last in its sentence, else the entry's own mountain
+  (`mountains[key]`, `best_bet.why`). It is about the days it names (weekday
+  names, today / tonight / tomorrow, weekend); one that names no day keeps
+  the previous phrase's days. Phrases about no mountain (regional) are not
+  precip-checked; their snow numbers must match some mountain.
+- Elevation: each precip word is read at the elevation word nearest to it in
+  its phrase: base (base, valley, lower elevations / slopes / mountain) reads
+  `base_precip_type`; summit (summit, peak, up top, upper mountain, higher
+  terrain) reads `precip_type`. With none, the word describes the summit,
+  except freezing rain, which passes where `freezing_rain_at` lists any
+  elevation ("Freezing rain Monday at Sugarloaf" on a summit-`rain` day with
+  freezing-rain hours at the summit).
 - Precip words: ice = freezing rain, freezing drizzle, ice, icy, glaze; snow =
   snow, snow showers, dusting, flurries, powder; mix = mix, wintry mix, sleet;
   rain = rain, drizzle, showers; dry = dry, drying. A `mix` day also accepts
   snow and rain words. Negated words ("no snow"), partial-day "dry until …",
-  and clauses about the base or valleys are skipped.
+  are skipped.
 - Snow numbers are amounts written with `″`, `"`, or "inches"; amounts
   followed by "of ice" or "of liquid" are not snow. A number passes when it is
   within 0.5″ of a day, multi-day sum, window mean, range end, model value,
-  NWS value, or accumulation value for the clause's mountains, or inside a
-  window's range.
+  NWS value, or accumulation value for the phrase's mountains, or inside a
+  window's range. A phrase opened by "with" that names its own mountains may
+  also match the list just before it ("2.7″ at Killington with a 0.7–6.3″
+  range and 0.1–4.5″ at Pico").
 - Storm words: clipper; coastal low / storm, nor'easter; inland runner,
   cutter; and "upslope" (needs a `nw_upslope` tag or a discussion).
 - A `null` `season_open` counts as open (date not known).
@@ -214,6 +234,14 @@ How `report_check.py` reads the prose (so a draft can be written to pass):
 The 2026-11-25 sample run would have failed the precip-type rule three times
 ([sample run](../experiments/2026-11-25-sample-run.md), finding 8) — the class
 of error this catches.
+
+**Regression corpus.** `tests/fixtures/report/corpus/` holds every
+`report-write` / `report-revise` call from production (`agent_call` input,
+output, stored errors), with each digest re-derived on frank from the same
+ingest run. `tests/unit/test_report_corpus.py` requires every stored output to
+pass and pins the exact errors of each morning draft re-checked on later
+numbers (genuine changes in the forecast). Add new calls to the corpus when a
+check rejects a draft that reads correctly.
 
 ## Compounding loop
 
@@ -261,14 +289,15 @@ calls are logged in `agent_call` with no `run_id`.
 
 Calls run on the owner's Claude subscription, not a metered API key, so there is
 no per-token bill and no workspace spend limit; usage counts against the
-subscription's limits. A rate-limited call fails like any other failed call and
-the page falls back to `numbers_only`.
+subscription's limits. A rate-limited call fails like any other failed call:
+the report job fails and the published edition stays.
 
 The in-app limit is a **daily call cap** (`HAZELST_AGENT_DAILY_CALLS`, default
 10): `agents/client.py` counts today's `agent_call` rows (America/New_York)
-before each call and, at the cap, skips the call and falls back to
-`numbers_only`. A normal day uses 1–2 calls (`report-write`, an occasional
-`report-revise`, and a `report-revise` per refresh only when its check fails);
+before each call and, at the cap, skips the call; the report job fails. A
+normal day uses 1–2 calls (`report-write`, an occasional `report-revise`, and
+`report-revise` rounds in a refresh only when its check fails; at most 4 per
+edition);
 `knowledge-propose` runs weekly; `conditions-extract` only on adapter failure.
 
 `ResultMessage.total_cost_usd` is the SDK's client-side estimate at list price.
@@ -281,5 +310,5 @@ small structured-output call measured $0.005–0.034 per call at that price.
 |---------|----------|
 | One source down | That section shows "source unavailable" in the footer; the run continues |
 | Open-Meteo down | Retry 3× over 20 min; then publish yesterday's forecast marked stale |
-| `report-write` / `report-revise` fail or `report-check` fails twice | `numbers_only` page; the `report-rebuild` slot (7:15, 7:30, … 9:00) runs `report-build` for today's newest edition while its newest version is `numbers_only`; it skips when agents are disabled or the daily call cap is reached |
+| `report-write` / `report-revise` fail, or `report-check` still fails after 3 revisions | The job fails (`run.status = failed`, non-zero exit, the reason and last errors in `run.error` and the log); nothing is published and the previous edition stays. `/health` returns 503 and `hazelst_report_job_failed` is 1 until a report job succeeds; frank alerts on it (`HazelstReportFailed`). The `report-rebuild` slot (7:15, 7:30, … 9:00) retries the newest due edition when its job failed; it skips when agents are disabled or the daily call cap is reached. There is no page without prose: a failure is a bug to fix (decisions row 33) |
 | Container down at 7:00 | `report-build` runs on startup if today has no report |
