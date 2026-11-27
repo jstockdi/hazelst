@@ -4,7 +4,6 @@
 <div class="band">
   <div class="k">Hazel St Forecast</div>
   <h1>{{ headline }}</h1>
-  <div class="when">{{ issued }}{% if p.status == "numbers_only" %} · numbers only{% endif %}</div>
 </div>
 <main>
 {% if narrative and narrative.best_bet %}
@@ -24,21 +23,20 @@
 {% endif %}
 {% endif %}
 
-  <div class="part">Forecast · what falls next</div>
-  <h2>Next 5 days</h2>
-  <p class="lead">From 6 AM {{ p.days[0] if p.days else "" }}, at summit elevation. Average of {{ used_names | join(", ") }}; range is the spread between them.</p>
-  <figure>{{ forecast_chart }}<figcaption>Forecast new snow, stacked by day.</figcaption></figure>
-  <figure>
-    <table class="types">
-      <thead><tr><th></th>{% for d in p.days %}<th>{{ d.split(" ")[0] }}<br>{{ d.split(" ")[1] }}</th>{% endfor %}</tr></thead>
-      <tbody>
-{% for m, cells in types %}
-        <tr><th>{{ m.name }}{% if not m.is_open %} <em>closed</em>{% endif %}</th>{% for c in cells %}<td style="background:{{ c.background }};color:{{ c.color }}">{{ c.label }}{% if c.wind %} <i title="lift-hold wind">💨</i>{% endif %}{% if c.liquid %}<small>{{ c.liquid }}</small>{% endif %}</td>{% endfor %}</tr>
+  <div class="part">Snow · reported and forecast</div>
+{% set t = timeline %}
+  <figure class="tl-fig">
+    <div class="tl" role="table" aria-label="Snow by mountain and day">
+      <div class="tl-now" style="grid-row:2 / span {{ t.rows | length }}"></div>
+      <div role="row" class="tl-row"><div role="columnheader"></div>{% for a, b in t.past_days %}<div role="columnheader" class="tl-h tl-h-past">{{ a }}<br>{{ b }}</div>{% endfor %}<div role="columnheader" class="tl-nowh"><span>Now</span></div>{% for a, b in t.days %}<div role="columnheader" class="tl-h">{{ a }}<br>{{ b }}</div>{% endfor %}</div>
+{% for r in t.rows %}
+      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">{{ r.name }}{% if not r.is_open %}<small>closed</small>{% endif %}</div>
+{%- for c in r.past + r.days %}<div role="cell" class="c {{ c.kind }}"{% if c.background %} style="background:{{ c.background }};color:{{ c.color }}"{% endif %} title="{{ c.title }}">{% if c.text %}<b>{{ c.text }}</b>{% endif %}{% if c.word %}<span class="w" style="color:{{ c.word_color }}">{{ c.word }}</span>{% endif %}</div>{% endfor %}</div>
 {% endfor %}
-      </tbody>
-    </table>
-    <figcaption>Precipitation type at the summit, liquid inches. 💨 = lift-hold wind.</figcaption>
+    </div>
   </figure>
+
+  <div class="part">Forecast · what falls next</div>
   <table id="fct">
     <thead><tr><th>Mountain</th><th>Next<br>24 h</th><th>Next<br>3 days</th><th>Next<br>5 days</th></tr></thead>
     <tbody>
@@ -58,23 +56,6 @@
 {% else %}
   <div class="empty">{{ accumulation_empty }}</div>
 {% endif %}
-{% if accumulation_days %}
-  <h2>By day</h2>
-  <p class="lead">Each day is what the resort reported; other reports are listed beside it and never added in.</p>
-{% for m in accumulation_days %}
-  <details class="acc">
-    <summary><b>{{ m.name }}</b> <small>{{ m.summary }}</small></summary>
-    <table>
-      <thead><tr><th>Day</th><th>Resort</th><th>Not resort-reported</th></tr></thead>
-      <tbody>
-{% for d in m.days %}
-        <tr><td>{{ d.label }}</td><td{% if d.resort == "no report" %} class="none"{% endif %}>{{ d.resort }}</td><td>{% for c in d.context %}<small>{{ c }}</small>{% endfor %}{% if d.more %}<small>+{{ d.more }} more in the JSON</small>{% endif %}{% if not d.context %}<small>—</small>{% endif %}</td></tr>
-{% endfor %}
-      </tbody>
-    </table>
-  </details>
-{% endfor %}
-{% endif %}
 
   <div class="foot">
     <p>Forecast: Open-Meteo ({% for label, stale in runs %}{{ label }}{% if stale %} (stale, not in the average){% endif %}{{ ", " if not loop.last }}{% endfor %}) at summit and base elevation; NWS gridpoints and alerts{% if offices %}; NWS forecast discussions ({{ offices | join(", ") }}){% endif %}.</p>
@@ -88,9 +69,10 @@
     <p>Accumulation: {{ accumulation_sources | join(", ") }}.</p>
 {% endif %}
 {% if context_sources %}
-    <p>Beside it, not resort-reported: {{ context_sources | join(", ") }}.</p>
+    <p>Not resort-reported, in the JSON only: {{ context_sources | join(", ") }}.</p>
 {% endif %}
     <p>{{ verification }}</p>
+    <p>{{ edition }}</p>
     <p><a href="/archive">Archive</a> · <a href="/api/report/{{ p.date.isoformat() }}.json">JSON</a></p>
   </div>
 </main>
