@@ -115,27 +115,6 @@ def sorted_by_5d(mountains: Sequence[MountainReport]) -> list[MountainReport]:
     return sorted(mountains, key=lambda m: -m.forecast.windows["5d"].snow_in)
 
 
-def _resort_rows(payload: ReportPayload) -> list[MountainReport]:
-    """Mountains whose resort reported anything (only resort numbers make the chart)."""
-    return [m for m in payload.mountains if m.accumulation and m.accumulation.has_resort_data]
-
-
-def accumulation_state(payload: ReportPayload) -> tuple[str, str]:
-    """("chart" | "empty", empty-state sentence) for the accumulation section."""
-    span = f"{payload.past_days[0]} \u2013 {payload.past_days[-1]}" if payload.past_days else ""
-    with_data = _resort_rows(payload)
-    if not with_data:
-        return "empty", f"No resort snow reports for the last 7 days ({span})."
-    recent = [sum(v or 0 for v in m.accumulation.last7_in) for m in with_data if m.accumulation]
-    if max(recent) < ACCUMULATION_MIN_IN:
-        return (
-            "empty",
-            f"No mountain reported {ACCUMULATION_MIN_IN:g}″ or more of new snow"
-            f" in the last 7 days ({span}).",
-        )
-    return "chart", ""
-
-
 ACCUMULATION_SOURCE_NAMES = {
     "resort": "resort reports",
     "resort_llm": "resort report pages read by Claude",
@@ -253,7 +232,6 @@ class TimelineCell:
 @dataclass(frozen=True)
 class TimelineRow:
     name: str
-    is_open: bool
     past: list[TimelineCell]
     days: list[TimelineCell]
 
@@ -323,7 +301,6 @@ def snow_timeline(payload: ReportPayload) -> Timeline:
     rows = [
         TimelineRow(
             name=m.name,
-            is_open=m.is_open,
             past=[
                 _past_cell(d, v, s)
                 for d, (v, s) in zip(past_dates, _past(m, past_dates), strict=True)
@@ -345,11 +322,6 @@ def snow_timeline(payload: ReportPayload) -> Timeline:
 def render_report(payload: ReportPayload, narrative: Narrative) -> str:
     """The report page: every page carries a checked narrative (J33)."""
     rows = sorted_by_5d(payload.mountains)
-    state, empty_text = accumulation_state(payload)
-    accumulation_rows = sorted(
-        _resort_rows(payload),
-        key=lambda m: -((m.accumulation.season_in or 0) if m.accumulation else 0),
-    )
     context: dict[str, Any] = {
         "p": payload,
         "narrative": narrative,
@@ -358,11 +330,6 @@ def render_report(payload: ReportPayload, narrative: Narrative) -> str:
         "edition": edition_label(payload),
         "rows": rows,
         "timeline": snow_timeline(payload),
-        "accumulation_state": state,
-        "accumulation_empty": empty_text,
-        "accumulation_chart": charts.accumulation_chart(accumulation_rows)
-        if state == "chart"
-        else Markup(""),
         "accumulation_sources": accumulation_sources(payload),
         "context_sources": context_sources(payload),
         "verification": verification_line(payload),
