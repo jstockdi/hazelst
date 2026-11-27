@@ -68,6 +68,7 @@ M4                  ├─▶ J12 ─┐
 M5                                J14 ─▶ J15 ─▶ J16
 M6          J09 + J11 ─▶ J17 ─▶ J18 ─▶ J19 ─▶ J20 ─▶ J21
 M7                                                  J21 ─▶ J22
+M8                                                         J22 ─▶ J23
 ```
 
 After J03, the forecast track (J05–J09), the Claude track (J10), and the
@@ -133,6 +134,12 @@ accumulation empty state if J14 is not done.
 | Job | Name | Scope | Done when |
 |-----|------|-------|-----------|
 | J22 | `season-backfill` | Open-Meteo Previous Runs (GFS, GEM; ECMWF has no snowfall at lead) and IEM LSR / PNS for the prior season into the same tables; seed `skill` | `skill` has rows per mountain × backfilled model; backfill is idempotent |
+
+### M8 — Resort-reported history
+
+| Job | Name | Scope | Done when |
+|-----|------|-------|-----------|
+| J23 | `snocountry-history` | New source `sources/snocountry.py`: `GET https://good-cormorant-17.convex.site/api/resort-data?resortId={id}` (fallback `https://snocountry.com/.netlify/functions/snowreport-resort?resortId={id}`), one call per mountain, raw response kept in `fetch`. `snocountry_id` per mountain in `config/mountains.json` (Killington 802007, Pico 802014, Stratton 802019, Sugarbush 802023, Cranmore 603007, Loon 603014, Sugarloaf 207008, Sunday River 207009). Rows go to `observation` with `source = 'snocountry'` per data-sources.md [SnoCountry](data-sources.md#snocountry). Migration 0003: unique index on `observation (mountain, source, obs_date)` for `source = 'snocountry'`; writes upsert. `season-backfill` loads the full history (2019-11 onward for new snow, 2012 onward for base depth); `ingest-obs` fetches it at each run as the resort fallback. `forecast-verify` source order: resort > snocountry > PNS / LSR > NOHRSC. After merge: deploy to frank, run the backfill for 2019-11-01..2026-04-30, re-run `forecast-verify` and `skill-learn` over the backfilled range | `observation` has `snocountry` rows for all 8 mountains; counts per mountain per season match the source (tests on saved fixtures); inferred zeros only on base-depth days; re-running the backfill leaves counts unchanged; `verification.observed_source = 'snocountry'` appears for backfilled days; `skill` rebuilt |
 
 ## Owner actions
 
