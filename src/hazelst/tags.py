@@ -50,6 +50,20 @@ def _or(value: float | None, default: float) -> float:
     return default if value is None else value
 
 
+def is_upslope(hours: Sequence[Hour]) -> bool:
+    """`nw_upslope`: 850 hPa wind 270-340 deg, >= 20 kt, RH >= 75%, T <= -8 C, for >= 6 h."""
+    upslope = sum(
+        1
+        for h in hours
+        if h.wd850 is not None
+        and UPSLOPE_DIR[0] <= h.wd850 <= UPSLOPE_DIR[1]
+        and _or(h.ws850_mph, 0) >= UPSLOPE_MIN_MPH
+        and _or(h.rh850, 0) >= UPSLOPE_MIN_RH
+        and _or(h.t850_f, 99) <= UPSLOPE_MAX_T850_F
+    )
+    return upslope >= UPSLOPE_MIN_HOURS
+
+
 def day_tags(
     hours: Sequence[Hour],
     *,
@@ -60,16 +74,7 @@ def day_tags(
     """Tags for one 6 AM -> 6 AM day, in `TAG_ORDER`."""
     tags: set[str] = set()
     wet = [h for h in hours if _or(h.precip_in, 0) >= WET_IN_PER_H]
-    upslope = sum(
-        1
-        for h in hours
-        if h.wd850 is not None
-        and UPSLOPE_DIR[0] <= h.wd850 <= UPSLOPE_DIR[1]
-        and _or(h.ws850_mph, 0) >= UPSLOPE_MIN_MPH
-        and _or(h.rh850, 0) >= UPSLOPE_MIN_RH
-        and _or(h.t850_f, 99) <= UPSLOPE_MAX_T850_F
-    )
-    if upslope >= UPSLOPE_MIN_HOURS:
+    if is_upslope(hours):
         tags.add("nw_upslope")
     if any(_or(h.base_temp_f, 0) > WARM_F for h in wet):
         tags.add("mixing_base")

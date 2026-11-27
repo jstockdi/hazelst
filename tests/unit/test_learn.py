@@ -322,7 +322,7 @@ def test_gate_needs_twenty_verified_days(conn: sqlite3.Connection) -> None:
     assert (result.days, result.passed) == (19, False)
     verified_days(conn, range(19, 20), corrected_error=0.5, raw_error=2.0)
     result = corrected.gate(conn, "sugarbush", BEFORE)
-    assert (result.days, result.corrected_mae, result.raw_mean_mae) == (20, 0.5, 2.0)
+    assert (result.days, result.method_mae, result.raw_mean_mae) == (20, 0.5, 2.0)
     assert result.passed
     assert set(corrected.shown(conn, ["sugarbush", "killington"], BEFORE)) == {"sugarbush"}
 

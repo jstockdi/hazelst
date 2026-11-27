@@ -41,14 +41,68 @@ Daily buckets (6 AM → 6 AM) feed the forecast chart.
 - Base-elevation snowfall is computed the same way and shown when the rain/snow
   line falls between base and summit.
 
+### Resort ratio (`resort_ratio`, J27)
+
+Open-Meteo's `snowfall` is the model's snow water converted at a fixed 7:1
+(0.7 cm per mm). Resort-reported snow runs 9–15 in per inch of forecast snow
+water depending on the mountain (decisions row 26), so `resort_ratio`
+replaces the fixed 7:1 with a ratio fitted to each resort's own reports
+(`ratio.py`):
+
+- **Snow water** per model-hour = `snowfall_in / 7`, which keeps each model's
+  rain / snow split (`precip_in` is not used).
+- **Cells**: per mountain, per model (and `raw_mean`, the fit of the models'
+  mean), per summit 2 m temperature band of the hour (≤ 15 °F, 15–25 °F,
+  25–32 °F, > 32 °F; upper bounds inclusive; each model's own temperature),
+  and per `nw_upslope` side of the day. Stored in `snow_ratio` with `n`.
+- **Fit** (`skill-learn`, nightly, days up to D − 2): ratio of sums over
+  lead-day-1 snow days (resort report or the model's forecast ≥ 0.5″). A
+  day's resort-reported 6 AM → 6 AM snow is shared among its bands in
+  proportion to their forecast snow water; a cell's ratio = its share of
+  resort snow ÷ its forecast snow water, clamped to 4–25. A day with no
+  forecast snow water is left out; a day counts toward a band's `n` with at
+  least 0.01″ of snow water in it.
+- **Fallbacks**: the upslope split is used only where the mountain has ≥ 15
+  snow days on each side; a split cell with < 15 days uses the mountain's
+  own band value; a band with < 15 days uses the all-mountain value for that
+  band, then the mountain's all-band value, then the all-mountain all-band
+  value. A model with no fit of its own (ECMWF: Previous Runs has no ECMWF
+  snowfall) uses the `raw_mean` cells.
+- **Forecast**: each model's hourly snow water × its ratio, summed into days
+  and windows like the mean: headline = mean of the models in use (stale
+  models left out), range = min–max of the per-model `resort_ratio` totals,
+  confidence from that range. The days sum to the windows as for the mean.
+- **Where it shows**: `report-build` always stores `resort_ratio` windows
+  (`forecast_window`) and days (`forecast_day.resort_ratio_in`), and
+  `forecast-verify` scores them. At a mountain where `resort_ratio` has a
+  lower 1d MAE than `raw_mean` over the mountain's last 20 verified days
+  (every edition where both were scored, the `backfill` edition included),
+  the headline, range, chart, and table use `resort_ratio`, labelled
+  "resort ratio", with the mean shown beneath; elsewhere the mean stays.
+  `nws_disagrees` compares NWS with the value shown.
+- **Backfill edition**: a backfilled day's `resort_ratio` is computed with
+  ratios fitted on every other season (leave one season out), so the gate
+  never reads a score fitted on its own day.
+- **Backtest**: `hazelst ratio backtest --fit-to D --test-from D [--test-to D]`
+  fits on lead-day-1 days through `--fit-to` only and prints, per mountain
+  and for all, n, bias ratio, MAE, and hit rate for `raw_mean`, flat 10:1
+  (`flat_10`), `resort_ratio` on temperature only (`ratio_temp`), with the
+  upslope split (`ratio_upslope`), and `corrected` (skill cells learned
+  through `--fit-to`; the raw mean on a day without cells). A test day is a
+  mountain-day with a resort report where the report or any method is
+  ≥ 0.5″, so every method is scored on the same days. `hazelst ratio show`
+  prints the fitted cells and the ratio each one resolves to.
+
 ## Corrected value (learned)
 
 Once `skill` has at least 10 verified snow days for a mountain and model at
 a lead, `report-build` also stores a `corrected` window (bias-scaled models
 blended by 1 / MAE; [data-model.md](data-model.md#how-the-data-compounds),
-step 4). The window table shows it as "Corrected N″" under the mean, and only
-for a mountain where `corrected` has beaten the mean on its last 20 verified
-days. The mean stays the headline, so the chart and the table still agree.
+step 4). The window table shows it as "Corrected N″" under the headline, and
+only for a mountain where `corrected` has beaten the mean on its last 20
+verified days. It never becomes the headline, so the chart and the table
+still agree. `corrected` is computed from the raw models, not from
+`resort_ratio`.
 
 ## Accumulation (observed)
 
@@ -92,8 +146,8 @@ supports it.
 Thresholds are starting points; tune them with the verification scores
 ([agent-runs.md](agent-runs.md): `knowledge-propose` → `config_change`).
 
-Implementation: `derive.py` (windows, days, NWS proration, stale models) and
-`tags.py` (tags, precip type, storm type).
+Implementation: `derive.py` (windows, days, NWS proration, stale models),
+`tags.py` (tags, precip type, storm type), and `ratio.py` (`resort_ratio`).
 
 **Check against the 2026-11-25 sample run** (`tests/unit/test_derive.py`):
 rebuilt from the same model runs (GFS 06Z, ECMWF 06Z, GEM 00Z) through the
@@ -130,6 +184,7 @@ so the ranking and the narrative agree.
 {
   "key": "killington",
   "forecast": {
+    "method": "raw_mean",
     "windows": {
       "1d": { "snow_in": 4, "range": [3, 6], "confidence": "high", "nws_in": 5, "nws_disagrees": false,
               "by_model": { "gfs_seamless": 3, "ecmwf_ifs025": 4, "gem_seamless": 6 } },

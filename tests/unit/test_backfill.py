@@ -7,6 +7,7 @@ and local-time); LSR, PNS, and NOHRSC replay the recorded J00 fixtures.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -15,7 +16,17 @@ import httpx
 import pytest
 
 from hazelst import backfill, config, db, jobs
-from hazelst.sources import base, elevation, ghcn, iem, nohrsc, pns, previous_runs, snocountry
+from hazelst.sources import (
+    base,
+    elevation,
+    ghcn,
+    iem,
+    nohrsc,
+    open_meteo,
+    pns,
+    previous_runs,
+    snocountry,
+)
 from tests.support import FIXTURES
 from tests.unit.test_obs_sources import LSR_FEB, NOHRSC_24H, PNS_IDS, body
 from tests.unit.test_snocountry import SNOCOUNTRY_BODIES
@@ -57,6 +68,15 @@ def previous_runs_body(query: dict[str, str]) -> list[dict[str, Any]]:
                 missing = model == "ecmwf_ifs025" and var == "snowfall"
                 hourly[name] = [None if missing else value for _ in times]
                 units[name] = unit
+            if lead == 1:  # unsuffixed 850 hPa variables (the API has no _previous_dayN form)
+                for var, unit, value in (
+                    ("temperature_850hPa", "°F", 10.0),
+                    ("relative_humidity_850hPa", "%", 90.0),
+                    ("wind_speed_850hPa", "mp/h", 35.0),
+                    ("wind_direction_850hPa", "°", 300.0),
+                ):
+                    hourly[f"{var}_{model}"] = [value for _ in times]
+                    units[f"{var}_{model}"] = unit
         out.append({"utc_offset_seconds": 0, "hourly": hourly, "hourly_units": units})
     return out
 
@@ -146,6 +166,57 @@ def test_previous_runs_normalize_lead_and_models() -> None:
     assert (first.elevation, first.issued_at, first.lead_h) == ("summit", None, 48)
     assert (first.snowfall_in, first.precip_in, first.temp_f) == (0.3, 0.01, 20.0)
     assert first.valid_at == "2026-02-06T00:00:00+00:00"
+
+
+def _fetched(lead: int, mountains: Sequence[config.Mountain]) -> base.Fetched:
+    query = {
+        k: str(v)
+        for k, v in previous_runs.params(mountains, lead, DAY, DAY + timedelta(days=1)).items()
+    }
+    return base.Fetched(
+        previous_runs.SOURCE,
+        previous_runs.URL,
+        query,
+        200,
+        "2026-11-26T00:00:00+00:00",
+        0,
+        json.dumps(previous_runs_body(query)).encode(),
+        {"mountains": [m.key for m in mountains], "elevation": "summit", "lead_day": lead},
+    )
+
+
+def test_previous_runs_lead_day_1_adds_the_850_hpa_variables() -> None:
+    mountains = config.load({}).mountains[:2]
+    one = previous_runs.params(mountains, 1, DAY, DAY)
+    assert "temperature_850hPa" in one["hourly"].split(",")
+    assert one["wind_speed_unit"] == "mph"
+    assert "850hPa" not in previous_runs.params(mountains, 2, DAY, DAY)["hourly"]
+    rows = previous_runs.normalize(_fetched(1, mountains))
+    first = rows[0]
+    assert (first.t850_f, first.rh850, first.ws850_mph, first.wd850) == (10.0, 90.0, 35.0, 300.0)
+    assert previous_runs.normalize(_fetched(2, mountains))[0].t850_f is None
+
+
+def test_previous_runs_replace_rows_of_an_earlier_fetch(tmp_path: Path) -> None:
+    conn = db.connect(tmp_path / "h.db")
+    db.migrate(conn)
+    db.sync_mountains(conn, config.load({}).mountains)
+    mountains = config.load({}).mountains[:2]
+    run_id = db.start_run(conn, "season-backfill", None)
+    ids = []
+    for lead in (1, 1, 2):
+        fetched = _fetched(lead, mountains)
+        rows = previous_runs.normalize(fetched)
+        with db.transaction(conn):
+            fetch_id = base.store_fetch(conn, run_id, fetched)
+            dropped = previous_runs.drop_superseded(conn, fetch_id, rows)
+            open_meteo.store(conn, fetch_id, rows)
+        ids.append((fetch_id, dropped))
+    assert [d for _, d in ids] == [0, 2 * 2 * 48, 0]  # lead 2 leaves lead 1 alone
+    per_fetch = dict(
+        conn.execute("SELECT fetch_id, count(*) FROM forecast_hourly GROUP BY 1").fetchall()
+    )
+    assert per_fetch == {ids[1][0]: 2 * 2 * 48, ids[2][0]: 2 * 2 * 48}
 
 
 def test_backfill_loads_every_source_and_is_idempotent(cfg: config.Config) -> None:

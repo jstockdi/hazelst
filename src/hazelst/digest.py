@@ -89,6 +89,7 @@ class DigestMountain(_Model):
     season_open: dt.date | None = None
     favored_by: list[str] = Field(default_factory=list)
     windows: dict[WindowKey, DigestWindow]
+    forecast_method: Literal["raw_mean", "resort_ratio"] = "raw_mean"
     days: list[DigestDay]
     storm_type: StormType | None = None
     alerts: list[DigestAlert] = Field(default_factory=list)
@@ -188,6 +189,7 @@ def from_payload(
                 )
                 for key, w in m.forecast.windows.items()
             },
+            forecast_method=m.forecast.method,
             days=[
                 DigestDay(
                     date=d.date,

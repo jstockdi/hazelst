@@ -74,16 +74,16 @@ class CorrectedWindow:
 class GateResult:
     mountain: str
     days: int
-    corrected_mae: float | None
+    method_mae: float | None  # the gated method's MAE (corrected, or resort_ratio)
     raw_mean_mae: float | None
 
     @property
     def passed(self) -> bool:
         return (
             self.days >= GATE_DAYS
-            and self.corrected_mae is not None
+            and self.method_mae is not None
             and self.raw_mean_mae is not None
-            and self.corrected_mae < self.raw_mean_mae
+            and self.method_mae < self.raw_mean_mae
         )
 
 
@@ -213,8 +213,9 @@ def store(
 # --- gate ----------------------------------------------------------------------------------
 
 
-def gate(conn: sqlite3.Connection, mountain: str, before: date) -> GateResult:
-    """Corrected vs. model mean over the mountain's last 20 verified days before `before`."""
+def gate(conn: sqlite3.Connection, mountain: str, before: date, method: str = METHOD) -> GateResult:
+    """`method` (default corrected) vs. the model mean over the mountain's last 20 verified
+    days before `before`: 1d rows of every edition where both were scored."""
     rows = conn.execute(
         "SELECT c.for_date, abs(c.error_in), abs(r.error_in) FROM verification c"
         " JOIN verification r ON r.for_date = c.for_date AND r.edition = c.edition"
@@ -222,7 +223,7 @@ def gate(conn: sqlite3.Connection, mountain: str, before: date) -> GateResult:
         " WHERE c.mountain = ? AND c.window = ? AND c.method = ? AND c.for_date < ?"
         "  AND c.result != 'NO_OBS' AND r.result != 'NO_OBS'"
         " ORDER BY c.for_date DESC",
-        (verify.RAW_MEAN, mountain, verify.WINDOW, METHOD, before.isoformat()),
+        (verify.RAW_MEAN, mountain, verify.WINDOW, method, before.isoformat()),
     ).fetchall()
     days = set(sorted({r[0] for r in rows}, reverse=True)[:GATE_DAYS])
     kept = [r for r in rows if r[0] in days]
@@ -231,7 +232,7 @@ def gate(conn: sqlite3.Connection, mountain: str, before: date) -> GateResult:
     return GateResult(
         mountain=mountain,
         days=len(days),
-        corrected_mae=round(sum(r[1] for r in kept) / len(kept), 3),
+        method_mae=round(sum(r[1] for r in kept) / len(kept), 3),
         raw_mean_mae=round(sum(r[2] for r in kept) / len(kept), 3),
     )
 

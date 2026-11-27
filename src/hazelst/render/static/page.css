@@ -64,3 +64,4 @@ table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .acc td:first-child,.acc td:nth-child(2){white-space:nowrap}
 .acc td small{display:block;color:var(--mist);font-size:12px;line-height:1.3}
 .acc td.none{color:var(--mist);font-style:italic}
+.fct-note{margin:8px 0 0}

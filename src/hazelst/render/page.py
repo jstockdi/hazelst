@@ -53,6 +53,9 @@ _env.filters["num"] = charts.num
 # --- narrative markdown --------------------------------------------------------------
 
 
+METHOD_LABELS: dict[str, str] = {"raw_mean": "model mean", "resort_ratio": "resort ratio"}
+
+
 def md_to_html(md: str) -> Markup:
     """The narrative subset: `## ` headings, paragraphs, and `**bold**`; everything escaped."""
     out: list[str] = []
@@ -344,6 +347,7 @@ def render_report(payload: ReportPayload, narrative: Narrative | None = None) ->
         "runs": [(run_label(r.model, r.issued_at), r.stale) for r in payload.models],
         "offices": [f"{OFFICE_NAMES.get(o, o)}" for o in payload.discussions],
         "used_names": [MODEL_NAMES.get(m, m) for m in payload.used_models],
+        "method_labels": METHOD_LABELS,
     }
     return _env.get_template("report.html").render(**context)
 

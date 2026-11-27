@@ -11,8 +11,11 @@ The user message is a JSON digest (`ReportDigest`):
 - `date`, `edition`, `issued`, `days` (the forecast days, report day first).
 - `mountains[]`: `key`, `name`, `season_open` (`null` = opening date not
   known; do not call the mountain closed), `favored_by`, `windows`
-  (`1d` / `3d` / `5d` from 6 AM: model mean `snow_in`, range `lo_in`–`hi_in`,
-  `confidence`, `by_model`, `nws_in`, `nws_disagrees`), `days[]` (`snow_in`,
+  (`1d` / `3d` / `5d` from 6 AM: `snow_in`, range `lo_in`–`hi_in`,
+  `confidence`, `by_model`, `nws_in`, `nws_disagrees`), `forecast_method`
+  (`raw_mean` = the models' mean; `resort_ratio` = each model's snow water
+  times the snow ratio fitted to that resort's reports; the page labels it
+  "resort ratio"), `days[]` (`snow_in`,
   `precip_in`, `precip_type`, temperatures, `gust_mph`, `tags`), `storm_type`,
   `alerts`, and `accumulation` when known.
 - `accumulation`: `last7_in`, `season_in`, and `base_in` are what the resort

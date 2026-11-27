@@ -24,7 +24,8 @@ digest), never as the observation:
 reads obs_date X + 1. HIT is within 2 inches or 30% of the observed value.
 
 A day with no stored report (a season backfill) is scored as edition
-`backfill`: each model's lead-day-1 summit forecast from `forecast_hourly`.
+`backfill`: each model's lead-day-1 summit forecast from `forecast_hourly`,
+their mean, and `resort_ratio` (ratio.py, fitted leaving the day's season out).
 
 The same day-by-day choice fills the accumulation section: the resort-reported
 snow on each of the 7 days before the report date ("no report" without one),
@@ -38,7 +39,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import astuple, dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Literal
@@ -312,11 +313,16 @@ def edition_forecasts(conn: sqlite3.Connection, for_date: date) -> list[EditionF
 
 
 def backfill_forecasts(
-    conn: sqlite3.Connection, start: date, end: date, tz: str = TIMEZONE
+    conn: sqlite3.Connection,
+    start: date,
+    end: date,
+    tz: str = TIMEZONE,
+    extra: Mapping[tuple[str, date], Mapping[str, float]] | None = None,
 ) -> dict[date, list[EditionForecast]]:
     """Edition `backfill` for days `start`..`end`: each model's lead-day-1 summit forecast
     from `forecast_hourly` (a season backfill's Previous Runs, or any stored run), and
-    their mean as `raw_mean`. Used only for days with no stored report edition."""
+    their mean as `raw_mean`. Used only for days with no stored report edition.
+    `extra` adds other methods per (mountain, day), such as `resort_ratio`."""
     from hazelst.learn import model_forecasts  # learn imports this module
 
     by_day: dict[date, dict[str, dict[str, float]]] = {}
@@ -330,7 +336,11 @@ def backfill_forecasts(
                 BACKFILL_EDITION,
                 0,
                 mountain,
-                {**models, RAW_MEAN: round(sum(models.values()) / len(models), 2)},
+                {
+                    **models,
+                    RAW_MEAN: round(sum(models.values()) / len(models), 2),
+                    **(extra or {}).get((mountain, day), {}),
+                },
                 [],
             )
             for mountain, models in sorted(mountains.items())

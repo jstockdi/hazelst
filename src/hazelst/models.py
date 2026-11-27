@@ -42,6 +42,8 @@ class ForecastWindow(_Model):
     nws_disagrees: bool
     # The `corrected` method's value, set only once it beats the mean (corrected.py gate).
     corrected_in: float | None = None
+    # The model mean, set when the headline comes from `resort_ratio` (ratio.py gate).
+    raw_mean_in: float | None = None
 
 
 class ForecastDay(_Model):
@@ -59,11 +61,16 @@ class ForecastDay(_Model):
     tags: list[str]
 
 
+ForecastMethod = Literal["raw_mean", "resort_ratio"]
+
+
 class MountainForecast(_Model):
     key: str
     windows: dict[WindowKey, ForecastWindow]
     days: list[ForecastDay]
     storm_type: StormType
+    # The method behind snow_in, range, by_model, and the days' snow (ratio.py gate).
+    method: ForecastMethod = "raw_mean"
 
 
 class ModelRun(_Model):
