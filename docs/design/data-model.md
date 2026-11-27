@@ -89,7 +89,7 @@ CREATE TABLE alert (
 -- Normalized: ground truth ------------------------------------------------
 CREATE TABLE observation (                  -- one row per source per mountain per report
   id INTEGER PRIMARY KEY, mountain TEXT, fetch_id INT,
-  source TEXT,                              -- resort | resort_llm | nohrsc | model_analysis
+  source TEXT,                              -- resort | resort_llm | snocountry | nohrsc | model_analysis
   obs_date DATE, reported_at TEXT,          -- obs_date D = the 24 h ending the morning of D
   new_24h_in REAL, new_48h_in REAL, new_7d_in REAL,
   base_in REAL, season_in REAL,
@@ -121,7 +121,7 @@ CREATE TABLE forecast_day (
 CREATE TABLE verification (
   for_date DATE, edition TEXT,              -- 0700 | 0815 | 1440
   mountain TEXT, window TEXT, method TEXT,  -- window 1d; method raw_mean | corrected | a model id
-  forecast_in REAL, observed_in REAL, observed_source TEXT,  -- resort | resort_llm | pns | lsr | nohrsc
+  forecast_in REAL, observed_in REAL, observed_source TEXT,  -- resort | resort_llm | snocountry | pns | lsr | nohrsc
   error_in REAL, ratio REAL, result TEXT,   -- HIT | MISS | NO_OBS
   tags JSON,                                -- tags that fired, copied for slicing
   PRIMARY KEY (for_date, edition, mountain, window, method)
@@ -183,12 +183,14 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
    168 h to `forecast_hourly`, plus observations from up to four sources.
 2. **forecast-verify** scores each mountain's 1d forecast from each edition
    (7:00, 8:15, 2:40; raw mean and each model)
-   against the best available observation: resort 24 h > PNS/LSR within 5 mi >
-   NOHRSC > none. Resort and NOHRSC values are `observation` rows; PNS and LSR
+   against the best available observation: resort 24 h > SnoCountry >
+   PNS/LSR within 5 mi > NOHRSC > none. Resort, SnoCountry, and NOHRSC values
+   are `observation` rows; PNS and LSR
    points stay in `snow_report` (with `nearest_mountain` and `distance_mi`) and
    are not copied into `observation`. Day X (6 AM X to 6 AM X + 1) reads
    obs_date X + 1: the earliest non-stale resort report that day (`resort_llm`
-   only without an adapter value); else the highest PNS / LSR report within
+   only without an adapter value); else the `snocountry` row for obs_date
+   X + 1; else the highest PNS / LSR report within
    5 mi, using 24 h reports ending 4–10 AM on X + 1, or reports of unknown span
    (LSRs, storm totals) ending in the window by 10 AM; else the NOHRSC 24 h
    grid ending 12Z on X + 1. HIT is within 2″ or 30% of the observation.

@@ -87,6 +87,7 @@ All sources below are free and keyless (NWS requires a `User-Agent` header).
 | Source | Endpoint | Fields used | Feeds |
 |--------|----------|-------------|-------|
 | **Resort mountain reports** | Four shared presets, one config entry per resort (see [Resort adapters](#resort-adapters)) | New 24 h / 48 h / 7-day snow, base depth, season total, trails and lifts open, lifts on hold | Accumulation chart, per-mountain notes |
+| **SnoCountry** | `good-cormorant-17.convex.site/api/resort-data?resortId={id}` (see [SnoCountry](#snocountry)) | Resort-reported new snow by date (2019 onward), daily base depth (2012 onward) | Verification; resort fallback; season backfill |
 | **NWS snowfall reports (PNS)** | Live: `api.weather.gov/products/types/PNS/locations/{BTV,ALY,GYX}`; archive: IEM AFOS (see [Observation endpoints](#observation-and-backfill-endpoints)) | `**METADATA**` lines: place, lat/lon, `SNOW_24` or `SNOW` (storm total), inches, provider | Accumulation cross-check; verification; season backfill |
 | **NOAA NOHRSC** | National Snowfall Analysis v2 GeoTIFF, `www.nohrsc.noaa.gov/snowfall_v2/data/{YYYYMM}/sfav2_CONUS_24h_{YYYYMMDD}12.tif` | 24 h, 48 h, 72 h, and season-to-date snowfall at each mountain's pixel | Accumulation fallback; verification |
 | **Iowa Environmental Mesonet** | LSR GeoJSON `mesonet.agron.iastate.edu/geojson/lsr.php`; PNS text archive `api/1/nws/afos/list.json` + `api/1/nwstext/{product_id}` | Point snowfall reports with coordinates, current and historical | Ground truth; season backfill |
@@ -416,6 +417,36 @@ Latency: the 24 h grid ending 12Z on day D appeared at about 00Z on D+1
 the 9 PM `forecast-verify` and the next morning's accumulation fallback, not the
 same morning. Files are reprocessed later (the 2026-02-07 file was regenerated
 2026-02-12), so verification re-reads a grid once after 7 days.
+
+### SnoCountry
+
+Resort-reported snow history from snocountry.com (checked 2026-11-26: no
+robots.txt, terms cover privacy only).
+
+`GET https://good-cormorant-17.convex.site/api/resort-data?resortId={id}`
+(fallback `https://snocountry.com/.netlify/functions/snowreport-resort?resortId={id}`)
+returns one JSON document per resort. Fields used:
+
+| Field | Shape | Meaning |
+|-------|-------|---------|
+| `snowarchive` | `[{"date_of_new_snow": "2026-04-07", "snowMin": "3", "snowMax": "0"}]` | Reported new snow by report date, 2019-11 onward; days without snow are left out |
+| `jsonBaseDepth` | JSON string: `{"titles": [...], "data": [[{"x": "2025-11-11", "y": "12"}, ...], ...]}` | Base depth (in) on each day the resort reported, one series per season, 2012 onward |
+
+Rows: one `observation` per mountain per report date, `source = 'snocountry'`,
+`obs_date` = the report date (the 24 h ending that morning, as for
+`resort`), `base_in` from the base-depth series, `raw` the source entries.
+
+- **New snow:** `snowMax` when it is above `snowMin` (a range; resorts quote
+  the summit as the max), else `snowMin`.
+- **Zero days:** a date in the base-depth series with no `snowarchive` entry
+  is stored as `new_24h_in = 0` with `raw.inferred_zero = true`. A date in
+  neither stays absent, so a missing report is never scored as zero.
+- **Coverage** (new-snow days per season, 2019-20 to 2025-26): Killington
+  41–62, Sugarbush 43–70 (2020-21 missing), Pico 27–55, Loon 21–44,
+  Sugarloaf 17–43, Stratton 14–40, Cranmore 14–24, Sunday River 21–23 in
+  2019-20 and 2025-26 only.
+- Season sums can differ from other aggregators (Killington 2023-24: 223″
+  here, 157″ on OnTheSnow); scores use the daily values, not season sums.
 
 ### How `ingest-obs` reads these sources (J12)
 
