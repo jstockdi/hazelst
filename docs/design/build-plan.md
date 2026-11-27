@@ -70,6 +70,7 @@ M6          J09 + J11 ─▶ J17 ─▶ J18 ─▶ J19 ─▶ J20 ─▶ J21
 M7                                                  J21 ─▶ J22
 M8                                                         J22 ─▶ J23
 M9                                                         J22 ─▶ J24, J25 (parallel with J23)
+M10                                                        J23 + J24 + J25 ─▶ J26
 ```
 
 After J03, the forecast track (J05–J09), the Claude track (J10), and the
@@ -145,13 +146,22 @@ accumulation empty state if J14 is not done.
 ### M9 — Elevation-aware ground truth
 
 J24 and J25 run in parallel with J23. Migration numbers are fixed: J23 0003,
-J25 0004. J26 (forecast points) is planned after an owner decision on the
-point rule.
+J25 0004.
 
 | Job | Name | Scope | Done when |
 |-----|------|-------|-----------|
 | J24 | `station-truth` | New source `sources/ghcn.py`: GHCN-Daily `SNOW` and `SNWD` from the NCEI Access Data Service (`https://www.ncei.noaa.gov/access/services/data/v1?dataset=daily-summaries&stations={ids}&dataTypes=SNOW,SNWD&startDate=…&endDate=…&format=json&units=standard`, no token). Stations: every GHCN station within 20 mi of a mountain's configured point with `SNOW` reported since 2024-01-20 (from `ghcnd-stations.txt` and `ghcnd-inventory.txt`), plus Mount Washington `USW00014755` for Loon, Cranmore, Sunday River, and Sugarloaf; the list is generated once and committed as `config/stations.json` (id, name, lat, lon, elev_ft, mountain, distance_mi). Rows go to `snow_report` per data-sources.md [GHCN-Daily stations](data-sources.md#ghcn-daily-stations). `season-backfill --sources ghcn` loads 2024-01-20 onward; `ingest-obs` fetches the last 10 days each run (co-op reports arrive late). Verification eligibility is unchanged (the existing 5 mi PNS / LSR rule, reported as `observed_source = 'ghcn'`); stations beyond 5 mi are context, not truth. `hazelst stations summary --season 2025` prints, per mountain, season snowfall per station sorted by elevation, next to the SnoCountry season total | `config/stations.json` committed; `snow_report` has GHCN rows with `elev_ft` for every listed station with data; rerun leaves counts unchanged; the summary prints for all 8 mountains; tests on saved fixtures |
 | J25 | `report-elevation` | Every point observation carries an elevation; data-model.md gains the column with the migration (the schema test compares them). `snow_report.elev_ft` for PNS / LSR rows comes from the Open-Meteo elevation API (`https://api.open-meteo.com/v1/elevation?latitude=…&longitude=…`, up to 100 points per call) at insert, and a one-off `hazelst elevations fill` fills existing rows. Migration 0004 adds `verification.observed_elev_ft INT`: the report's elevation for `pns` / `lsr`, the pixel-center elevation for `nohrsc` (looked up once per mountain and stored in `config/mountains.json` as `nohrsc_pixel_elev_ft`), NULL for `resort` / `snocountry` (measurement site unknown). `hazelst verify summary --by elevation` prints n, bias ratio, MAE, and hit rate per mountain per band (< 1,500 ft, 1,500–2,500 ft, > 2,500 ft, unknown). After merge: deploy, fill, re-run `forecast-verify` for 2024-01-20..2026-04-30 | No PNS / LSR row has NULL `elev_ft` (except failed lookups, counted); `observed_elev_ft` set on every `pns` / `lsr` / `nohrsc` verification row; the summary prints on frank |
+
+### M10 — Resort-reported truth
+
+Owner decision 2026-11-26 (decisions row 24): each mountain is scored only
+against its own resort's reported snow; every other source is still collected
+and informs, but never stands in for it.
+
+| Job | Name | Scope | Done when |
+|-----|------|-------|-----------|
+| J26 | `resort-truth` | `verify.observed()` returns only resort-reported snow: the live resort report (`resort`, `resort_llm` as today), else the `snocountry` row for the same obs_date (the same resort number, republished). No PNS / LSR / GHCN / NOHRSC value becomes `observed_in`; a day without a resort-reported value is `NO_OBS`. Migration 0005 adds `verification.context JSON`: every other source's value for the mountain-day (NOHRSC 24 h at the pixel; each PNS / LSR / GHCN report within 20 mi with place, `snow_in`, `elev_ft`, `distance_mi`), same day window as today; data-model.md gains the column in the same PR. `skill-learn` follows (it reads the scored truth). Accumulation: resort-reported values only; a day without one shows "no report"; the other sources appear beside it, labelled with source and elevation, never summed into it (update product/report-page.md). The `report-write` digest carries the context labelled as not resort-reported. Remove the NOHRSC accumulation fallback. After merge: deploy, re-run `forecast-verify` for 2024-01-20..2026-04-30 (and the `backfill` edition), `skill-learn` | Tests: observed() never returns a non-resort source; `context` filled per source; accumulation shows "no report" with context beside it. On frank: `verification.observed_source` over 2024-01-20..2026-04-30 is only `resort` / `resort_llm` / `snocountry`; `skill` rebuilt; today's page renders |
 
 ## Owner actions
 
