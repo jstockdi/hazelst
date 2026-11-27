@@ -52,6 +52,7 @@ Every job thread:
 | A resort page is blocked or has no parseable data | Disable that adapter; that mountain uses SnoCountry's copy of the resort number, else `NO_OBS` / "no report" (PNS / LSR / GHCN / NOHRSC stay context, decisions row 24); record in `data-sources.md` |
 | ECMWF 06Z not available by 8:45 | The 8:15 edition publishes with the 00Z run and says so in the footer |
 | Open-Meteo Historical Forecast lacks a model or season | Backfill the models and dates it has |
+| Open-Meteo Previous Runs lacks the 850 hPa variables for a model | Fit J27 ratios on summit temperature only for that model; record in `data-sources.md` |
 | No snow falls during J14 | "Done when" is met on fixtures; the live check is deferred to the first snow day and noted in the PR |
 | A dependency release is under two weeks old | Pin the previous release |
 
@@ -71,6 +72,7 @@ M7                                                  J21 ─▶ J22
 M8                                                         J22 ─▶ J23
 M9                                                         J22 ─▶ J24, J25 (parallel with J23)
 M10                                                        J23 + J24 + J25 ─▶ J26
+M11                                                        J26 ─▶ J27
 ```
 
 After J03, the forecast track (J05–J09), the Claude track (J10), and the
@@ -162,6 +164,19 @@ and informs, but never stands in for it.
 | Job | Name | Scope | Done when |
 |-----|------|-------|-----------|
 | J26 | `resort-truth` | `verify.observed()` returns only resort-reported snow: the live resort report (`resort`, `resort_llm` as today), else the `snocountry` row for the same obs_date (the same resort number, republished). No PNS / LSR / GHCN / NOHRSC value becomes `observed_in`; a day without a resort-reported value is `NO_OBS`. Migration 0005 adds `verification.context JSON`: every other source's value for the mountain-day (NOHRSC 24 h at the pixel; each PNS / LSR / GHCN report within 20 mi with place, `snow_in`, `elev_ft`, `distance_mi`), same day window as today; data-model.md gains the column in the same PR. `skill-learn` follows (it reads the scored truth). Accumulation: resort-reported values only; a day without one shows "no report"; the other sources appear beside it, labelled with source and elevation, never summed into it (update product/report-page.md). The `report-write` digest carries the context labelled as not resort-reported. Remove the NOHRSC accumulation fallback. After merge: deploy, re-run `forecast-verify` for 2024-01-20..2026-04-30 (and the `backfill` edition), `skill-learn` | Tests: observed() never returns a non-resort source; `context` filled per source; accumulation shows "no report" with context beside it. On frank: `verification.observed_source` over 2024-01-20..2026-04-30 is only `resort` / `resort_llm` / `snocountry`; `skill` rebuilt; today's page renders |
+
+### M11 — Resort snow ratio
+
+Owner decision 2026-11-26 (decisions row 26). On the backfill edition
+(2024-01-20..2026-04-30, 946 scored snow days) the model mean is 0.53 of the
+resort-reported snow. Open-Meteo converts snow water to snowfall at a fixed
+7:1 (0.7 cm per mm), while resort snow per inch of forecast snow water is
+11.2 overall and 9.2 (Sugarloaf) to 14.8 (Pico) by mountain, so the gap is
+mostly the snow ratio, not the water amount.
+
+| Job | Name | Scope | Done when |
+|-----|------|-------|-----------|
+| J27 | `resort-ratio` | New forecast method `resort_ratio`: each model's hourly summit snow water (`snowfall_in / 7`, which keeps the model's rain / snow split) times a ratio fitted for that resort, summed into days and windows like `raw_mean` (mean of models, min–max range, same stale rule). Ratio per mountain by summit 2 m temperature band (≤ 15 °F, 15–25 °F, 25–32 °F, > 32 °F), split by `nw_upslope` (forecast-method.md, Pattern tags) where a mountain has ≥ 15 snow days on each side; a band or split with fewer than 15 snow days uses the all-mountain value for that band. `storm_type` is not used (it comes from NWS discussions, which the backfill does not have). Fit: least squares of resort-reported 6 AM → 6 AM snow against forecast snow water on lead-day-1 snow days, per model and for the mean. Migration 0006 adds a `snow_ratio` table (mountain, model, temp band, upslope, ratio, n, fitted_through); data-model.md gains it in the same PR. `skill-learn` refits it nightly with the same D − 2 rule. `season-backfill` adds `temperature_850hPa`, `relative_humidity_850hPa`, `wind_speed_850hPa`, `wind_direction_850hPa` to the Previous Runs fetch so `nw_upslope` can be computed for backfilled days; re-run the backfill for 2024-01-20..2026-04-30. `report-build` stores `resort_ratio` windows and days; `forecast-verify` scores them beside `raw_mean` and each model (live editions and the `backfill` edition). Page: at a mountain where `resort_ratio` beats `raw_mean` (lower 1d MAE over the mountain's last 20 verified days, every edition where both were scored), the headline, range, chart, and table use `resort_ratio`, labelled "resort ratio"; elsewhere `raw_mean` stays. Update forecast-method.md (Snow amount) and product/report-page.md. New `hazelst ratio backtest --fit-to 2025-04-30 --test-from 2025-11-01`: fits on days through `--fit-to` only, scores 2025-26 lead-day-1 snow days against resort reports, and prints per mountain n, bias ratio, MAE, and hit rate for `raw_mean`, flat 10:1, `resort_ratio` on temperature only, `resort_ratio` with the upslope split, and `corrected`. After merge: deploy, backfill, `skill-learn`, `forecast-verify` for 2024-01-20..2026-04-30, then run the backtest on frank | Tests on fixtures: ratio fit, band fallback to the all-mountain value, `resort_ratio` days sum to its windows. On frank: `snow_ratio` filled for all 8 mountains; the backtest table printed with the 2025-26 numbers for every method; `verification` has `resort_ratio` rows; today's page renders and names the method used per mountain |
 
 ## Owner actions
 
