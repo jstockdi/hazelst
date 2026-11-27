@@ -426,42 +426,27 @@ def test_accumulation_chart_renders(snow_day: sqlite3.Connection) -> None:
     assert "Cranmore</text>" not in chart
     assert "Accumulation: resort reports, resort report pages read by Claude." in html
     assert (
-        "Beside it, not resort-reported: NWS snowfall reports, NWS local storm reports,"
+        "Not resort-reported, in the JSON only: NWS snowfall reports, NWS local storm reports,"
         " NOHRSC snowfall analysis." in html
     )
     assert "Verification, Fri 6 Feb (next 24 h, model mean" in html
     assert "Verification: none yet." not in html
 
 
-def test_accumulation_shows_no_report_with_context_beside_it(
-    snow_day: sqlite3.Connection,
-) -> None:
-    payload = _with_accumulation(snow_day, date(2026, 2, 7))
-    by_day = {m.name: m for m in page.accumulation_by_day(payload)}
-    cranmore = by_day["Cranmore"]
-    assert cranmore.summary == "no report"
-    feb6 = cranmore.days[-1]
-    assert (feb6.label, feb6.resort) == ("Fri 6", "no report")
-    assert feb6.context[0] == "NOHRSC 1\u2033 (pixel 1,063 ft)"
-    assert feb6.context[1].startswith("PNS ")
-    assert feb6.more == 4  # 7 point reports within 20 mi, 3 shown
-    killington = by_day["Killington"]
-    assert killington.summary == "3\u2033 resort-reported · 6 days no report"
-    assert killington.days[-1].resort == "3\u2033 resort"
-    assert killington.days[0].resort == "no report" and killington.days[0].context == []
-    html = page.render_report(payload)
-    assert "<h2>By day</h2>" in html
-    assert "NOHRSC 1″ (pixel 1,063 ft)" in html
-    assert "+4 more in the JSON" in html
-
-
-def test_context_label() -> None:
-    station = ContextReport(
-        source="ghcn", place="STOWE 2.1 SSE", snow_in=3.0, elev_ft=720, distance_mi=4.2, hours=24
+def test_timeline_past_is_resort_reported_only(snow_day: sqlite3.Connection) -> None:
+    payload = _with_accumulation(snow_day, date(2026, 2, 7)).model_copy(
+        update={"date": date(2026, 2, 7)}
     )
-    assert page.context_label(station) == "GHCN STOWE 2.1 SSE 3\u2033 (720 ft, 4.2 mi)"
-    spotter = ContextReport(source="lsr", place="Warren", snow_in=1.5, distance_mi=5.0)
-    assert page.context_label(spotter) == "LSR Warren 1.5\u2033 (elevation unknown, 5 mi)"
+    rows = {r.name: r for r in page.snow_timeline(payload).rows}
+    # Cranmore has NOHRSC and PNS context on Fri 6 but no resort number: no report.
+    feb6 = rows["Cranmore"].past[-1]
+    assert (feb6.kind, feb6.text, feb6.title) == ("nr", "\u2013", "Fri 6 · no resort report")
+    killington = rows["Killington"].past
+    assert killington[-1].text == "3\u2033"
+    assert killington[-1].title == "Fri 6 · resort reported 3\u2033 (resort)"
+    assert [c.kind for c in killington[:2]] == ["nr", "nr"]
+    html = page.render_report(payload)
+    assert "NOHRSC 1" not in html  # context stays in the JSON
 
 
 def test_accumulation_empty_without_resort_reports(snow_day: sqlite3.Connection) -> None:
@@ -472,7 +457,7 @@ def test_accumulation_empty_without_resort_reports(snow_day: sqlite3.Connection)
     assert state == "empty"
     assert text.startswith("No resort snow reports for the last 7 days")
     html = page.render_report(payload)
-    assert "<h2>By day</h2>" in html and "no report" in html
+    assert "no resort report" in html
 
 
 def test_accumulation_empty_without_observations(tmp_path: Path) -> None:

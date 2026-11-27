@@ -55,7 +55,7 @@ def test_today_falls_back_to_latest(db_path: Path) -> None:
     resp = client(db_path).get("/")
     assert resp.status_code == 200
     assert "Hazel St Forecast · 2026-11-26" in resp.text
-    assert "numbers only" in resp.text
+    assert "The written report is delayed." in resp.text
 
 
 def test_report_by_date_with_narrative(db_path: Path) -> None:
@@ -96,7 +96,7 @@ def test_new_version_replaces_cached_page(db_path: Path) -> None:
     insert(conn, payload, version=2, status="published", narrative=True)
     conn.close()
     html = c.get("/d/2026-11-26").text
-    assert "Best bet" in html and "8:15 AM edition" in html
+    assert "Best bet" in html and "<p>Thu 26 Nov 2026 · 8:15 AM</p>" in html
 
 
 def test_static_fonts_and_css(db_path: Path) -> None:

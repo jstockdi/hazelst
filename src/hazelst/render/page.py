@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import html
+import math
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -15,9 +16,7 @@ from markupsafe import Markup
 
 from hazelst.config import TIMEZONE
 from hazelst.models import (
-    AccumulationDay,
     BestBet,
-    ContextReport,
     MountainReport,
     Narrative,
     PrecipType,
@@ -29,14 +28,6 @@ from hazelst.render import charts
 MODEL_NAMES = {"gfs_seamless": "GFS", "ecmwf_ifs025": "ECMWF", "gem_seamless": "GEM"}
 OFFICE_NAMES = {"BTV": "Burlington", "ALY": "Albany", "GYX": "Gray"}
 EDITIONS = {"0700": "7:00 AM", "0815": "8:15 AM", "1440": "2:40 PM"}
-# Precip type at the summit -> (label, background, text color).
-TYPE_STYLE: dict[PrecipType, tuple[str, str, str]] = {
-    "snow": ("Snow", "#1a5c88", "#fff"),
-    "ice": ("Ice", "#7c3aed", "#fff"),
-    "rain": ("Rain", "#12806a", "#fff"),
-    "mix": ("Mix", "#c4b5fd", "#132534"),
-    "dry": ("—", "#eef4f8", "#5b7183"),
-}
 ACCUMULATION_MIN_IN = 0.5
 
 _env = Environment(
@@ -107,16 +98,12 @@ def clock(value: datetime) -> str:
     return f"{t.hour % 12 or 12}:{t:%M} {t:%p}"
 
 
-def issued_label(value: datetime, edition: str | None = None) -> str:
-    """ "Thu 26 Nov 2026 · 7:00 AM edition" (plus the issue time when it differs)."""
-    t = local(value)
-    day = f"{t:%a} {t.day} {t:%b %Y}"
-    label = EDITIONS.get(edition or "")
-    if label is None:
-        return f"{day} · {clock(value)}"
-    if label == clock(value):
-        return f"{day} · {label} edition"
-    return f"{day} · {label} edition, issued {clock(value)}"
+def edition_label(payload: ReportPayload) -> str:
+    """ "Thu 26 Nov 2026 · 7:00 AM": the report date and its edition (the issue time
+    when the payload has no edition)."""
+    d = payload.date
+    edition = EDITIONS.get(payload.edition or "") or clock(payload.issued)
+    return f"{d:%a} {d.day} {d:%b %Y} · {edition}"
 
 
 def run_label(model: str, issued: datetime | None) -> str:
@@ -136,31 +123,6 @@ def numbers_only_headline(payload: ReportPayload) -> str:
     best = top[0]
     total = best.forecast.windows["5d"].snow_in
     return f"Most snow in the next 5 days: {best.name}, {charts.num(total)}″ at the summit."
-
-
-@dataclass(frozen=True)
-class TypeCell:
-    label: str
-    background: str
-    color: str
-    liquid: str
-    wind: bool
-
-
-def type_cells(m: MountainReport) -> list[TypeCell]:
-    cells = []
-    for day in m.forecast.days:
-        label, background, color = TYPE_STYLE[day.precip_type]
-        cells.append(
-            TypeCell(
-                label=label,
-                background=background,
-                color=color,
-                liquid="" if day.precip_type == "dry" else f"{day.precip_in:.2f}″",
-                wind=any(t.startswith("wind_hold") for t in day.tags),
-            )
-        )
-    return cells
 
 
 def _resort_rows(payload: ReportPayload) -> list[MountainReport]:
@@ -195,9 +157,7 @@ CONTEXT_SOURCE_NAMES = {
     "ghcn": "GHCN-Daily stations",
     "nohrsc": "NOHRSC snowfall analysis",
 }
-CONTEXT_LABELS = {"nohrsc": "NOHRSC", "pns": "PNS", "lsr": "LSR", "ghcn": "GHCN"}
 RESORT_LABELS = {"resort": "resort", "resort_llm": "resort page", "snocountry": "SnoCountry"}
-CONTEXT_SHOWN = 3  # point reports shown per day on the page (all are in the JSON)
 NO_REPORT = "no report"
 RESULT_WORDS = (("HIT", "HIT"), ("MISS", "MISS"), ("NO_OBS", NO_REPORT))
 
@@ -218,75 +178,6 @@ def context_sources(payload: ReportPayload) -> list[str]:
         for c in d.context
     }
     return [name for key, name in CONTEXT_SOURCE_NAMES.items() if key in used]
-
-
-def context_label(c: ContextReport) -> str:
-    """ "GHCN Stowe 2.1 SSE 3″ (720 ft, 4.2 mi)"; NOHRSC: "NOHRSC 2.1″ (pixel 2,150 ft)"."""
-    name = CONTEXT_LABELS.get(c.source, c.source.upper())
-    amount = f"{charts.num(c.snow_in)}\u2033"
-    if c.source == "nohrsc":
-        where = f" (pixel {c.elev_ft:,} ft)" if c.elev_ft is not None else ""
-        return f"{name} {amount}{where}"
-    detail = [f"{c.elev_ft:,} ft" if c.elev_ft is not None else "elevation unknown"]
-    if c.distance_mi is not None:
-        detail.append(f"{charts.num(c.distance_mi)} mi")
-    return f"{name} {c.place} {amount} ({', '.join(detail)})"
-
-
-def context_shown(day: AccumulationDay) -> tuple[list[str], int]:
-    """Labels for the page: NOHRSC, then the highest point reports; and how many are left out."""
-    grid = [c for c in day.context if c.source == "nohrsc"]
-    points = sorted(
-        (c for c in day.context if c.source != "nohrsc"),
-        key=lambda c: (c.elev_ft is None, -(c.elev_ft or 0), c.distance_mi or 0),
-    )
-    shown = [*grid, *points[:CONTEXT_SHOWN]]
-    return [context_label(c) for c in shown], max(len(points) - CONTEXT_SHOWN, 0)
-
-
-@dataclass(frozen=True)
-class AccumulationDayRow:
-    label: str  # "Sat 7"
-    resort: str  # "3″ resort" | "no report"
-    context: list[str]
-    more: int
-
-
-@dataclass(frozen=True)
-class AccumulationByDay:
-    name: str
-    summary: str  # "3″ resort-reported in 7 days · 6 days no report"
-    days: list[AccumulationDayRow]
-
-
-def accumulation_by_day(payload: ReportPayload) -> list[AccumulationByDay]:
-    """Per mountain, each day's resort number ("no report" without one) and the context."""
-    out: list[AccumulationByDay] = []
-    for m in payload.mountains:
-        acc = m.accumulation
-        if acc is None or not acc.days:
-            continue
-        rows = []
-        for d in acc.days:
-            if d.snow_in is None:
-                resort = NO_REPORT
-            else:
-                resort = (
-                    f"{charts.num(d.snow_in)}\u2033 {RESORT_LABELS.get(d.source or '', d.source)}"
-                )
-            labels, more = context_shown(d)
-            rows.append(AccumulationDayRow(f"{d.date:%a} {d.date.day}", resort, labels, more))
-        reported = [d.snow_in for d in acc.days if d.snow_in is not None]
-        missing = len(acc.days) - len(reported)
-        parts = [
-            f"{charts.num(round(sum(reported), 1))}\u2033 resort-reported"
-            if reported
-            else NO_REPORT
-        ]
-        if reported and missing:
-            parts.append(f"{missing} {'day' if missing == 1 else 'days'} no report")
-        out.append(AccumulationByDay(m.name, " · ".join(parts), rows))
-    return out
 
 
 def verification_counts(summary: VerificationSummary) -> str:
@@ -325,6 +216,155 @@ def cautions(payload: ReportPayload) -> list[str]:
     return lines
 
 
+# --- snow timeline ---------------------------------------------------------------------
+
+TIMELINE_PAST_DAYS = 3  # resort-reported days left of the now rule
+TIMELINE_DAYS = 4  # forecast days right of it, from 6 AM on the report date
+# Palette D, one scale for reported and forecast cells: (upper bound in inches,
+# background, text color). Bins take the amount as shown.
+SNOW_BINS: tuple[tuple[float, str, str], ...] = (
+    (ACCUMULATION_MIN_IN, "#ffffff", "#8a9cab"),
+    (1, "#f3f8c9", "#132534"),
+    (3, "#c7e9b4", "#132534"),
+    (6, "#7fcdbb", "#132534"),
+    (12, "#2c7fb8", "#ffffff"),
+    (math.inf, "#253494", "#ffffff"),
+)
+# Precip-type words on forecast cells; on the two dark bins the word takes the text color.
+WET_COLORS: dict[PrecipType, str] = {"rain": "#12806a", "ice": "#7c3aed", "mix": "#a21caf"}
+WHITE_TEXT = "#ffffff"
+
+
+def _half_up(value: float, places: int = 0) -> float:
+    scale: float = 10.0**places
+    return math.floor(value * scale + 0.5 + 1e-9) / scale
+
+
+def shown_snow(value: float) -> float:
+    """The amount as the timeline shows it: tenths below 1″, whole inches from 1″ up.
+
+    Tenths are taken first, so 0.97 shows as 1″ (not ".9″" or "1.0″")."""
+    tenths = _half_up(value, 1)
+    return _half_up(value) if tenths >= 1 else tenths
+
+
+def snow_text(value: float) -> str:
+    """3.4 -> "3″", 0.97 -> "1″", 0.6 -> ".6″", 0 -> "0″"."""
+    shown = shown_snow(value)
+    if shown >= 1:
+        return f"{shown:.0f}″"
+    return f".{round(shown * 10)}″" if shown > 0 else "0″"
+
+
+def snow_bin(value: float) -> tuple[str, str]:
+    """(background, text color) for an amount, binned on the amount as shown."""
+    shown = shown_snow(value)
+    for top, background, color in SNOW_BINS:
+        if shown < top:
+            return background, color
+    raise AssertionError("the last bin is unbounded")
+
+
+@dataclass(frozen=True)
+class TimelineCell:
+    kind: str  # "past" | "fut" | "nr" (no resort report)
+    text: str  # "3″", ".6″", "0", "·", an en dash (no report), or "" for a type word only
+    word: str  # "rain" | "ice" | "mix" | ""
+    background: str
+    color: str
+    word_color: str
+    title: str
+
+
+@dataclass(frozen=True)
+class TimelineRow:
+    name: str
+    is_open: bool
+    past: list[TimelineCell]
+    days: list[TimelineCell]
+
+
+@dataclass(frozen=True)
+class Timeline:
+    past_days: list[tuple[str, str]]  # ("Wed", "25")
+    days: list[tuple[str, str]]
+    rows: list[TimelineRow]
+
+
+def _day_parts(day: date) -> tuple[str, str]:
+    return f"{day:%a}", str(day.day)
+
+
+def _past_cell(day: date, snow_in: float | None, source: str | None) -> TimelineCell:
+    label = f"{day:%a} {day.day}"
+    if snow_in is None:
+        return TimelineCell("nr", "\u2013", "", "", "", "", f"{label} · no resort report")
+    via = RESORT_LABELS.get(source or "", source or "")
+    title = f"{label} · resort reported {charts.num(snow_in)}″" + (f" ({via})" if via else "")
+    background, color = snow_bin(snow_in)
+    text = snow_text(snow_in) if shown_snow(snow_in) > 0 else "0"
+    return TimelineCell("past", text, "", background, color, color, title)
+
+
+def _forecast_cell(m: MountainReport, index: int) -> TimelineCell:
+    day = m.forecast.days[index]
+    wet = day.precip_type in WET_COLORS
+    parts = [day.label, f"{charts.num(round(day.snow_in, 1))}″ snow"]
+    if wet:
+        parts.append(day.precip_type)
+    parts.append(f"{day.precip_in:.2f}″ liquid")
+    if day.hi_f is not None:
+        parts.append(f"high {day.hi_f}°F")
+    if day.gust_mph is not None:
+        parts.append(f"gusts {day.gust_mph} mph")
+    if "wind_hold_likely" in day.tags:
+        parts.append("lift holds likely on wind")
+    if index == 0 and m.forecast.day1_method:
+        parts.append(f"day 1: {METHOD_LABELS.get(m.forecast.day1_method, m.forecast.day1_method)}")
+    title = " · ".join(parts)
+    background, color = snow_bin(day.snow_in)
+    word = day.precip_type if wet else ""
+    word_color = color if color == WHITE_TEXT else WET_COLORS.get(day.precip_type, color)
+    if shown_snow(day.snow_in) < ACCUMULATION_MIN_IN:
+        if wet:
+            return TimelineCell("fut", "", word, background, color, word_color, title)
+        return TimelineCell("fut", "·", "", background, color, color, title)
+    return TimelineCell("fut", snow_text(day.snow_in), word, background, color, word_color, title)
+
+
+def _past(m: MountainReport, days: Sequence[date]) -> list[tuple[float | None, str | None]]:
+    by_date = {d.date: d for d in m.accumulation.days} if m.accumulation else {}
+    return [(by_date[d].snow_in, by_date[d].source) if d in by_date else (None, None) for d in days]
+
+
+def snow_timeline(payload: ReportPayload) -> Timeline:
+    """One row per mountain: the last 3 resort-reported days, then 4 forecast days.
+
+    Rows sort by forecast snow over the 4 days; ties keep roster order."""
+    past_dates = [payload.date - timedelta(days=n) for n in range(TIMELINE_PAST_DAYS, 0, -1)]
+    ordered = sorted(
+        payload.mountains,
+        key=lambda m: -sum(d.snow_in for d in m.forecast.days[:TIMELINE_DAYS]),
+    )
+    rows = [
+        TimelineRow(
+            name=m.name,
+            is_open=m.is_open,
+            past=[
+                _past_cell(d, v, s)
+                for d, (v, s) in zip(past_dates, _past(m, past_dates), strict=True)
+            ],
+            days=[_forecast_cell(m, i) for i in range(min(TIMELINE_DAYS, len(m.forecast.days)))],
+        )
+        for m in ordered
+    ]
+    return Timeline(
+        past_days=[_day_parts(d) for d in past_dates],
+        days=[(day.split(" ")[0], day.split(" ")[-1]) for day in payload.days[:TIMELINE_DAYS]],
+        rows=rows,
+    )
+
+
 # --- pages -----------------------------------------------------------------------------
 
 
@@ -340,10 +380,9 @@ def render_report(payload: ReportPayload, narrative: Narrative | None = None) ->
         "narrative": narrative,
         "headline": narrative.headline if narrative else numbers_only_headline(payload),
         "body": md_to_html(narrative.body_md) if narrative else Markup(""),
-        "issued": issued_label(payload.issued, payload.edition),
+        "edition": edition_label(payload),
         "rows": rows,
-        "types": [(m, type_cells(m)) for m in rows],
-        "forecast_chart": charts.forecast_chart(rows, payload.days),
+        "timeline": snow_timeline(payload),
         "accumulation_state": state,
         "accumulation_empty": empty_text,
         "accumulation_chart": charts.accumulation_chart(accumulation_rows)
@@ -352,7 +391,6 @@ def render_report(payload: ReportPayload, narrative: Narrative | None = None) ->
         "cautions": cautions(payload),
         "accumulation_sources": accumulation_sources(payload),
         "context_sources": context_sources(payload),
-        "accumulation_days": accumulation_by_day(payload),
         "verification": verification_line(payload),
         "runs": [(run_label(r.model, r.issued_at), r.stale) for r in payload.models],
         "offices": [f"{OFFICE_NAMES.get(o, o)}" for o in payload.discussions],
