@@ -47,6 +47,7 @@ from zoneinfo import ZoneInfo
 
 from hazelst.config import TIMEZONE, Mountain
 from hazelst.models import Accumulation, AccumulationDay, ContextReport, VerificationSummary
+from hazelst.sources.open_meteo import is_fine
 from hazelst.sources.snow_report import distance_mi
 
 Result = Literal["HIT", "MISS", "NO_OBS"]
@@ -320,8 +321,9 @@ def backfill_forecasts(
     extra: Mapping[tuple[str, date], Mapping[str, float]] | None = None,
 ) -> dict[date, list[EditionForecast]]:
     """Edition `backfill` for days `start`..`end`: each model's lead-day-1 summit forecast
-    from `forecast_hourly` (a season backfill's Previous Runs, or any stored run), and
-    their mean as `raw_mean`. Used only for days with no stored report edition.
+    from `forecast_hourly` (a season backfill's Previous Runs and Historical Forecast, or
+    any stored run), and the global models' mean as `raw_mean`. Used only for days with
+    no stored report edition.
     `extra` adds other methods per (mountain, day), such as `resort_ratio`."""
     from hazelst.learn import model_forecasts  # learn imports this module
 
@@ -331,20 +333,24 @@ def backfill_forecasts(
             by_day.setdefault(day, {}).setdefault(mountain, {})[model] = round(snow_in, 2)
     out: dict[date, list[EditionForecast]] = {}
     for day, mountains in sorted(by_day.items()):
-        out[day] = [
-            EditionForecast(
-                BACKFILL_EDITION,
-                0,
-                mountain,
-                {
-                    **models,
-                    RAW_MEAN: round(sum(models.values()) / len(models), 2),
-                    **(extra or {}).get((mountain, day), {}),
-                },
-                [],
+        out[day] = []
+        for mountain, models in sorted(mountains.items()):
+            # The model mean is the global models'; the finer models are scored by name.
+            global_values = [v for m, v in models.items() if not is_fine(m)]
+            mean = (
+                {RAW_MEAN: round(sum(global_values) / len(global_values), 2)}
+                if global_values
+                else {}
             )
-            for mountain, models in sorted(mountains.items())
-        ]
+            out[day].append(
+                EditionForecast(
+                    BACKFILL_EDITION,
+                    0,
+                    mountain,
+                    {**models, **mean, **(extra or {}).get((mountain, day), {})},
+                    [],
+                )
+            )
     return out
 
 

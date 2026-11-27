@@ -90,6 +90,7 @@ class DigestMountain(_Model):
     favored_by: list[str] = Field(default_factory=list)
     windows: dict[WindowKey, DigestWindow]
     forecast_method: Literal["raw_mean", "resort_ratio"] = "raw_mean"
+    day1_method: str | None = None  # a finer-model candidate behind day 1, when chosen
     days: list[DigestDay]
     storm_type: StormType | None = None
     alerts: list[DigestAlert] = Field(default_factory=list)
@@ -190,6 +191,7 @@ def from_payload(
                 for key, w in m.forecast.windows.items()
             },
             forecast_method=m.forecast.method,
+            day1_method=m.forecast.day1_method,
             days=[
                 DigestDay(
                     date=d.date,

@@ -293,6 +293,11 @@ def _cmd_season_backfill(args: argparse.Namespace) -> int:
             code = 1
         chunks.append(summary)
         print(json.dumps(summary, default=str), flush=True)
+        if any(isinstance(v, dict) and v.get("rate_limited") for v in summary.values()):
+            # Open-Meteo answered HTTP 429: stop here; a rerun resumes from this month.
+            print(f"stopped at {first}: HTTP 429 (rate limited); rerun to resume", flush=True)
+            code = 1
+            break
     learned = None
     if not args.no_learn:
         learned = jobs.run_job(cfg, "skill-learn", lock_timeout_s=args.lock_wait)
@@ -491,15 +496,30 @@ def _cmd_ratio_backtest(args: argparse.Namespace) -> int:
     print(
         "methods: raw_mean = Open-Meteo snowfall (7:1), models' mean; flat_10 = snow water x 10;"
         " ratio_temp = resort_ratio by temperature band; ratio_upslope = resort_ratio with the"
-        " nw_upslope split; corrected = bias-scaled models blended by 1 / MAE"
+        " nw_upslope split; corrected = bias-scaled models blended by 1 / MAE;"
+        " <model>_ratio = one finer model's snow water x its own ratio (Historical Forecast,"
+        " short lead); fine_ratio = their mean; nbm_raw = NBM native snowfall"
     )
+    fallback = {m: n for m, n in result.fine_fallback_days.items() if n}
+    if fallback:
+        print(f"finer-model test days without a value (raw mean used): {fallback}")
+    print("finer-model fit days (own all-band cell, n; * = under 15, left out of method choose)")
+    models = [m for m in ratio.FINE_SHORT if any(k[1] == m for k in result.fine_fit_days)]
+    print(f"{'mountain':<14} " + " ".join(f"{ratio.FINE_SHORT[m]:>6}" for m in models))
+    for mountain in sorted({k for k, _ in result.fine_fit_days}):
+        cells = []
+        for model in models:
+            n = result.fine_fit_days[(mountain, model)]
+            cells.append(f"{n:>5}{'*' if n < ratio.MIN_DAYS else ' '}")
+        print(f"{mountain:<14} " + " ".join(cells))
     header = f"{'mountain':<14} {'method':<14} {'n':>5} {'bias':>6} {'mae_in':>7} {'hit':>5}"
     print(header)
     print("-" * len(header))
     for c in result.cells:
+        thin = c.method in result.thin.get(c.mountain, ())
         print(
             f"{c.mountain:<14} {c.method:<14} {c.n:>5} {_fmt(c.bias_ratio, '.2f'):>6}"
-            f" {c.mae_in:>7.2f} {c.hit_rate:>5.2f}"
+            f" {c.mae_in:>7.2f} {c.hit_rate:>5.2f}{'  thin fit' if thin else ''}"
         )
     if not result.cells:
         print("(no test days)")
@@ -508,7 +528,7 @@ def _cmd_ratio_backtest(args: argparse.Namespace) -> int:
 
 def _cmd_method_choose(args: argparse.Namespace) -> int:
     """Choose each mountain's method (held-out season, or live days) and write `method_gate`."""
-    from hazelst import method
+    from hazelst import method, ratio
 
     cfg = config.load()
     as_of = args.date or jobs.today(cfg)
@@ -534,10 +554,11 @@ def _cmd_method_choose(args: argparse.Namespace) -> int:
     print(header)
     print("-" * len(header))
     for r in rows:
+        mark = ("day 1" if r.method in ratio.FINE_METHODS else "yes") if r.chosen else ""
         print(
             f"{r.mountain:<14} {r.method:<14} {r.test_from or '-'!s:<10}"
             f" {r.test_to or '-'!s:<10} {r.n:>4} {_fmt(r.mae_in, '.3f'):>7}"
-            f" {_fmt(r.raw_mean_mae_in, '.3f'):>7} {'yes' if r.chosen else '':>6}"
+            f" {_fmt(r.raw_mean_mae_in, '.3f'):>7} {mark:>6}"
         )
     print("(dry run: method_gate unchanged)" if args.dry_run else "method_gate written")
     return 0
@@ -785,9 +806,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_backfill = sub.add_parser(
         "season-backfill",
-        help="load a past range (Previous Runs, IEM LSR / PNS, NOHRSC, SnoCountry,"
-        " GHCN-Daily),"
-        " then rebuild skill",
+        help="load a past range (Previous Runs, Historical Forecast for the finer models,"
+        " IEM LSR / PNS, NOHRSC, SnoCountry, GHCN-Daily), then rebuild skill",
     )
     p_backfill.add_argument("--from", dest="start", type=date.fromisoformat, required=True)
     p_backfill.add_argument("--to", type=date.fromisoformat, required=True)
@@ -795,8 +815,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--sources",
         "--steps",
         dest="steps",
-        help="comma-separated subset of previous_runs,lsr,pns,nohrsc,snocountry,ghcn"
-        " (default: all)",
+        help="comma-separated subset of previous_runs,historical_forecast,lsr,pns,nohrsc,"
+        "snocountry,ghcn (default: all)",
     )
     p_backfill.add_argument("--no-learn", action="store_true", help="skip the skill-learn run")
     p_backfill.add_argument(

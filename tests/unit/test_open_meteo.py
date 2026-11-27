@@ -154,7 +154,48 @@ def test_ingest_forecast_fills_forecast_hourly(
     sources = conn.execute(
         "SELECT source, count(*) FROM fetch WHERE source LIKE 'open_meteo%' GROUP BY source"
     ).fetchall()
-    assert dict((r[0], r[1]) for r in sources) == {"open_meteo": 2, "open_meteo_meta": 4}
+    # The finer models' call and their meta.json files 404 in these fixtures (recorded
+    # before J29): stored, reported, and not fatal.
+    assert dict((r[0], r[1]) for r in sources) == {"open_meteo": 4, "open_meteo_meta": 8}
+    assert summary["open_meteo"]["fine_forecast_hourly"] == 0
+    assert summary["open_meteo"]["fine_errors"] == ["summit: HTTP 404", "base: HTTP 404"]
+
+
+FINE_DAY = FIXTURES / "open_meteo" / "2026-11-27"
+
+
+def test_fine_models_are_one_call_per_elevation() -> None:
+    mountains = config.load_mountains(config.DEFAULT_MOUNTAINS)
+    recorded = load_fixtures(FINE_DAY)
+    summit = by_label(recorded, "forecast-summit-fine")
+    assert summit.params == open_meteo.fine_params(mountains, "summit")
+    assert summit.params["models"].split(",") == list(open_meteo.FINE_MODELS)
+    assert open_meteo.is_fine_fetch(summit)
+    assert not open_meteo.is_fine_fetch(by_label(recorded, "forecast-summit"))
+    runs = open_meteo.run_times(f for f in recorded if f.source == open_meteo.META_SOURCE)
+    assert set(runs) == set(open_meteo.MODELS) | set(open_meteo.FINE_MODELS)
+    rows = open_meteo.normalize(summit, runs)
+    assert {r.model for r in rows} == set(open_meteo.FINE_MODELS)
+    hrrr = [r for r in rows if r.model == "ncep_hrrr_conus" and r.mountain == "killington"]
+    assert hrrr[0].issued_at == "2026-11-27T10:00:00+00:00"  # hourly cycle
+    # HRRR and HRDPS end within two days of the run; the others cover the call's 4 days.
+    assert max(r.lead_h or 0 for r in hrrr) < 48
+    assert all(r.snowfall_in is not None and r.temp_f is not None for r in rows)
+    assert all(r.t850_f is None and r.gust_mph is None for r in rows)  # not requested
+
+
+def test_ingest_forecast_stores_the_fine_models(tmp_path: Path) -> None:
+    cfg = config.load({"HAZELST_DB": str(tmp_path / "h.db")})
+    summary = jobs.run_job(cfg, "ingest-forecast", client=replay_client(load_fixtures(FINE_DAY)))
+    assert summary["open_meteo"]["status"] == "ok"
+    assert summary["open_meteo"]["fine_forecast_hourly"] > 0
+    assert "fine_errors" not in summary["open_meteo"]
+    conn = db.connect(cfg.settings.db_path)
+    models = {
+        r[0]
+        for r in conn.execute("SELECT DISTINCT model FROM forecast_hourly WHERE elevation = 'base'")
+    }
+    assert models == set(open_meteo.MODELS) | set(open_meteo.FINE_MODELS)
 
 
 def test_ingest_forecast_fails_when_open_meteo_is_down(tmp_path: Path) -> None:

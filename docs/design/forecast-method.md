@@ -98,9 +98,10 @@ Each mountain's headline method is chosen on held-out evidence (decisions
 rows 28–29; `method.py`), stored in `method_gate`, and read by `report-build`:
 
 - **Candidates**: `raw_mean` and each method `report-build` stores in
-  `forecast_window` that the held-out test scores (today `resort_ratio` and
-  `corrected`). The list is read from the data, so a method J29 stores and
-  scores joins without code changes to the rule.
+  `forecast_window` that the held-out test scores (`resort_ratio` and
+  `corrected`), plus the finer-model day-1 candidates (J29, below) whether or
+  not a report has stored them yet; a finer candidate with fewer than 15 fit
+  days at a mountain is left out there.
 - **Held-out season**: seasons run Nov 1 – Apr 30. The test season is the
   newest one that ended before the decision date; the fit uses every day
   through the Apr 30 before it. Scoring is `ratio backtest`'s: the same
@@ -116,11 +117,62 @@ rows 28–29; `method.py`), stored in `method_gate`, and read by `report-build`:
   below `raw_mean`'s and lowest among the headline candidates; a tie for
   lowest keeps `raw_mean`. `corrected` never becomes the headline (see
   [Corrected value](#corrected-value-learned)); its row is chosen when its
-  MAE is at least 0.05″ below `raw_mean`'s.
+  MAE is at least 0.05″ below `raw_mean`'s. When the winner is a finer-model
+  candidate, it is chosen for day 1 only, and the same rule over the global
+  candidates alone picks the method for the windows and days 2–5; both rows
+  are chosen (decisions row 30).
 - **When**: `hazelst method choose [--date D] [--dry-run]` prints the
   table and writes `method_gate`; `skill-learn` re-runs the choice nightly
   after refitting `snow_ratio`. Without a `method_gate` row a mountain
   uses `raw_mean` and shows no corrected value.
+
+### Finer models for day 1 (J29)
+
+The global models (13–25 km) leave `resort_ratio` about 25% low against
+resort reports (held-out 2025-26: bias 0.75). Five finer models compete for
+day 1 (decisions row 30; data-sources.md, "Finer models (J29)"):
+ECMWF IFS HRES 9 km (`ecmwf_ifs`), HRRR CONUS 3 km (`ncep_hrrr_conus`), HRDPS
+Continental 2.5 km (`gem_hrdps_continental`), NBM CONUS (`ncep_nbm_conus`,
+native snowfall), and AIFS (`ecmwf_aifs025_single`).
+
+- **Collected** every `ingest-forecast` run at summit and base, and
+  backfilled from the Historical Forecast API (summit). They never enter the
+  model mean, its range, the tags, or `resort_ratio`; those stay on the three
+  global models.
+- **Ratios**: each finer model gets its own `snow_ratio` cells, fitted as
+  `resort_ratio`'s (same bands, upslope split, fallbacks). Snow water is
+  `snowfall_in / 7` for every model; for NBM, whose `snowfall` is native
+  rather than 7:1, that quantity is a scaled snowfall and its ratio a scale
+  factor on it, which works the same way.
+- **Day-1 candidates** (`ratio.fine_values`), all lead day 1:
+  - `ifs9_ratio`, `hrrr_ratio`, `hrdps_ratio`, `nbm_ratio`, `aifs_ratio`:
+    one model's snow water by band × its own resolved ratio;
+  - `fine_ratio`: the mean of those over the models with ≥ 15 fit days at the
+    mountain (all of them when none has);
+  - `nbm_raw`: NBM's native snowfall, as is.
+  
+  A candidate whose model has fewer than 15 fit days at a mountain (its own
+  all-band cell) is reported and left out of `method choose` for that
+  mountain (`nbm_raw` with NBM; `fine_ratio` unless at least two finer
+  models have enough fit days, since a mean of one model repeats it).
+- **Live**: a model counts when its run is at most 18 h old and it covers at
+  least 23 hours of day 1. `report-build` stores each candidate as a 1d
+  `forecast_window` row (method = the candidate name), and `forecast-verify`
+  scores it.
+- **Where it shows**: where `method_gate` chose a finer-model candidate for a
+  mountain, day 1 and the 1d window take its value, and the 3d and 5d windows
+  shift by the same difference, so the chart and the table still agree. Days
+  2–5 stay on the mountain's global method (HRRR and HRDPS end 18–48 h after
+  their run). The 1d range is the finer models' spread for `fine_ratio`, the
+  value itself for a single model. The table names the day-1 method beneath
+  the mountain ("day 1: HRRR ratio").
+- **Backtest**: `ratio backtest` prints every candidate beside the global
+  methods on the same days, the fit days per finer model and mountain, and
+  the thin candidates. A test day without a candidate's value scores the raw
+  mean for it; the fallback count is printed. The backfilled finer-model
+  series is the Historical Forecast's stitched short-lead output, while the
+  global models' backfill is Previous Runs `previous_day1` (lead 24–48 h), so
+  the backtest favors the finer models by lead time (decisions row 30).
 
 ## Corrected value (learned)
 

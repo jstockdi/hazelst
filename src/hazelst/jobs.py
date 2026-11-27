@@ -28,6 +28,7 @@ from hazelst import (
     db,
     derive,
     digest,
+    fine,
     knowledge,
     learn,
     method,
@@ -101,19 +102,36 @@ def ingest_open_meteo(ctx: JobContext) -> dict[str, Any]:
     """Fetch summit and base forecasts plus model run times; store raw and normalized rows."""
     fetched = open_meteo.fetch(ctx.client, ctx.cfg.mountains)
     for f in fetched:
-        if f.source == open_meteo.SOURCE and f.http_status != 200:
+        if (
+            f.source == open_meteo.SOURCE
+            and f.http_status != 200
+            and not open_meteo.is_fine_fetch(f)
+        ):
             raise JobError(f"open_meteo {f.meta.get('elevation')}: HTTP {f.http_status}")
     metas = [f for f in fetched if f.source == open_meteo.META_SOURCE]
     runs = open_meteo.run_times(metas)
-    rows = 0
+    rows = fine_rows = 0
+    fine_errors: list[str] = []
     with db.transaction(ctx.conn):
         for f in fetched:
             fetch_id = base.store_fetch(ctx.conn, ctx.run_id, f)
-            if f.source == open_meteo.SOURCE:
+            if f.source != open_meteo.SOURCE:
+                continue
+            if not open_meteo.is_fine_fetch(f):
                 rows += open_meteo.store(ctx.conn, fetch_id, open_meteo.normalize(f, runs))
+                continue
+            # The finer models compete for day 1 only: a failure leaves the global forecast.
+            try:
+                if f.http_status != 200:
+                    raise open_meteo.NormalizeError(f"HTTP {f.http_status}")
+                fine_rows += open_meteo.store(ctx.conn, fetch_id, open_meteo.normalize(f, runs))
+            except (open_meteo.NormalizeError, KeyError, ValueError) as exc:
+                fine_errors.append(f"{f.meta.get('elevation')}: {exc}")
     return {
         "fetches": len(fetched),
         "forecast_hourly": rows,
+        "fine_forecast_hourly": fine_rows,
+        **({"fine_errors": fine_errors} if fine_errors else {}),
         "runs": {
             model: {
                 "issued_at": open_meteo.isoformat(run.initialised_at),
@@ -661,11 +679,15 @@ def build_report(ctx: JobContext, kind: str) -> None:
         raise JobError(f"ingest run {ingest_run} has no forecast rows")
     raw = derive.derive(ctx.cfg.mountains, inputs, for_date=ctx.for_date, as_of=now)
     corrections = corrected.correct(raw, corrected.load_cells(ctx.conn))
-    ratio_forecasts = ratio.compute(raw, inputs.hourly, ratio.Ratios.load(ctx.conn))
+    ratios = ratio.Ratios.load(ctx.conn)
+    ratio_forecasts = ratio.compute(raw, inputs.hourly, ratios)
     choice = method.load(ctx.conn)
     passed = [m for m in choice.shows(corrected.METHOD) if m in corrections]
     ratio_passed = [m for m in choice.uses(ratio.METHOD) if m in ratio_forecasts]
     forecast = ratio.apply(corrected.apply(raw, corrections, passed), ratio_forecasts, ratio_passed)
+    fine_days = fine.compute(raw, inputs.hourly, ratios)
+    day1_chosen = {m: d for m, d in choice.day1.items() if m in fine_days}
+    forecast = fine.apply(forecast, fine_days, day1_chosen)
     notes: list[str] = []
     ingested = datetime.fromisoformat(started[0])
     if now - ingested > STALE_INGEST:
@@ -704,6 +726,7 @@ def build_report(ctx: JobContext, kind: str) -> None:
         derive.store(ctx.conn, ctx.run_id, raw)
         corrected.store(ctx.conn, ctx.run_id, raw, corrections)
         ratio.store_rows(ctx.conn, ctx.run_id, raw, ratio_forecasts)
+        fine.store_rows(ctx.conn, ctx.run_id, raw, fine_days)
         version = ctx.conn.execute(
             "SELECT coalesce(max(version), 0) + 1 FROM report WHERE for_date = ?",
             (ctx.for_date.isoformat(),),
@@ -735,6 +758,7 @@ def build_report(ctx: JobContext, kind: str) -> None:
             "notes": notes,
             "corrected": {"mountains": sorted(corrections), "shown": sorted(passed)},
             "resort_ratio": {"mountains": sorted(ratio_forecasts), "shown": sorted(ratio_passed)},
+            "fine": {"mountains": sorted(fine_days), "day1": day1_chosen},
         }
     )
     log_event(run_id=ctx.run_id, step=kind, edition=edition, version=version, status=status)

@@ -7,6 +7,12 @@ For report days `start`..`end` (local dates):
   `fetch`, `forecast_hourly` (`issued_at` NULL, `lead_h` = 24 x (N - 1)). A
   new fetch for a lead day replaces the rows of earlier fetches for the same
   hours (a re-run after the query changed).
+- `historical_forecast`: Open-Meteo Historical Forecast, the finer models at
+  summit (one request per model, from each model's first archived day) ->
+  `fetch`, `forecast_hourly` (`issued_at` NULL, nominal `lead_h` 0: the
+  stitched short-lead series stands in for day 1, decisions row 30).
+  Requests are sent `REQUEST_INTERVAL_S` apart, and an HTTP 429 stops the
+  step and the CLI's remaining months (`rate_limited`); a rerun resumes.
 - `lsr`: IEM Local Storm Reports for the days and the morning after ->
   `snow_report`.
 - `pns`: IEM AFOS PNS listings per office per day, then each product's text
@@ -36,6 +42,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time as clock
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
@@ -50,6 +57,7 @@ from hazelst.sources import (
     base,
     elevation,
     ghcn,
+    historical_forecast,
     iem,
     nohrsc,
     open_meteo,
@@ -66,6 +74,7 @@ class Counts:
     cached: int = 0
     errors: list[str] = field(default_factory=list)
     rows: dict[str, int] = field(default_factory=dict)
+    rate_limited: bool = False
 
     def add(self, table: str, n: int) -> None:
         self.rows[table] = self.rows.get(table, 0) + n
@@ -77,7 +86,26 @@ class Counts:
             "rows": self.rows,
             "errors": self.errors[:20],
             "error_count": len(self.errors),
+            **({"rate_limited": True} if self.rate_limited else {}),
         }
+
+
+def sleep(seconds: float) -> None:
+    """Pause between paced requests (patched in tests)."""
+    clock.sleep(seconds)
+
+
+_last_paced: float | None = None
+
+
+def pace(interval_s: float) -> None:
+    """Wait until `interval_s` has passed since the previous paced request in this process
+    (the CLI runs one job per month in one process, so the pacing spans months)."""
+    global _last_paced
+    now = clock.monotonic()
+    if _last_paced is not None and now - _last_paced < interval_s:
+        sleep(interval_s - (now - _last_paced))
+    _last_paced = clock.monotonic()
 
 
 def chunks(start: date, end: date, days: int = 31) -> Iterator[tuple[date, date]]:
@@ -152,6 +180,7 @@ class Backfill:
             return None
         if fetched.http_status != 200:
             counts.errors.append(f"{source}: HTTP {fetched.http_status} {url} {query}")
+            counts.rate_limited = fetched.http_status == 429
             with db.transaction(self.conn):
                 base.store_fetch(self.conn, self.run_id, fetched)
             return None
@@ -189,6 +218,41 @@ class Backfill:
                 counts.add("forecast_hourly", open_meteo.store(self.conn, fetch_id, rows))
                 if dropped:
                     counts.add("superseded", dropped)
+            self._remember(fetched)
+        return counts
+
+    def historical_forecast(self, start: date, end: date) -> Counts:
+        """The finer models for report days `start`..`end` (UTC dates through end + 1)."""
+        counts = Counts()
+        mountains = self.cfg.mountains
+        last = end + timedelta(days=1)
+        for model in open_meteo.FINE_MODELS:
+            span = historical_forecast.window(model, start, last)
+            if span is None:
+                continue
+            query = historical_forecast.params(mountains, model, *span)
+            if not self._seen(historical_forecast.SOURCE, historical_forecast.URL, query):
+                pace(historical_forecast.REQUEST_INTERVAL_S)
+            fetched = self._get(
+                counts,
+                historical_forecast.SOURCE,
+                historical_forecast.URL,
+                query,
+                partial(historical_forecast.fetch, self.client, mountains, model, *span),
+            )
+            if counts.rate_limited:
+                break
+            if fetched is None:
+                continue
+            try:
+                rows = historical_forecast.normalize(fetched)
+            except (open_meteo.NormalizeError, KeyError, ValueError) as exc:
+                counts.errors.append(f"historical_forecast {model}: {exc}")
+                continue
+            with db.transaction(self.conn):
+                fetch_id = base.store_fetch(self.conn, self.run_id, fetched)
+                counts.add("forecast_hourly", open_meteo.store(self.conn, fetch_id, rows))
+                counts.add(f"forecast_hourly:{model}", len(rows))
             self._remember(fetched)
         return counts
 
@@ -372,7 +436,15 @@ class Backfill:
         return counts
 
 
-STEPS: tuple[str, ...] = ("previous_runs", "lsr", "pns", "nohrsc", "snocountry", "ghcn")
+STEPS: tuple[str, ...] = (
+    "previous_runs",
+    "historical_forecast",
+    "lsr",
+    "pns",
+    "nohrsc",
+    "snocountry",
+    "ghcn",
+)
 # Steps that load a whole history in one pass, whatever the range.
 WHOLE_HISTORY_STEPS = frozenset({"snocountry"})
 

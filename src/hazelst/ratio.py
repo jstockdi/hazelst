@@ -113,7 +113,14 @@ class LeadDay:
     models: Mapping[str, DayWater]  # model id -> forecast; MEAN_MODEL = the models' mean
 
     def raw_models(self) -> dict[str, DayWater]:
-        return {k: v for k, v in self.models.items() if k != MEAN_MODEL}
+        """The global models (the finer models compete for day 1 separately)."""
+        return {
+            k: v for k, v in self.models.items() if k != MEAN_MODEL and not open_meteo.is_fine(k)
+        }
+
+    def fine_models(self) -> dict[str, DayWater]:
+        """The finer models (J29), in `open_meteo.FINE_MODELS` order."""
+        return {m: self.models[m] for m in open_meteo.FINE_MODELS if m in self.models}
 
 
 @dataclass
@@ -147,7 +154,9 @@ def lead_days(
     from the run. The models' mean is taken per hour over the models of that
     fetch. `nw_upslope` is the tag's rule over the fetch's hours (850 hPa means
     of the models, GFS direction). Several fetches of a day are averaged; the
-    day is upslope when at least half of them tag it.
+    day is upslope when at least half of them tag it. The mean and the tag
+    read the global models only; a fetch of the finer models alone adds their
+    forecasts and no upslope vote.
     """
     local_day = learn._local_day_fn(tz)
     sql = (
@@ -163,7 +172,9 @@ def lead_days(
     if end is not None:
         sql += " AND valid_at < ?"
         params.append((end + timedelta(days=3)).isoformat())
-    per_day: dict[tuple[str, date], list[tuple[dict[str, DayWater], bool]]] = defaultdict(list)
+    per_day: dict[tuple[str, date], list[tuple[dict[str, DayWater], bool | None]]] = defaultdict(
+        list
+    )
     # One fetch at a time (rows come in fetch order): (mountain, day) -> model -> hour -> values.
     groups: dict[tuple[str, str], dict[str, dict[str, tuple[Any, ...]]]] = {}
     current: int | None = None
@@ -178,10 +189,11 @@ def lead_days(
     _fetch_days(groups, per_day, start, end)
     out: dict[tuple[str, date], LeadDay] = {}
     for (mountain, day), fetches in per_day.items():
+        votes = [up for _, up in fetches if up is not None]
         out[(mountain, day)] = LeadDay(
             mountain=mountain,
             day=day,
-            upslope=2 * sum(1 for _, up in fetches if up) >= len(fetches),
+            upslope=bool(votes) and 2 * sum(1 for up in votes if up) >= len(votes),
             models=_average([m for m, _ in fetches]),
         )
     return out
@@ -189,11 +201,12 @@ def lead_days(
 
 def _fetch_days(
     groups: Mapping[tuple[str, str], Mapping[str, Mapping[str, tuple[Any, ...]]]],
-    per_day: dict[tuple[str, date], list[tuple[dict[str, DayWater], bool]]],
+    per_day: dict[tuple[str, date], list[tuple[dict[str, DayWater], bool | None]]],
     start: date | None,
     end: date | None,
 ) -> None:
-    """Add one fetch's lead-day-1 days to `per_day`: each model's water, the mean, upslope."""
+    """Add one fetch's lead-day-1 days to `per_day`: each model's water, and the global
+    models' mean and upslope tag (None for a fetch of the finer models alone)."""
     for (mountain, day_text), by_model in groups.items():
         day = date.fromisoformat(day_text)
         if (start is not None and day < start) or (end is not None and day > end):
@@ -208,15 +221,19 @@ def _fetch_days(
         models = {
             model: _day_water((h[1], h[2]) for h in hours.values()) for model, hours in kept.items()
         }
+        globals_ = {m: hours for m, hours in kept.items() if not open_meteo.is_fine(m)}
+        if not globals_:
+            per_day[(mountain, day)].append((models, None))
+            continue
         mean_hours: list[tuple[float, float | None]] = []
         tag_hours: list[tags.Hour] = []
-        for t in sorted({t for hours in kept.values() for t in hours}):
-            at = [hours[t] for hours in kept.values() if t in hours]
+        for t in sorted({t for hours in globals_.values() for t in hours}):
+            at = [hours[t] for hours in globals_.values() if t in hours]
             temps = [a[2] for a in at if a[2] is not None]
             mean_hours.append(
                 (sum(a[1] for a in at) / len(at), sum(temps) / len(temps) if temps else None)
             )
-            gfs = kept.get(DIRECTION_MODEL, {}).get(t)
+            gfs = globals_.get(DIRECTION_MODEL, {}).get(t)
             tag_hours.append(
                 tags.Hour(
                     t850_f=_mean(a[3] for a in at),
@@ -436,6 +453,84 @@ class Ratios:
         return sum(present) / len(present) if present else None
 
 
+# --- finer models: day-1 candidates ------------------------------------------------------
+
+# Short names for the finer models' methods (`<short>_ratio`).
+FINE_SHORT: dict[str, str] = {
+    "ecmwf_ifs": "ifs9",
+    "ncep_hrrr_conus": "hrrr",
+    "gem_hrdps_continental": "hrdps",
+    "ncep_nbm_conus": "nbm",
+    "ecmwf_aifs025_single": "aifs",
+}
+FINE_RATIO = "fine_ratio"  # the mean of the finer models, each times its own ratio
+NBM_MODEL = "ncep_nbm_conus"
+NBM_RAW = "nbm_raw"  # NBM's native snowfall, as is
+
+
+def fine_method(model: str) -> str:
+    """The day-1 method of one finer model times its ratio, e.g. `hrrr_ratio`."""
+    return f"{FINE_SHORT[model]}_ratio"
+
+
+FINE_METHODS: tuple[str, ...] = (
+    *(fine_method(m) for m in open_meteo.FINE_MODELS),
+    FINE_RATIO,
+    NBM_RAW,
+)
+assert set(FINE_SHORT) == set(open_meteo.FINE_MODELS)
+
+
+def fit_days(ratios: Ratios, mountain: str, model: str) -> int:
+    """Snow days in a model's own all-band fit at a mountain (0 without one)."""
+    return ratios.n(mountain, model, ALL_BANDS, BOTH_SIDES)
+
+
+def thin_models(ratios: Ratios, mountain: str) -> list[str]:
+    """Finer models with fewer than 15 fit days of their own at the mountain."""
+    return [m for m in open_meteo.FINE_MODELS if fit_days(ratios, mountain, m) < MIN_DAYS]
+
+
+def thin_methods(ratios: Ratios, mountain: str) -> set[str]:
+    """Day-1 methods left out of the method choice at a mountain: each thin model's
+    `<short>_ratio` (and `nbm_raw` with NBM's), and `fine_ratio` unless at least two
+    finer models have enough fit days (a mean of one model repeats that model)."""
+    thin = thin_models(ratios, mountain)
+    out = {fine_method(m) for m in thin}
+    if NBM_MODEL in thin:
+        out.add(NBM_RAW)
+    if len(open_meteo.FINE_MODELS) - len(thin) < 2:
+        out.add(FINE_RATIO)
+    return out
+
+
+def fine_values(ld: LeadDay, ratios: Ratios) -> dict[str, float]:
+    """Each finer-model candidate's day-1 snow for one lead day (methods without data absent).
+
+    `<short>_ratio` is the model's snow water by band times its own resolved
+    ratio (with the upslope split, as `resort_ratio`); `fine_ratio` the mean of
+    those over the models with at least 15 fit days at the mountain (all of
+    them when none has); `nbm_raw` NBM's native snowfall.
+    """
+    out: dict[str, float] = {}
+    nbm = ld.models.get(NBM_MODEL)
+    if nbm is not None:
+        out[NBM_RAW] = nbm.snow_in
+    if not ratios:
+        return out
+    thin = set(thin_models(ratios, ld.mountain))
+    scaled: dict[str, float] = {}
+    for model, dw in ld.fine_models().items():
+        value = ratios.day_snow(ld, dw, model, split=True)
+        if value is not None:
+            scaled[model] = value
+            out[fine_method(model)] = value
+    members = [v for m, v in scaled.items() if m not in thin] or list(scaled.values())
+    if members:
+        out[FINE_RATIO] = sum(members) / len(members)
+    return out
+
+
 # --- live forecast -----------------------------------------------------------------------
 
 
@@ -629,7 +724,8 @@ def backfill_values(
     end: date,
     tz: str = TIMEZONE,
 ) -> dict[tuple[str, date], dict[str, float]]:
-    """(mountain, day) -> {"resort_ratio": snow} for the `backfill` edition, `start`..`end`.
+    """(mountain, day) -> {"resort_ratio": snow, each finer-model candidate: snow} for the
+    `backfill` edition, `start`..`end`.
 
     Leave one season out: a day's ratios are fitted on every other season's
     lead-day-1 days, so a backfilled score never reads its own day.
@@ -646,20 +742,24 @@ def backfill_values(
             if season(ld.day) != s:
                 continue
             value = ratios.mean_snow(ld) if ratios else None
+            values = {k: round(v, 2) for k, v in fine_values(ld, ratios).items()}
             if value is not None:
-                out[key] = {METHOD: round(value, 2)}
+                values[METHOD] = round(value, 2)
+            if values:
+                out[key] = values
     return out
 
 
 # --- backtest ----------------------------------------------------------------------------
 
-BACKTEST_METHODS: tuple[str, ...] = (
+GLOBAL_BACKTEST_METHODS: tuple[str, ...] = (
     "raw_mean",
     "flat_10",
     "ratio_temp",
     "ratio_upslope",
     "corrected",
 )
+BACKTEST_METHODS: tuple[str, ...] = (*GLOBAL_BACKTEST_METHODS, *FINE_METHODS)
 
 
 @dataclass(frozen=True)
@@ -680,6 +780,12 @@ class Backtest:
     fit_days: int
     cells: list[BacktestCell]
     corrected_fallback_days: int  # test days without corrected cells (raw mean used)
+    # Finer-model candidate -> test days without its value (raw mean used).
+    fine_fallback_days: dict[str, int] = field(default_factory=dict)
+    # (mountain, finer model) -> snow days in its own all-band fit through `fit_to`.
+    fine_fit_days: dict[tuple[str, str], int] = field(default_factory=dict)
+    # Mountain -> candidates left out of the method choice (thin fit, n < 15).
+    thin: dict[str, list[str]] = field(default_factory=dict)
 
 
 def _corrected_cells(
@@ -735,6 +841,12 @@ class HeldOut:
     fit_days: int
     days: list[HeldOutDay]
     corrected_fallback_days: int
+    # Finer-model candidate -> test days without its value (raw mean used).
+    fine_fallback_days: dict[str, int] = field(default_factory=dict)
+    # (mountain, finer model) -> snow days in its own all-band fit through `fit_to`.
+    fine_fit_days: dict[tuple[str, str], int] = field(default_factory=dict)
+    # Mountain -> candidates left out of the method choice (thin fit, n < 15).
+    thin: dict[str, list[str]] = field(default_factory=dict)
 
 
 def held_out(
@@ -761,6 +873,7 @@ def held_out(
     cells = _corrected_cells(conn, mountains, fit_to, tz)
     out: list[HeldOutDay] = []
     fallback = 0
+    fine_fallback: dict[str, int] = dict.fromkeys(FINE_METHODS, 0)
     for key, ld in sorted(days.items()):
         if not test_from <= ld.day <= test_to or key not in observed:
             continue
@@ -778,17 +891,30 @@ def held_out(
             "ratio_upslope": mean if upslope is None else upslope,
             "corrected": mean if found is None else found,
         }
+        fine = fine_values(ld, ratios)
+        forecasts.update({m: fine.get(m, mean) for m in FINE_METHODS})
         obs = observed[key]
         if max(obs, *forecasts.values()) < learn.SNOW_DAY_IN:
             continue
         fallback += 1 if found is None else 0
+        for m in FINE_METHODS:
+            if m not in fine:
+                fine_fallback[m] += 1
         out.append(
             HeldOutDay(ld.mountain, ld.day, obs, {m: round(v, 2) for m, v in forecasts.items()})
         )
+    names = sorted(keys)
     return HeldOut(
         fit_days=len({(ld.mountain, ld.day) for ld, _ in pairs}),
         days=out,
         corrected_fallback_days=fallback,
+        fine_fallback_days=fine_fallback,
+        fine_fit_days={
+            (m, model): fit_days(ratios, m, model)
+            for m in names
+            for model in open_meteo.FINE_MODELS
+        },
+        thin={m: sorted(thin_methods(ratios, m)) for m in names},
     )
 
 
@@ -836,4 +962,7 @@ def backtest(
         fit_days=found.fit_days,
         cells=out,
         corrected_fallback_days=found.corrected_fallback_days,
+        fine_fallback_days=found.fine_fallback_days,
+        fine_fit_days=found.fine_fit_days,
+        thin=found.thin,
     )

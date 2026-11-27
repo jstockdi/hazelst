@@ -53,7 +53,17 @@ _env.filters["num"] = charts.num
 # --- narrative markdown --------------------------------------------------------------
 
 
-METHOD_LABELS: dict[str, str] = {"raw_mean": "model mean", "resort_ratio": "resort ratio"}
+METHOD_LABELS: dict[str, str] = {
+    "raw_mean": "model mean",
+    "resort_ratio": "resort ratio",
+    "ifs9_ratio": "ECMWF 9 km ratio",
+    "hrrr_ratio": "HRRR ratio",
+    "hrdps_ratio": "HRDPS ratio",
+    "nbm_ratio": "NBM ratio",
+    "aifs_ratio": "AIFS ratio",
+    "fine_ratio": "fine-model ratio",
+    "nbm_raw": "NBM snowfall",
+}
 
 
 def md_to_html(md: str) -> Markup:

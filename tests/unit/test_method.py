@@ -218,3 +218,51 @@ def test_cli_schedule_prints_every_slot(capsys: pytest.CaptureFixture[str]) -> N
     slots = {s["slot"]: s["steps"] for s in out["slots"]}
     assert slots["report-rebuild"] == ["report-build"]
     assert len(slots) == 11
+
+
+# --- finer models (J29) ----------------------------------------------------------------------
+
+
+def test_a_fine_winner_takes_day_1_and_the_global_rule_keeps_days_2_to_5() -> None:
+    maes = {"raw_mean": 2.0, "resort_ratio": 1.5, "hrrr_ratio": 1.2, "corrected": 1.4}
+    assert method.decide_day1(maes) == ("resort_ratio", {"corrected"}, "hrrr_ratio")
+    assert method.decide_day1({"raw_mean": 2.0, "resort_ratio": 1.97, "nbm_raw": 1.5}) == (
+        "raw_mean",
+        set(),
+        "nbm_raw",
+    )
+    assert method.decide_day1({"raw_mean": 2.0, "resort_ratio": 1.0, "hrrr_ratio": 1.5}) == (
+        "resort_ratio",
+        set(),
+        None,
+    )
+
+
+def fine_seasons(conn: sqlite3.Connection) -> None:
+    """Loon as `two_seasons`; HRRR forecasts twice GFS's snow water, NBM 0.1 in/h."""
+    for start, obs in ((date(2025, 1, 5), 2.4), (date(2026, 1, 5), 4.8)):
+        for i in range(16):
+            d = start + timedelta(days=i)
+            add_hours(conn, d, "loon", snow={"gfs_seamless": 0.07}, temp=10)
+            add_hours(conn, d, "loon", snow={"ncep_hrrr_conus": 0.14}, temp=10)
+            add_report(conn, "loon", d, obs)
+    # NBM only in the held-out season: no fit days, so `nbm_raw` and `nbm_ratio` are thin.
+    for i in range(16):
+        add_hours(conn, date(2026, 1, 5) + timedelta(days=i), "loon",
+                  snow={"ncep_nbm_conus": 0.2}, temp=10)  # fmt: skip
+    conn.commit()
+
+
+def test_choose_takes_fine_candidates_and_leaves_thin_ones_out(conn: sqlite3.Connection) -> None:
+    fine_seasons(conn)
+    stored(conn, "raw_mean")  # resort_ratio never stored: raw_mean is the only global method
+    rows = {r.method: r for r in method.choose(conn, MOUNTAINS, AS_OF) if r.mountain == "loon"}
+    # nbm_raw would score 4.8 in (no error), but NBM has no fit days through 2025-04-30.
+    assert "nbm_raw" not in rows and "nbm_ratio" not in rows and "ifs9_ratio" not in rows
+    assert rows["hrrr_ratio"].mae_in == 2.4  # 5:1 fitted on 2024-25 vs 20:1 observed
+    assert rows["hrrr_ratio"].chosen and rows["raw_mean"].chosen  # day 1 + days 2-5
+    with db.transaction(conn):
+        method.store(conn, rows.values(), datetime(2026, 11, 27, tzinfo=UTC))
+    choice = method.load(conn)
+    assert choice.day1 == {"loon": "hrrr_ratio"}
+    assert choice.headline == {"loon": "raw_mean"}
