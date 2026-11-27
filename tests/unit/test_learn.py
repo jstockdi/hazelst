@@ -1,9 +1,8 @@
-"""skill-learn and the corrected method's gates, on synthetic verification data.
+"""skill-learn and the corrected method, on synthetic verification data.
 
-The gates (data-model.md, "How the data compounds", step 4):
-
-- a `corrected` value exists only for skill cells with n >= 10 verified snow days;
-- the page shows it only after it beats the model mean on the last 20 verified days.
+- a `corrected` value exists only for skill cells with n >= 10 verified snow days
+  (data-model.md, "How the data compounds", step 4);
+- the page shows it only where `method_gate` chose it (method.py; tests/unit/test_method.py).
 """
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from hazelst import config, corrected, db, jobs, learn
+from hazelst import config, corrected, db, jobs, learn, method
 from hazelst.models import Forecast, ForecastWindow, MountainForecast
 from tests.support import replay_client
 from tests.unit.test_schedule import recorded
@@ -297,54 +296,7 @@ def test_bias_scale_is_clamped(conn: sqlite3.Connection) -> None:
     assert out["sugarbush"]["1d"].snow_in == 1.5  # 6 / 4, not 6 / 40
 
 
-# --- gate 2: beats the model mean on the last 20 verified days ---------------------------------
-
-
-def verified_days(
-    conn: sqlite3.Connection,
-    days: range,
-    corrected_error: float,
-    raw_error: float,
-    mountain: str = "sugarbush",
-) -> None:
-    for i in days:
-        day = DAY0 + timedelta(days=i)
-        add_verification(conn, day, mountain, "raw_mean", 4.0 + raw_error, 4.0)
-        add_verification(conn, day, mountain, "corrected", 4.0 + corrected_error, 4.0)
-
-
-BEFORE = DAY0 + timedelta(days=60)
-
-
-def test_gate_needs_twenty_verified_days(conn: sqlite3.Connection) -> None:
-    verified_days(conn, range(19), corrected_error=0.5, raw_error=2.0)
-    result = corrected.gate(conn, "sugarbush", BEFORE)
-    assert (result.days, result.passed) == (19, False)
-    verified_days(conn, range(19, 20), corrected_error=0.5, raw_error=2.0)
-    result = corrected.gate(conn, "sugarbush", BEFORE)
-    assert (result.days, result.method_mae, result.raw_mean_mae) == (20, 0.5, 2.0)
-    assert result.passed
-    assert set(corrected.shown(conn, ["sugarbush", "killington"], BEFORE)) == {"sugarbush"}
-
-
-def test_gate_uses_only_the_last_twenty_days(conn: sqlite3.Connection) -> None:
-    verified_days(conn, range(0, 30), corrected_error=0.0, raw_error=3.0)  # older: better
-    verified_days(conn, range(30, 50), corrected_error=2.0, raw_error=1.0)  # last 20: worse
-    result = corrected.gate(conn, "sugarbush", BEFORE)
-    assert (result.days, result.passed) == (20, False)
-    # Scoring as of an earlier date sees the good stretch.
-    assert corrected.gate(conn, "sugarbush", DAY0 + timedelta(days=30)).passed
-
-
-def test_gate_ties_and_no_obs_days_do_not_count(conn: sqlite3.Connection) -> None:
-    verified_days(conn, range(20), corrected_error=1.0, raw_error=1.0)  # a tie does not beat
-    assert not corrected.gate(conn, "sugarbush", BEFORE).passed
-    conn.execute("DELETE FROM verification")
-    verified_days(conn, range(19), corrected_error=0.0, raw_error=2.0)
-    day = DAY0 + timedelta(days=40)
-    add_verification(conn, day, "sugarbush", "raw_mean", 5.0, None)
-    add_verification(conn, day, "sugarbush", "corrected", 5.0, None)
-    assert corrected.gate(conn, "sugarbush", BEFORE).days == 19
+# --- shown beneath the headline only where method_gate chose it ---------------------------
 
 
 def test_apply_sets_corrected_only_for_passed_mountains(conn: sqlite3.Connection) -> None:
@@ -435,7 +387,15 @@ def test_report_build_stores_corrected_rows_and_shows_them_after_the_gate(
         for w in m["forecast"]["windows"].values()
     )
     with db.transaction(conn):
-        verified_days(conn, range(20), corrected_error=0.5, raw_error=2.0, mountain="killington")
+        method.store(
+            conn,
+            [
+                method.GateRow("killington", "raw_mean", None, None, 20, 2.0, 2.0, True),
+                method.GateRow("killington", "corrected", None, None, 20, 0.5, 2.0, True),
+                method.GateRow("loon", "corrected", None, None, 20, 1.99, 2.0, False),
+            ],
+            datetime.now(UTC),
+        )
     summary = jobs.run_job(built, "report-build", day, options={"force": True})
     assert summary["corrected"]["shown"] == ["killington"]
     payload = json.loads(

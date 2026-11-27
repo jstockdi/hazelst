@@ -197,7 +197,8 @@ def _cmd_schedule(args: argparse.Namespace) -> int:
 
     cfg = config.load()
     now = datetime.now(UTC)
-    steps = {slot.id: [step.kind for step in slot.steps] for slot in scheduler.SLOTS}
+    slots = (*scheduler.SLOTS, scheduler.REBUILD)
+    steps = {slot.id: [step.kind for step in slot.steps] for slot in slots}
     out = [
         {"slot": slot_id, "next": fire.isoformat(), "steps": steps[slot_id]}
         for slot_id, fire in scheduler.next_runs(cfg, now)
@@ -502,6 +503,43 @@ def _cmd_ratio_backtest(args: argparse.Namespace) -> int:
         )
     if not result.cells:
         print("(no test days)")
+    return 0
+
+
+def _cmd_method_choose(args: argparse.Namespace) -> int:
+    """Choose each mountain's method (held-out season, or live days) and write `method_gate`."""
+    from hazelst import method
+
+    cfg = config.load()
+    as_of = args.date or jobs.today(cfg)
+    conn = _open_db(cfg)
+    try:
+        rows = method.choose(conn, cfg.mountains, as_of, cfg.timezone)
+        if not args.dry_run:
+            with db.transaction(conn):
+                method.store(conn, rows, datetime.now(UTC))
+    finally:
+        conn.close()
+    season = method.held_out_season(as_of)
+    print(
+        f"method choice as of {as_of}: held-out season {season[0]}..{season[1]} (fit through"
+        f" {season[0].year}-04-30), or the current season's live days where a mountain has"
+        f" >= {method.LIVE_DAYS}; a method is chosen when its 1d MAE is >= {method.MARGIN_IN} in"
+        " below raw_mean's and lowest; corrected is shown beneath the headline, never as it"
+    )
+    header = (
+        f"{'mountain':<14} {'method':<14} {'test_from':<10} {'test_to':<10} {'n':>4}"
+        f" {'mae_in':>7} {'raw_mae':>7} {'chosen':>6}"
+    )
+    print(header)
+    print("-" * len(header))
+    for r in rows:
+        print(
+            f"{r.mountain:<14} {r.method:<14} {r.test_from or '-'!s:<10}"
+            f" {r.test_to or '-'!s:<10} {r.n:>4} {_fmt(r.mae_in, '.3f'):>7}"
+            f" {_fmt(r.raw_mean_mae_in, '.3f'):>7} {'yes' if r.chosen else '':>6}"
+        )
+    print("(dry run: method_gate unchanged)" if args.dry_run else "method_gate written")
     return 0
 
 
@@ -850,6 +888,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_show = ratio_sub.add_parser("show", help="the fitted snow_ratio cells and the ratios used")
     p_show.add_argument("--model", default="raw_mean", help="model id or raw_mean (default)")
     p_show.set_defaults(handler=_cmd_ratio_show)
+
+    p_method = sub.add_parser("method", help="the forecast method chosen per mountain")
+    method_sub = p_method.add_subparsers(dest="method_command", metavar="<method-command>")
+    p_choose = method_sub.add_parser(
+        "choose", help="score candidates on the held-out season (or live days); write method_gate"
+    )
+    p_choose.add_argument(
+        "--date", type=date.fromisoformat, default=None, help="decision date (default today)"
+    )
+    p_choose.add_argument(
+        "--dry-run", action="store_true", help="print the choice without writing method_gate"
+    )
+    p_choose.set_defaults(handler=_cmd_method_choose)
 
     p_schedule = sub.add_parser("schedule", help="print the job schedule and each slot's next run")
     p_schedule.set_defaults(handler=_cmd_schedule)

@@ -13,10 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from hazelst import config, db, jobs, ratio, verify
+from hazelst import config, db, jobs, method, ratio, verify
 from hazelst.ratio import ALL_BANDS, ALL_MOUNTAINS, BOTH_SIDES, MEAN_MODEL, DayWater, LeadDay
 from tests.support import replay_client
-from tests.unit.test_learn import add_verification
 from tests.unit.test_schedule import recorded
 
 CFG = config.load({})
@@ -250,7 +249,7 @@ def flat_ratios(value: float) -> list[ratio.RatioRow]:
     ]
 
 
-def test_report_build_stores_resort_ratio_and_shows_it_after_the_gate(
+def test_report_build_stores_resort_ratio_and_shows_it_where_chosen(
     built: config.Config,
 ) -> None:
     day = date(2026, 11, 26)
@@ -289,10 +288,16 @@ def test_report_build_stores_resort_ratio_and_shows_it_after_the_gate(
     assert {m["forecast"].get("method", "raw_mean") for m in payload["mountains"]} == {"raw_mean"}
 
     with db.transaction(conn):
-        for i in range(20):
-            d = day - timedelta(days=30 - i)
-            add_verification(conn, d, "killington", "raw_mean", 1.0, 4.0, edition="backfill")
-            add_verification(conn, d, "killington", "resort_ratio", 3.5, 4.0, edition="backfill")
+        method.store(
+            conn,
+            [
+                method.GateRow("killington", "raw_mean", None, None, 20, 3.0, 3.0, False),
+                method.GateRow("killington", "resort_ratio", None, None, 20, 0.5, 3.0, True),
+                method.GateRow("loon", "raw_mean", None, None, 20, 1.0, 1.0, True),
+                method.GateRow("loon", "resort_ratio", None, None, 20, 0.98, 1.0, False),
+            ],
+            datetime.now(UTC),
+        )
     summary = jobs.run_job(built, "report-build", day, options={"force": True})
     assert summary["resort_ratio"]["shown"] == ["killington"]
     payload = json.loads(

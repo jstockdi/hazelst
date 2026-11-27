@@ -633,6 +633,14 @@ Idempotent: a request already stored with HTTP 200 (same source, URL, and
 query) is not sent again (for SnoCountry, either URL); PNS products are fetched once (`discussion` ids); a
 PNS listing is stored only when all its products were fetched, so a failed
 product is retried; NOHRSC dates with stored rows are skipped. Previous
+**GFS lead-day-1 snowfall before 2024-12-06 (J28).** Previous Runs
+`gfs_seamless` `snowfall_previous_day1` is empty before 2024-12-06: on frank
+(checked 2026-11-27) the first lead-day-1 GFS summit hour with snowfall is
+2024-12-06T18:00Z, while GEM's is 2024-01-20T00:00Z, the backfill start. So
+backfilled lead-day-1 days 2024-01-20..2024-12-05 carry GEM only, and the
+`raw_mean` forecast and `snow_ratio` fit for those days are GEM's. The
+held-out test season (2025-26) has both models.
+
 Runs `previous_day1` is the run from the day before each hour, so backfilled
 lead day 1 is up to a day older than a live 7 AM forecast's day 1 (decisions
 row 17 accepted this to keep one lead convention).

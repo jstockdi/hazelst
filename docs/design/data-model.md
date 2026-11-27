@@ -24,7 +24,7 @@ the lock writes no `run` row.
 |-------|--------|------------|----------|
 | **Raw** | `run`, `fetch` | every job | append-only |
 | **Normalized** | `forecast_hourly`, `nws_grid`, `discussion`, `alert`, `observation`, `snow_report` | ingest jobs, from `fetch` | append-only; rebuildable from Raw |
-| **Derived** | `forecast_window`, `forecast_day`, `verification`, `skill`, `snow_ratio` | build / verify / learn jobs | recomputed |
+| **Derived** | `forecast_window`, `forecast_day`, `verification`, `skill`, `snow_ratio`, `method_gate` | build / verify / learn jobs | recomputed |
 | **Published** | `report`, `agent_call` | build job | append-only (new version per rerun) |
 | **Knowledge** | `knowledge`, `config_change` | `knowledge-propose` + owner | status changes only |
 
@@ -142,6 +142,14 @@ CREATE TABLE snow_ratio (                   -- migration 0006; rebuilt nightly b
   fitted_through DATE,                      -- the last day the fit read (run date D - 2)
   PRIMARY KEY (mountain, model, temp_band, upslope)
 );
+CREATE TABLE method_gate (                  -- migration 0007; rewritten by `method choose` and nightly by skill-learn (J28)
+  mountain TEXT, method TEXT,               -- method raw_mean | a forecast_window method (resort_ratio, corrected)
+  test_from DATE, test_to DATE,             -- the days scored: the held-out season, or the current season's live days
+  n INT, mae_in REAL, raw_mean_mae_in REAL, -- n snow days; 1d MAE of the method and of raw_mean on the same days
+  chosen INT,                               -- 1 = the page's headline method (one per mountain); for corrected, shown beneath the headline
+  decided_at TEXT,
+  PRIMARY KEY (mountain, method)
+);
 
 -- Published ----------------------------------------------------------------
 CREATE TABLE report (
@@ -234,19 +242,24 @@ CREATE INDEX snow_report_ending_at ON snow_report (ending_at);  -- migration 000
    ∝ 1 / MAE; the 1d / 3d / 5d windows sum their segments, and a window is
    written only when every segment it spans has a cell. The page shows
    `corrected` (beside the headline, never as it) only for a
-   mountain where it beats `raw_mean` on the mountain's last 20 verified
-   days: lower mean absolute error over the 1d rows of those days, every
-   edition where both were scored. Both stay in the DB either way.
+   mountain where `method_gate` chose it (step 6). Both stay in the DB
+   either way.
 5. **Resort ratio** (`ratio.py`) — when `snow_ratio` has cells,
    `report-build` adds a `resort_ratio` method: each model's hourly snow
    water times its resolved ratio, summed into windows and days like the
    mean (mean of the models in use, min–max range). Its days go to
    `forecast_day.resort_ratio_in`. `forecast-verify` scores it beside
    `raw_mean` (live editions from `forecast_window`; the `backfill` edition
-   with ratios fitted leaving the day's season out). Where it beats
-   `raw_mean` on the mountain's last 20 verified days (the step 4 gate), the
-   page's headline, range, chart, and table use it.
-6. **Knowledge** — `knowledge-review` (Monday 3:00 AM) sends `knowledge-propose`
+   with ratios fitted leaving the day's season out). Where `method_gate`
+   chose it (step 6), the page's headline, range, chart, and table use it.
+6. **Method choice** (`method.py`, J28) — `hazelst method choose` and the
+   nightly `skill-learn` score each candidate method against `raw_mean` on
+   the held-out season (fit on earlier seasons, test on the newest complete
+   one, the `ratio backtest` days), or on the current season's live
+   verified snow days once a mountain has 20, and rewrite `method_gate`. A
+   method is chosen when its 1d MAE is at least 0.05″ below `raw_mean`'s
+   and lowest (forecast-method.md, "Method choice").
+7. **Knowledge** — `knowledge-review` (Monday 3:00 AM) sends `knowledge-propose`
    the `skill` cells with n ≥ 3 (and each cell's values at the previous call,
    read from that call's `agent_call.input`), the week's MISSes with tags and
    discussions, current `knowledge`, and the thresholds. Valid proposals are

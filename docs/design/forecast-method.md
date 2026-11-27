@@ -74,15 +74,14 @@ replaces the fixed 7:1 with a ratio fitted to each resort's own reports
   confidence from that range. The days sum to the windows as for the mean.
 - **Where it shows**: `report-build` always stores `resort_ratio` windows
   (`forecast_window`) and days (`forecast_day.resort_ratio_in`), and
-  `forecast-verify` scores them. At a mountain where `resort_ratio` has a
-  lower 1d MAE than `raw_mean` over the mountain's last 20 verified days
-  (every edition where both were scored, the `backfill` edition included),
-  the headline, range, chart, and table use `resort_ratio`, labelled
-  "resort ratio", with the mean shown beneath; elsewhere the mean stays.
-  `nws_disagrees` compares NWS with the value shown.
+  `forecast-verify` scores them. At a mountain where `method_gate` chose
+  `resort_ratio` ([Method choice](#method-choice-j28)), the headline,
+  range, chart, and table use it, labelled "resort ratio", with the mean
+  shown beneath; elsewhere the mean stays. `nws_disagrees` compares NWS
+  with the value shown.
 - **Backfill edition**: a backfilled day's `resort_ratio` is computed with
-  ratios fitted on every other season (leave one season out), so the gate
-  never reads a score fitted on its own day.
+  ratios fitted on every other season (leave one season out), so a
+  backfilled score never reads a ratio fitted on its own day.
 - **Backtest**: `hazelst ratio backtest --fit-to D --test-from D [--test-to D]`
   fits on lead-day-1 days through `--fit-to` only and prints, per mountain
   and for all, n, bias ratio, MAE, and hit rate for `raw_mean`, flat 10:1
@@ -93,15 +92,45 @@ replaces the fixed 7:1 with a ratio fitted to each resort's own reports
   ≥ 0.5″, so every method is scored on the same days. `hazelst ratio show`
   prints the fitted cells and the ratio each one resolves to.
 
+### Method choice (J28)
+
+Each mountain's headline method is chosen on held-out evidence (decisions
+rows 28–29; `method.py`), stored in `method_gate`, and read by `report-build`:
+
+- **Candidates**: `raw_mean` and each method `report-build` stores in
+  `forecast_window` that the held-out test scores (today `resort_ratio` and
+  `corrected`). The list is read from the data, so a method J29 stores and
+  scores joins without code changes to the rule.
+- **Held-out season**: seasons run Nov 1 – Apr 30. The test season is the
+  newest one that ended before the decision date; the fit uses every day
+  through the Apr 30 before it. Scoring is `ratio backtest`'s: the same
+  lead-day-1 snow days with a resort report for every method, and the same
+  values (`resort_ratio` is the backtest's `ratio_upslope`). On
+  2026-11-27 the test season is 2025-26, fitted through 2025-04-30.
+- **Live days**: once the current season has ≥ 20 live verified snow days
+  at a mountain (1d `verification` rows of editions other than `backfill`;
+  a day counts when every candidate scored at the mountain this season has
+  a row and the report or a forecast is ≥ 0.5″; a day's error is the mean
+  over its editions), that mountain is decided on those days only.
+- **Rule**: a headline method is chosen when its 1d MAE is at least 0.05″
+  below `raw_mean`'s and lowest among the headline candidates; a tie for
+  lowest keeps `raw_mean`. `corrected` never becomes the headline (see
+  [Corrected value](#corrected-value-learned)); its row is chosen when its
+  MAE is at least 0.05″ below `raw_mean`'s.
+- **When**: `hazelst method choose [--date D] [--dry-run]` prints the
+  table and writes `method_gate`; `skill-learn` re-runs the choice nightly
+  after refitting `snow_ratio`. Without a `method_gate` row a mountain
+  uses `raw_mean` and shows no corrected value.
+
 ## Corrected value (learned)
 
 Once `skill` has at least 10 verified snow days for a mountain and model at
 a lead, `report-build` also stores a `corrected` window (bias-scaled models
 blended by 1 / MAE; [data-model.md](data-model.md#how-the-data-compounds),
 step 4). The window table shows it as "Corrected N″" under the headline, and
-only for a mountain where `corrected` has beaten the mean on its last 20
-verified days. It never becomes the headline, so the chart and the table
-still agree. `corrected` is computed from the raw models, not from
+only for a mountain where `method_gate` chose it: the same held-out test
+and 0.05″ margin as the headline methods ([Method choice](#method-choice-j28)).
+It never becomes the headline, so the chart and the table still agree. `corrected` is computed from the raw models, not from
 `resort_ratio`.
 
 ## Accumulation (observed)
@@ -147,7 +176,8 @@ Thresholds are starting points; tune them with the verification scores
 ([agent-runs.md](agent-runs.md): `knowledge-propose` → `config_change`).
 
 Implementation: `derive.py` (windows, days, NWS proration, stale models),
-`tags.py` (tags, precip type, storm type), and `ratio.py` (`resort_ratio`).
+`tags.py` (tags, precip type, storm type), `ratio.py` (`resort_ratio`), and
+`method.py` (method choice).
 
 **Check against the 2026-11-25 sample run** (`tests/unit/test_derive.py`):
 rebuilt from the same model runs (GFS 06Z, ECMWF 06Z, GEM 00Z) through the
