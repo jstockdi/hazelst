@@ -512,6 +512,59 @@ Rows: one `observation` per mountain per report date, `source = 'snocountry'`,
 - Season sums can differ from other aggregators (Killington 2023-24: 223″
   here, 157″ on OnTheSnow); scores use the daily values, not season sums.
 
+#### Report dating (J32, measured 2026-11-27)
+
+Question: does `obs_date` name the right day for every mountain? Each
+SnoCountry value was compared with the lead-day-1 model mean (GFS, ECMWF,
+GEM; 6 AM → 6 AM local) at three lags over 2023-11-01..2026-04-30. Lag *k*
+pairs forecast day X with `obs_date` X + 1 + *k*: lag 0 is the current
+mapping, lag −1 means the value is dated one day early (it holds snow that
+fell after 6 AM on its own date). Same days at every lag; MAE on days where
+the forecast or the report is ≥ 0.5″.
+
+| Mountain | Days | r −1 | r 0 | r +1 | MAE −1 | MAE 0 | MAE +1 |
+|----------|-----:|-----:|----:|-----:|-------:|------:|-------:|
+| Killington | 332 | 0.47 | **0.62** | 0.08 | 2.49 | **2.13** | 2.77 |
+| Pico | 204 | 0.46 | **0.54** | 0.16 | 2.49 | **2.23** | 2.73 |
+| Sugarbush | 367 | 0.23 | **0.67** | 0.07 | 2.49 | **2.01** | 2.49 |
+| Stratton | 332 | 0.12 | **0.74** | 0.13 | 2.60 | **1.89** | 2.82 |
+| Loon | 317 | 0.16 | **0.81** | 0.11 | 2.56 | **2.15** | 2.66 |
+| Cranmore | 265 | 0.43 | **0.55** | −0.04 | 2.47 | **2.40** | 2.98 |
+| Sunday River | 53 | 0.21 | **0.86** | 0.02 | 4.03 | 2.83 | **2.26** |
+| Sugarloaf | 367 | **0.54** | 0.40 | −0.03 | **2.34** | 2.69 | 3.01 |
+
+- **No fixed offset.** Lag 0 has the highest correlation at seven of eight
+  mountains over the range, and at Killington and Pico in every season. A
+  two-term fit, report(D) ≈ a·forecast(day D − 1) + b·forecast(day D), puts
+  about 38% of Killington's and Pico's reported snow on lag −1 (Loon 11%,
+  Stratton 0%): a partial lead, consistent with SnoCountry keeping a midday
+  or afternoon storm update as the day's value. 2026-01-24 is one such day:
+  Killington and Pico's 7″ is dated 2026-01-25, though every model starts
+  the storm after 6 AM that day.
+  Shifting every Killington or Pico value by a day would misdate the
+  majority.
+- **Season-specific leads at Sugarloaf and Cranmore.** Lag −1 beats lag 0 at
+  Sugarloaf in 2023-24 (r 0.78 vs 0.57, MAE 2.14 vs 3.00) and 2024-25
+  (r 0.59 vs 0.22, MAE 2.21 vs 2.89), and at Cranmore in 2024-25 (r 0.47 vs
+  0.28, MAE 2.07 vs 2.43); in 2025-26 both are on lag 0 (Sugarloaf r 0.61 vs
+  0.11). Month by month the lag −1 share moves between 0 and 1, so the
+  dating likely varied with how the reports were entered (assumption), not
+  at one date that a shift could key on.
+- **The code maps every mountain the same way.** `snocountry.normalize` uses
+  `date_of_new_snow` as `obs_date` for all eight mountains; the resort preset
+  plays no part in SnoCountry history. Live reports use the local date of
+  the page's own update time (`dor_html` "Updated …" ET, `mtnpowder`
+  `LastUpdate`, `boyne_reportpal` `updated`, `cranmore_html` date only), and
+  `forecast-verify` takes the earliest non-stale report of that date. As of
+  2026-11-27 the live feed has no snow day to measure (all values 0 or NULL;
+  the Killington and Pico pages still read "Updated" 2026-11-15).
+- **Not changed.** No code explains the leads, and no one shift fits a
+  mountain across seasons. Candidate follow-ups: leave Sugarloaf 2023-24 and
+  2024-25 and Cranmore 2024-25 SnoCountry days out of `snow_ratio` fits and
+  `method choose` (they are fit seasons for the 2025-26 held-out test), or
+  score SnoCountry-backed days on two-day sums; re-measure the live feed
+  after 20 verified snow days this season.
+
 ### GHCN-Daily stations
 
 Daily snowfall (`SNOW`, in) and snow depth (`SNWD`, in) from co-op, CoCoRaHS,
