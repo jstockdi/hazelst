@@ -24,7 +24,7 @@ the lock writes no `run` row.
 |-------|--------|------------|----------|
 | **Raw** | `run`, `fetch` | every job | append-only |
 | **Normalized** | `forecast_hourly`, `nws_grid`, `discussion`, `alert`, `observation`, `snow_report` | ingest jobs, from `fetch` | append-only; rebuildable from Raw |
-| **Derived** | `forecast_window`, `forecast_day`, `verification`, `skill` | build / verify / learn jobs | recomputed |
+| **Derived** | `forecast_window`, `forecast_day`, `verification`, `skill`, `snow_ratio` | build / verify / learn jobs | recomputed |
 | **Published** | `report`, `agent_call` | build job | append-only (new version per rerun) |
 | **Knowledge** | `knowledge`, `config_change` | `knowledge-propose` + owner | status changes only |
 
@@ -106,7 +106,7 @@ CREATE TABLE snow_report (                  -- point reports: NWS PNS / LSR, GHC
 -- Derived ------------------------------------------------------------------
 CREATE TABLE forecast_window (
   run_id INT, mountain TEXT, window TEXT,   -- 1d | 3d | 5d
-  method TEXT,                              -- raw_mean | corrected
+  method TEXT,                              -- raw_mean | corrected | resort_ratio
   snow_in REAL, lo_in REAL, hi_in REAL, confidence TEXT,
   by_model JSON, base_snow_in REAL, nws_in REAL, nws_ice_in REAL,
   PRIMARY KEY (run_id, mountain, window, method)
@@ -116,11 +116,12 @@ CREATE TABLE forecast_day (
   snow_in REAL, precip_in REAL, precip_type TEXT,
   hi_f REAL, lo_f REAL, gust_mph REAL, freezing_level_ft REAL,
   tags JSON,                                -- nw_upslope, mixing_base, freezing_rain, ...
+  resort_ratio_in REAL,                     -- migration 0006: the day's resort_ratio snow (snow_in is the model mean)
   PRIMARY KEY (run_id, mountain, day)
 );
 CREATE TABLE verification (
   for_date DATE, edition TEXT,              -- 0700 | 0815 | 1440 | backfill (a day with no report)
-  mountain TEXT, window TEXT, method TEXT,  -- window 1d; method raw_mean | corrected | a model id
+  mountain TEXT, window TEXT, method TEXT,  -- window 1d; method raw_mean | corrected | resort_ratio | a model id
   forecast_in REAL, observed_in REAL, observed_source TEXT,  -- resort | resort_llm | snocountry (J26; before: also pns | lsr | ghcn | nohrsc)
   error_in REAL, ratio REAL, result TEXT,   -- HIT | MISS | NO_OBS
   tags JSON,                                -- tags that fired, copied for slicing
@@ -133,6 +134,13 @@ CREATE TABLE skill (                        -- rebuilt nightly from verification
   n INT, bias_ratio REAL, mae_in REAL, hit_rate REAL,
   updated_at TEXT,
   PRIMARY KEY (mountain, model, lead_bucket, tag)
+);
+CREATE TABLE snow_ratio (                   -- migration 0006; rebuilt nightly by skill-learn (J27)
+  mountain TEXT, model TEXT,                -- mountain key or 'all'; model id or 'raw_mean' (the models' mean)
+  temp_band TEXT, upslope TEXT,             -- band '<=15' | '15-25' | '25-32' | '>32' (summit 2 m °F), '' = every band; upslope 'yes' | 'no', '' = both
+  ratio REAL, n INT,                        -- resort snow per inch of forecast snow water (clamped 4-25); n snow days
+  fitted_through DATE,                      -- the last day the fit read (run date D - 2)
+  PRIMARY KEY (mountain, model, temp_band, upslope)
 );
 
 -- Published ----------------------------------------------------------------
@@ -212,7 +220,10 @@ CREATE INDEX snow_report_ending_at ON snow_report (ending_at);  -- migration 000
    day, at its lead day N = ⌊lead at 6 AM / 24⌋ + 1 (the API's past hours,
    with negative lead, are skipped); fetches of the same lead day are
    averaged. Lead days pool into the window segments `1d` (day 1), `2-3d`, and
-   `4-5d`. The observation and tags are the ones `forecast-verify` scored
+   `4-5d`. The same run refits `snow_ratio` (J27, `ratio.py`): resort-reported
+   snow per inch of lead-day-1 forecast snow water (`snowfall_in / 7`) per
+   mountain × model × summit temperature band × `nw_upslope` side, ratio of
+   sums over snow days, clamped to 4–25 (forecast-method.md, "Resort ratio"). The observation and tags are the ones `forecast-verify` scored
    (earliest edition's model-mean row); a day without a `verification` row
    (a backfilled day) takes `verify.observed`. Only snow days count (observed
    or forecast ≥ 0.5″). A run on date D learns from days up to D − 2.
@@ -222,11 +233,20 @@ CREATE INDEX snow_report_ending_at ON snow_report (ending_at);  -- migration 000
    (clamped to 0.25–4) and the models with a cell are blended with weights
    ∝ 1 / MAE; the 1d / 3d / 5d windows sum their segments, and a window is
    written only when every segment it spans has a cell. The page shows
-   `corrected` (beside the mean, which stays the headline) only for a
+   `corrected` (beside the headline, never as it) only for a
    mountain where it beats `raw_mean` on the mountain's last 20 verified
    days: lower mean absolute error over the 1d rows of those days, every
    edition where both were scored. Both stay in the DB either way.
-5. **Knowledge** — `knowledge-review` (Monday 3:00 AM) sends `knowledge-propose`
+5. **Resort ratio** (`ratio.py`) — when `snow_ratio` has cells,
+   `report-build` adds a `resort_ratio` method: each model's hourly snow
+   water times its resolved ratio, summed into windows and days like the
+   mean (mean of the models in use, min–max range). Its days go to
+   `forecast_day.resort_ratio_in`. `forecast-verify` scores it beside
+   `raw_mean` (live editions from `forecast_window`; the `backfill` edition
+   with ratios fitted leaving the day's season out). Where it beats
+   `raw_mean` on the mountain's last 20 verified days (the step 4 gate), the
+   page's headline, range, chart, and table use it.
+6. **Knowledge** — `knowledge-review` (Monday 3:00 AM) sends `knowledge-propose`
    the `skill` cells with n ≥ 3 (and each cell's values at the previous call,
    read from that call's `agent_call.input`), the week's MISSes with tags and
    discussions, current `knowledge`, and the thresholds. Valid proposals are

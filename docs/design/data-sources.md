@@ -618,7 +618,7 @@ D..D into the live tables (all steps, or the listed ones), one `season-backfill`
 
 | Step | Request | Writes |
 |------|---------|--------|
-| `previous_runs` | Previous Runs, one request per lead day N = 1–5: all eight mountains (summit elevation), `gfs_seamless,gem_seamless`, `snowfall_previous_dayN`, `precipitation_previous_dayN`, `temperature_2m_previous_dayN`, `timezone=GMT`, UTC dates D..end + 1 | `forecast_hourly` at summit, `issued_at` NULL (a stitched series has no single run), nominal `lead_h` = 24 × (N − 1) so `skill-learn` places the day at lead day N |
+| `previous_runs` | Previous Runs, one request per lead day N = 1–5: all eight mountains (summit elevation), `gfs_seamless,gem_seamless`, `snowfall_previous_dayN`, `precipitation_previous_dayN`, `temperature_2m_previous_dayN`, `timezone=GMT`, UTC dates D..end + 1; lead day 1 also requests the unsuffixed `temperature_850hPa`, `relative_humidity_850hPa`, `wind_speed_850hPa`, `wind_direction_850hPa` with `wind_speed_unit=mph` (J27) | `forecast_hourly` at summit, `issued_at` NULL (a stitched series has no single run), nominal `lead_h` = 24 × (N − 1) so `skill-learn` places the day at lead day N. A new fetch replaces the rows of earlier Previous Runs fetches for the same lead day and hours, so re-running after the query changed does not store a day twice |
 | `lsr` | IEM LSR GeoJSON from midnight before D to midnight after the morning of end + 1 | `snow_report` |
 | `pns` | IEM AFOS listing per office per day (D..end + 1), then each new product's text | `discussion` (`PNS`), `snow_report` |
 | `nohrsc` | The 24 h grid ending 12Z on each obs_date (D + 1..end + 1) | `observation` (`nohrsc`) |
@@ -636,6 +636,20 @@ product is retried; NOHRSC dates with stored rows are skipped. Previous
 Runs `previous_day1` is the run from the day before each hour, so backfilled
 lead day 1 is up to a day older than a live 7 AM forecast's day 1 (decisions
 row 17 accepted this to keep one lead convention).
+
+**850 hPa at lead (J27).** Previous Runs has no `_previous_dayN` form of the
+pressure-level variables: `temperature_850hPa_previous_day1` is rejected
+("Cannot initialize … from invalid String value", checked 2026-11-26 for
+`gfs_seamless` and `gem_seamless`). The unsuffixed `temperature_850hPa`,
+`relative_humidity_850hPa`, `wind_speed_850hPa`, and `wind_direction_850hPa`
+are served for both models over 2024-01-20..2026-04-30; each hour comes from
+the newest run before it (lead under 24 h, the API's day 0). The backfill
+stores them on the lead-day-1 rows, and `nw_upslope` for a backfilled day is
+tagged from that short-lead series (decisions row 27). The Fallbacks row
+("fit J27 ratios on summit temperature only for that model") is therefore
+not needed: both models have 850 hPa values for every backfilled day, only
+not at lead day N. Summit temperature for the bands is each model's own
+`temperature_2m_previous_day1`.
 
 Proof on 2026-11-26 (local DB, 2026-02-01 to 2026-02-14): 5 + 1 + 77 + 14
 requests in 64 s; 28,800 `forecast_hourly` rows, 850 `snow_report` rows, 32

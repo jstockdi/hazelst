@@ -31,6 +31,7 @@ from hazelst import (
     knowledge,
     learn,
     narrative,
+    ratio,
     verify,
 )
 from hazelst import backup as db_backup
@@ -657,10 +658,12 @@ def build_report(ctx: JobContext, kind: str) -> None:
     inputs = derive.load_inputs(ctx.conn, ingest_run, now)
     if not inputs.hourly:
         raise JobError(f"ingest run {ingest_run} has no forecast rows")
-    forecast = derive.derive(ctx.cfg.mountains, inputs, for_date=ctx.for_date, as_of=now)
-    corrections = corrected.correct(forecast, corrected.load_cells(ctx.conn))
+    raw = derive.derive(ctx.cfg.mountains, inputs, for_date=ctx.for_date, as_of=now)
+    corrections = corrected.correct(raw, corrected.load_cells(ctx.conn))
     passed = corrected.shown(ctx.conn, corrections, ctx.for_date)
-    forecast = corrected.apply(forecast, corrections, passed)
+    ratio_forecasts = ratio.compute(raw, inputs.hourly, ratio.Ratios.load(ctx.conn))
+    ratio_passed = ratio.shown(ctx.conn, ratio_forecasts, ctx.for_date)
+    forecast = ratio.apply(corrected.apply(raw, corrections, passed), ratio_forecasts, ratio_passed)
     notes: list[str] = []
     ingested = datetime.fromisoformat(started[0])
     if now - ingested > STALE_INGEST:
@@ -696,8 +699,9 @@ def build_report(ctx: JobContext, kind: str) -> None:
     status: ReportStatus = "published" if written else "numbers_only"
     payload = payload.model_copy(update={"status": status})
     with db.transaction(ctx.conn):
-        derive.store(ctx.conn, ctx.run_id, forecast)
-        corrected.store(ctx.conn, ctx.run_id, forecast, corrections)
+        derive.store(ctx.conn, ctx.run_id, raw)
+        corrected.store(ctx.conn, ctx.run_id, raw, corrections)
+        ratio.store_rows(ctx.conn, ctx.run_id, raw, ratio_forecasts)
         version = ctx.conn.execute(
             "SELECT coalesce(max(version), 0) + 1 FROM report WHERE for_date = ?",
             (ctx.for_date.isoformat(),),
@@ -728,6 +732,7 @@ def build_report(ctx: JobContext, kind: str) -> None:
             },
             "notes": notes,
             "corrected": {"mountains": sorted(corrections), "shown": sorted(passed)},
+            "resort_ratio": {"mountains": sorted(ratio_forecasts), "shown": sorted(ratio_passed)},
         }
     )
     log_event(run_id=ctx.run_id, step=kind, edition=edition, version=version, status=status)
@@ -784,7 +789,8 @@ def forecast_verify(ctx: JobContext) -> None:
 def rescore_range(ctx: JobContext, start: date, end: date) -> None:
     """Re-score each date `start`..`end`: its stored report editions, or, for a day with
     none (a season backfill), the `backfill` edition built from `forecast_hourly`."""
-    backfilled = verify.backfill_forecasts(ctx.conn, start, end, ctx.cfg.timezone)
+    extra = ratio.backfill_values(ctx.conn, ctx.cfg.mountains, start, end, ctx.cfg.timezone)
+    backfilled = verify.backfill_forecasts(ctx.conn, start, end, ctx.cfg.timezone, extra)
     days = rows_total = backfill_days = 0
     sources: dict[str, int] = {}
     context_sources: dict[str, int] = {}
@@ -841,20 +847,32 @@ def backup(ctx: JobContext) -> None:
 
 
 def skill_learn(ctx: JobContext) -> None:
-    """Rebuild `skill` from verified days and stored forecasts (learn.py)."""
+    """Rebuild `skill` (learn.py) and refit `snow_ratio` (ratio.py) from verified days."""
     found = learn.samples(ctx.conn, ctx.cfg.mountains, ctx.for_date, ctx.cfg.timezone)
     rows = learn.build(found)
+    ratios = ratio.refit(ctx.conn, ctx.cfg.mountains, ctx.for_date, ctx.cfg.timezone)
     with db.transaction(ctx.conn):
         written = learn.store(ctx.conn, rows, clock())
+        ratio_rows = ratio.store(ctx.conn, ratios)
     ctx.summary.update(
         {
             "samples": len(found),
             "snow_day_samples": sum(1 for s in found if learn.is_snow_day(s)),
             "skill": written,
             **learn.summarize(rows, corrected.MIN_N),
+            "snow_ratio": ratio_rows,
+            "snow_ratio_mountains": sorted(
+                {r.mountain for r in ratios if r.mountain != ratio.ALL_MOUNTAINS}
+            ),
         }
     )
-    log_event(run_id=ctx.run_id, step="skill-learn", samples=len(found), skill=written)
+    log_event(
+        run_id=ctx.run_id,
+        step="skill-learn",
+        samples=len(found),
+        skill=written,
+        snow_ratio=ratio_rows,
+    )
 
 
 # --- season-backfill ---------------------------------------------------------------------

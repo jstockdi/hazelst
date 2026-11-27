@@ -145,7 +145,7 @@ def test_closed_mountain_listed() -> None:
         }
     )
     html = page.render_report(closed)
-    assert "Pico<small>closed</small>" in html
+    assert "Pico<small>model mean</small><small>closed</small>" in html
     assert "Pico <em>closed</em>" in html
 
 

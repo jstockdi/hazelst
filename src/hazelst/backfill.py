@@ -3,8 +3,10 @@
 For report days `start`..`end` (local dates):
 
 - `previous_runs`: Open-Meteo Previous Runs, GFS and GEM at summit, lead days
-  1-5 (one request per lead day) -> `fetch`, `forecast_hourly` (`issued_at`
-  NULL, `lead_h` = 24 x (N - 1)).
+  1-5 (one request per lead day; lead day 1 adds the 850 hPa variables) ->
+  `fetch`, `forecast_hourly` (`issued_at` NULL, `lead_h` = 24 x (N - 1)). A
+  new fetch for a lead day replaces the rows of earlier fetches for the same
+  hours (a re-run after the query changed).
 - `lsr`: IEM Local Storm Reports for the days and the morning after ->
   `snow_report`.
 - `pns`: IEM AFOS PNS listings per office per day, then each product's text
@@ -183,7 +185,10 @@ class Backfill:
                 continue
             with db.transaction(self.conn):
                 fetch_id = base.store_fetch(self.conn, self.run_id, fetched)
+                dropped = previous_runs.drop_superseded(self.conn, fetch_id, rows)
                 counts.add("forecast_hourly", open_meteo.store(self.conn, fetch_id, rows))
+                if dropped:
+                    counts.add("superseded", dropped)
             self._remember(fetched)
         return counts
 

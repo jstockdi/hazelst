@@ -463,6 +463,90 @@ def _cmd_verify_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_ratio_backtest(args: argparse.Namespace) -> int:
+    """Fit snow ratios on days through --fit-to, score lead-day-1 snow days from --test-from."""
+    from hazelst import ratio
+
+    cfg = config.load()
+    conn = _open_db(cfg)
+    try:
+        result = ratio.backtest(
+            conn,
+            cfg.mountains,
+            fit_to=args.fit_to,
+            test_from=args.test_from,
+            test_to=args.test_to,
+            tz=cfg.timezone,
+        )
+    finally:
+        conn.close()
+    print(
+        f"resort_ratio backtest: fit on lead-day-1 days through {result.fit_to}"
+        f" ({result.fit_days} mountain-days with a resort report); test"
+        f" {result.test_from}..{result.test_to}, snow days (resort report or any method"
+        f" >= 0.5 in); corrected used the raw mean on {result.corrected_fallback_days} days"
+        " without skill cells"
+    )
+    print(
+        "methods: raw_mean = Open-Meteo snowfall (7:1), models' mean; flat_10 = snow water x 10;"
+        " ratio_temp = resort_ratio by temperature band; ratio_upslope = resort_ratio with the"
+        " nw_upslope split; corrected = bias-scaled models blended by 1 / MAE"
+    )
+    header = f"{'mountain':<14} {'method':<14} {'n':>5} {'bias':>6} {'mae_in':>7} {'hit':>5}"
+    print(header)
+    print("-" * len(header))
+    for c in result.cells:
+        print(
+            f"{c.mountain:<14} {c.method:<14} {c.n:>5} {_fmt(c.bias_ratio, '.2f'):>6}"
+            f" {c.mae_in:>7.2f} {c.hit_rate:>5.2f}"
+        )
+    if not result.cells:
+        print("(no test days)")
+    return 0
+
+
+def _cmd_ratio_show(args: argparse.Namespace) -> int:
+    """The fitted `snow_ratio` cells, and the ratio each mountain's model mean resolves to."""
+    from hazelst import ratio
+
+    cfg = config.load()
+    conn = _open_db(cfg)
+    try:
+        ratios = ratio.Ratios.load(conn)
+    finally:
+        conn.close()
+    if not ratios:
+        print("(snow_ratio is empty; run skill-learn)")
+        return 1
+    model = args.model
+    through = next(iter(ratios.cells.values())).fitted_through
+    print(f"snow_ratio for model {model}, fitted through {through}")
+    print("cell = own fit (ratio, n); used = the ratio the forecast applies after fallbacks")
+    header = (
+        f"{'mountain':<14} {'band':<7} {'side':<5} {'ratio':>6} {'n':>5} {'used':>6} {'from':<26}"
+    )
+    print(header)
+    print("-" * len(header))
+    keys = [*(m.key for m in cfg.mountains), ratio.ALL_MOUNTAINS]
+    for mountain in keys:
+        split = mountain != ratio.ALL_MOUNTAINS and ratios.splits(mountain, model)
+        sides = (ratio.UPSLOPE_YES, ratio.UPSLOPE_NO) if split else (ratio.BOTH_SIDES,)
+        for b in (*ratio.BANDS, ratio.ALL_BANDS):
+            for side in sides:
+                cell = ratios.cells.get((mountain, ratios.model_key(model), b, side))
+                used = ratios.resolve(mountain, model, b, side if split else None)
+                source = "-" if used is None else f"{used.mountain}/{used.temp_band or 'all'}"
+                if used is not None and used.upslope:
+                    source += f"/{used.upslope}"
+                print(
+                    f"{mountain:<14} {b or 'all':<7} {side or 'both':<5}"
+                    f" {_fmt(cell.ratio if cell else None, '.2f'):>6}"
+                    f" {cell.n if cell else 0:>5}"
+                    f" {_fmt(used.ratio if used else None, '.2f'):>6} {source:<26}"
+                )
+    return 0
+
+
 SMOKE_PAGE = """\
 Snow Report - updated 6:42 AM
 Sample page for the hazelst agent smoke test.
@@ -747,6 +831,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--all-days", action="store_true", help="include days with no snow forecast or observed"
     )
     p_summary.set_defaults(handler=_cmd_verify_summary)
+
+    p_ratio = sub.add_parser("ratio", help="resort snow ratios: fitted cells and the backtest")
+    ratio_sub = p_ratio.add_subparsers(dest="ratio_command", metavar="<ratio-command>")
+    p_backtest = ratio_sub.add_parser(
+        "backtest",
+        help="fit on days through --fit-to, score lead-day-1 snow days from --test-from",
+    )
+    p_backtest.add_argument("--fit-to", type=date.fromisoformat, required=True)
+    p_backtest.add_argument("--test-from", type=date.fromisoformat, required=True)
+    p_backtest.add_argument(
+        "--test-to",
+        type=date.fromisoformat,
+        default=date(2026, 4, 30),
+        help="last test day (default 2026-04-30)",
+    )
+    p_backtest.set_defaults(handler=_cmd_ratio_backtest)
+    p_show = ratio_sub.add_parser("show", help="the fitted snow_ratio cells and the ratios used")
+    p_show.add_argument("--model", default="raw_mean", help="model id or raw_mean (default)")
+    p_show.set_defaults(handler=_cmd_ratio_show)
 
     p_schedule = sub.add_parser("schedule", help="print the job schedule and each slot's next run")
     p_schedule.set_defaults(handler=_cmd_schedule)

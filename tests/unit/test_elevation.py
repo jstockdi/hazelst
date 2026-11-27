@@ -206,7 +206,7 @@ def test_migration_0005_adds_context(tmp_path: Path) -> None:
         "INSERT INTO verification (for_date, edition, mountain, window, method, result)"
         " VALUES ('2026-02-06', '0700', 'loon', '1d', 'raw_mean', 'HIT')"
     )
-    assert db.migrate(c) == [5]
+    assert db.migrate(c, [m for m in migrations if m.version <= 5]) == [5]
     columns = [r[1] for r in c.execute("PRAGMA table_info(verification)")]
     assert columns[-2:] == ["observed_elev_ft", "context"]
     assert c.execute("SELECT context FROM verification").fetchone()[0] is None
