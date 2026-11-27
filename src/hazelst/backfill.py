@@ -13,6 +13,8 @@ For report days `start`..`end` (local dates):
   obs_date) -> `observation` (`nohrsc`).
 - `snocountry`: one request per mountain for the resort's whole SnoCountry
   history (not limited to the range) -> `observation` (`snocountry`).
+- `ghcn`: GHCN-Daily `SNOW` / `SNWD` for every station in `stations.json`,
+  dates start..end + 1, one request per 50 stations -> `snow_report`.
 
 `skill-learn` then learns from these days like verified live days: the
 observation comes from `verify.observed` (no `verification` rows exist for a
@@ -44,6 +46,7 @@ import httpx
 from hazelst import config, db
 from hazelst.sources import (
     base,
+    ghcn,
     iem,
     nohrsc,
     open_meteo,
@@ -325,8 +328,36 @@ class Backfill:
             self._remember(fetched)
         return counts
 
+    def ghcn(self, start: date, end: date) -> Counts:
+        """Station days `start`..`end` + 1 (the morning after each report day)."""
+        counts = Counts()
+        stations = ghcn.load_stations(ghcn.stations_path(self.cfg.settings))
+        by_id = ghcn.nearest(stations)
+        last = end + timedelta(days=1)
+        for ids in ghcn.batches(by_id):
+            query = ghcn.params(ids, start, last)
+            fetched = self._get(
+                counts,
+                ghcn.SOURCE,
+                ghcn.URL,
+                query,
+                partial(ghcn.fetch, self.client, ids, start, last),
+            )
+            if fetched is None:
+                continue
+            try:
+                rows = ghcn.normalize(fetched, by_id, self.cfg.timezone)
+            except (ghcn.NormalizeError, ValueError) as exc:
+                counts.errors.append(f"ghcn {ids[0]}..: {exc}")
+                continue
+            with db.transaction(self.conn):
+                base.store_fetch(self.conn, self.run_id, fetched)
+                counts.add("snow_report", ghcn.store(self.conn, rows))
+            self._remember(fetched)
+        return counts
 
-STEPS: tuple[str, ...] = ("previous_runs", "lsr", "pns", "nohrsc", "snocountry")
+
+STEPS: tuple[str, ...] = ("previous_runs", "lsr", "pns", "nohrsc", "snocountry", "ghcn")
 # Steps that load a whole history in one pass, whatever the range.
 WHOLE_HISTORY_STEPS = frozenset({"snocountry"})
 

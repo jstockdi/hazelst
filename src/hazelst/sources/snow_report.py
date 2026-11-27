@@ -1,4 +1,4 @@
-"""Point snowfall reports (NWS PNS and IEM LSR) and the `snow_report` table.
+"""Point snowfall reports (NWS PNS, IEM LSR, GHCN-Daily) and the `snow_report` table.
 
 Each report is tagged with its nearest mountain and great-circle distance, so
 `forecast-verify` can pick the reports within 5 mi of a mountain. The same
@@ -21,7 +21,7 @@ from hazelst.config import Mountain
 
 EARTH_RADIUS_MI = 3958.8
 
-Kind = Literal["pns", "lsr"]
+Kind = Literal["pns", "lsr", "ghcn"]
 
 
 @dataclass(frozen=True)
@@ -103,10 +103,11 @@ def store(conn: sqlite3.Connection, rows: Iterable[SnowReportRow], kind: Kind) -
     """Write rows; returns how many were inserted or replaced.
 
     PNS rows replace any row with the same id (a later PNS, or the LSR copy of
-    the same observation). LSR rows never replace an existing row.
+    the same observation). LSR rows never replace an existing row. GHCN rows
+    have their own ids (`ghcn:{station}:{date}`) and replace an earlier copy.
     """
     params = [astuple(r) for r in rows]
-    verb = "INSERT OR REPLACE" if kind == "pns" else "INSERT OR IGNORE"
+    verb = "INSERT OR IGNORE" if kind == "lsr" else "INSERT OR REPLACE"
     before = conn.total_changes
     conn.executemany(
         f"{verb} INTO snow_report ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", params

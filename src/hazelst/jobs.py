@@ -43,6 +43,7 @@ from hazelst.render.payload import build_payload
 from hazelst.sources import (
     base,
     discussions,
+    ghcn,
     iem,
     nohrsc,
     nws,
@@ -334,6 +335,31 @@ def ingest_lsr(ctx: JobContext) -> dict[str, Any]:
     return {"reports": len(rows), "snow_report": written}
 
 
+def ingest_ghcn(ctx: JobContext) -> dict[str, Any]:
+    """GHCN-Daily station snowfall for the last 10 days → `snow_report` (late reports fill in)."""
+    stations = ghcn.load_stations(ghcn.stations_path(ctx.cfg.settings))
+    start, end = ghcn.recent_range(ctx.for_date)
+    fetched = ghcn.fetch_all(ctx.client, stations, start, end)
+    ok = [f for f in fetched if f.http_status == 200]
+    if not ok:
+        statuses = sorted({f.http_status for f in fetched})
+        raise JobError(f"ghcn: no batch succeeded (HTTP {statuses})")
+    by_id = ghcn.nearest(stations)
+    rows = [r for f in ok for r in ghcn.normalize(f, by_id, ctx.cfg.timezone)]
+    with db.transaction(ctx.conn):
+        for f in fetched:
+            base.store_fetch(ctx.conn, ctx.run_id, f)
+        written = ghcn.store(ctx.conn, rows)
+    return {
+        "from": start.isoformat(),
+        "to": end.isoformat(),
+        "batches": len(fetched),
+        "batch_errors": len(fetched) - len(ok),
+        "reports": len(rows),
+        "snow_report": written,
+    }
+
+
 def ingest_nohrsc(ctx: JobContext) -> dict[str, Any]:
     """NOHRSC 24 h / 48 h / season grids at each mountain → `observation` (source nohrsc)."""
     now = datetime.now(UTC)
@@ -463,6 +489,7 @@ def extract_failed_page(
 OBS_SOURCES: dict[str, SourceStep] = {
     "pns": ingest_pns,
     "lsr": ingest_lsr,
+    "ghcn": ingest_ghcn,
     "nohrsc": ingest_nohrsc,
     "resorts": ingest_resorts,
     "snocountry": ingest_snocountry,
@@ -935,4 +962,5 @@ RECORDERS: dict[str, tuple[Recorder, Callable[[base.Fetched], str]]] = {
     "discussions": (lambda client, _mountains: discussions.fetch(client), discussions.label),
     "resorts": (resorts.record, resorts.label),
     "snocountry": (snocountry.fetch, snocountry.label),
+    "ghcn": (ghcn.record, ghcn.label),
 }
