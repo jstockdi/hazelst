@@ -385,7 +385,8 @@ For each LSR or PNS point, compute the great-circle distance to every mountain
 in `mountains.json`; store `nearest_mountain` and `distance_mi` in
 `snow_report`. `forecast-verify` uses reports within 5 mi of the mountain
 (data-model.md, observation priority). Reports are mostly valley spotters and
-read lower than summits; elevation is not given (`elev_ft` is `null`). The same
+read lower than summits; neither product gives an elevation, so `elev_ft` comes
+from the Open-Meteo elevation API ([Report elevation](#report-elevation-j25)). The same
 CoCoRaHS observation can appear in both an LSR and a PNS: deduplicate on
 `(lat, lon)` rounded to 2 decimals, `ending_at`, and `snow_in`, keeping the PNS
 row. LSR coordinates carry only two decimals (PNS carries four), so a
@@ -393,6 +394,32 @@ row. LSR coordinates carry only two decimals (PNS carries four), so a
 in an LSR; 2 decimals matches all 38. The key is the `snow_report.id`
 (`44.30,-73.98,2026-02-07T12:00:00+00:00,3`): a PNS row replaces a row with the
 same id, and an LSR row never replaces one.
+
+### Report elevation (J25)
+
+`GET https://api.open-meteo.com/v1/elevation?latitude=a,b,…&longitude=a,b,…`
+(no key) returns `{"elevation": [metres, …]}` in request order from the
+Copernicus 90 m DEM, up to 100 points per call; a bad request returns HTTP 400
+with `{"error": true, "reason": …}`. Verified 2026-11-26: Killington's
+configured point (43.6045, -72.8201) is 1,257 m (4,124 ft).
+
+- `snow_report.elev_ft` (feet) is filled for every row without one: after each
+  `ingest-obs` PNS and LSR step, after each `season-backfill` PNS and LSR step,
+  and by `hazelst elevations fill` (one-off for rows stored before J25;
+  rerunnable). GHCN rows keep the station elevation.
+- Points are keyed by latitude and longitude rounded to 0.001° (about the DEM
+  resolution); a key already known from another `snow_report` row is not
+  requested again. A PNS row that replaces the LSR copy of the same observation
+  keeps the stored elevation.
+- A failed lookup leaves `elev_ft` NULL, is counted in the step summary
+  (`elev_ft.failed`), and is retried by the next fill. Requests are not stored
+  in `fetch` (reference data, rebuildable from coordinates).
+- NOHRSC: `nohrsc_pixel_elev_ft` in `config/mountains.json` is the elevation of
+  the center of the 0.04° pixel that `forecast-verify` reads for each mountain,
+  looked up once with `hazelst elevations nohrsc-pixels` (2026-11-26):
+  Killington 3,291 ft, Pico 1,926, Sugarbush 1,969, Stratton 2,425, Loon 2,228,
+  Cranmore 1,063, Sunday River 2,100, Sugarloaf 2,306. One DEM sample stands
+  for a ~4 km cell, so it is an approximate elevation of the analysis value.
 
 ### NOHRSC National Snowfall Analysis
 

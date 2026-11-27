@@ -43,6 +43,7 @@ from hazelst.render.payload import build_payload
 from hazelst.sources import (
     base,
     discussions,
+    elevation,
     ghcn,
     iem,
     nohrsc,
@@ -319,6 +320,7 @@ def ingest_pns(ctx: JobContext) -> dict[str, Any]:
         "products": len(products_ok),
         "product_errors": len(texts) - len(products_ok),
         "snow_report": reports,
+        "elev_ft": elevation.safe_fill(ctx.conn, ctx.client),
     }
 
 
@@ -332,7 +334,11 @@ def ingest_lsr(ctx: JobContext) -> dict[str, Any]:
     with db.transaction(ctx.conn):
         base.store_fetch(ctx.conn, ctx.run_id, fetched)
         written = snow_report.store(ctx.conn, rows, "lsr")
-    return {"reports": len(rows), "snow_report": written}
+    return {
+        "reports": len(rows),
+        "snow_report": written,
+        "elev_ft": elevation.safe_fill(ctx.conn, ctx.client),
+    }
 
 
 def ingest_ghcn(ctx: JobContext) -> dict[str, Any]:
@@ -776,12 +782,20 @@ def forecast_verify(ctx: JobContext) -> None:
 
 
 def rescore_range(ctx: JobContext, start: date, end: date) -> None:
-    """Re-score each report date `start`..`end` that has stored editions."""
-    days = rows_total = 0
+    """Re-score each date `start`..`end`: its stored report editions, or, for a day with
+    none (a season backfill), the `backfill` edition built from `forecast_hourly`."""
+    backfilled = verify.backfill_forecasts(ctx.conn, start, end, ctx.cfg.timezone)
+    days = rows_total = backfill_days = 0
     sources: dict[str, int] = {}
+    with_elev: dict[str, int] = {}
     day = start
     while day <= end:
         rows = verify.verify_date(ctx.conn, ctx.cfg.mountains, day, ctx.cfg.timezone)
+        if not rows and day in backfilled:
+            rows = verify.verify_date(
+                ctx.conn, ctx.cfg.mountains, day, ctx.cfg.timezone, forecasts=backfilled[day]
+            )
+            backfill_days += 1 if rows else 0
         if rows:
             with db.transaction(ctx.conn):
                 rows_total += verify.store(ctx.conn, rows)
@@ -790,13 +804,17 @@ def rescore_range(ctx: JobContext, start: date, end: date) -> None:
                 if r.method == verify.RAW_MEAN:
                     key = r.observed_source or "none"
                     sources[key] = sources.get(key, 0) + 1
+                    if r.observed_elev_ft is not None:
+                        with_elev[key] = with_elev.get(key, 0) + 1
         day += timedelta(days=1)
     ctx.summary["rescored"] = {
         "from": start.isoformat(),
         "to": end.isoformat(),
         "days": days,
+        "backfill_days": backfill_days,
         "rows": rows_total,
         "model_mean_observed_source": dict(sorted(sources.items())),
+        "model_mean_with_observed_elev_ft": dict(sorted(with_elev.items())),
     }
     log_event(run_id=ctx.run_id, step="forecast-verify", rescored=ctx.summary["rescored"])
 

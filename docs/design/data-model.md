@@ -98,7 +98,7 @@ CREATE TABLE observation (                  -- one row per source per mountain p
 );
 CREATE TABLE snow_report (                  -- point reports: NWS PNS / LSR, GHCN-Daily stations
   id TEXT PRIMARY KEY, product_id TEXT, place TEXT, -- id: "lat,lon,ending_at,snow_in" (lat/lon to 2 dp); GHCN: "ghcn:{station}:{date}", product_id 'GHCN'
-  lat REAL, lon REAL, elev_ft INT, ending_at TEXT,
+  lat REAL, lon REAL, elev_ft INT, ending_at TEXT,  -- elev_ft: station elevation (GHCN), else Open-Meteo elevation API
   snow_in REAL, hours INT,
   nearest_mountain TEXT, distance_mi REAL
 );
@@ -119,11 +119,12 @@ CREATE TABLE forecast_day (
   PRIMARY KEY (run_id, mountain, day)
 );
 CREATE TABLE verification (
-  for_date DATE, edition TEXT,              -- 0700 | 0815 | 1440
+  for_date DATE, edition TEXT,              -- 0700 | 0815 | 1440 | backfill (a day with no report)
   mountain TEXT, window TEXT, method TEXT,  -- window 1d; method raw_mean | corrected | a model id
   forecast_in REAL, observed_in REAL, observed_source TEXT,  -- resort | resort_llm | snocountry | pns | lsr | ghcn | nohrsc
   error_in REAL, ratio REAL, result TEXT,   -- HIT | MISS | NO_OBS
   tags JSON,                                -- tags that fired, copied for slicing
+  observed_elev_ft INT,                     -- migration 0004: report elevation (pns | lsr | ghcn), NOHRSC pixel center (nohrsc), NULL otherwise
   PRIMARY KEY (for_date, edition, mountain, window, method)
 );
 CREATE TABLE skill (                        -- rebuilt nightly from verification + forecast_hourly

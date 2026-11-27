@@ -344,6 +344,120 @@ def _cmd_stations_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_elevations_fill(args: argparse.Namespace) -> int:
+    """Open-Meteo elevations for `snow_report` rows that have none (one-off, rerunnable)."""
+    from hazelst.sources import elevation
+
+    cfg = config.load()
+    conn = _open_db(cfg)
+    try:
+        with base.make_client(cfg.settings.nws_user_agent) as client:
+            result = elevation.fill(conn, client)
+        remaining = conn.execute(
+            "SELECT count(*), sum(elev_ft IS NULL) FROM snow_report"
+        ).fetchone()
+    finally:
+        conn.close()
+    out = {
+        **result.as_dict(),
+        "snow_report": {"rows": remaining[0], "without_elev_ft": remaining[1] or 0},
+    }
+    print(json.dumps(out, indent=2))
+    return 0
+
+
+def _cmd_elevations_nohrsc(args: argparse.Namespace) -> int:
+    """Center and ground elevation of the NOHRSC pixel containing each mountain's point.
+
+    The result goes into `config/mountains.json` as `nohrsc_pixel_elev_ft`.
+    """
+    from hazelst.sources import elevation, geotiff, nohrsc
+
+    cfg = config.load()
+    with base.make_client(cfg.settings.nws_user_agent) as client:
+        if args.grid:
+            data = Path(args.grid).read_bytes()
+        else:
+            (fetched,) = nohrsc.fetch(client, args.date, products=("24h",))
+            if fetched.http_status != 200:
+                raise config.ConfigError(f"NOHRSC grid for {args.date}: HTTP {fetched.http_status}")
+            data = fetched.body
+        if data[:2] == b"\x1f\x8b":
+            import gzip
+
+            data = gzip.decompress(data)
+        grid = geotiff.read(data)
+        centers = {}
+        for m in cfg.mountains:
+            pixel = grid.pixel_at(m.lat, m.lon)
+            if pixel is None:
+                raise config.ConfigError(f"{m.key} is outside the NOHRSC grid")
+            row, col = pixel
+            lat = grid.origin_y - (row + 0.5) * grid.scale_y
+            lon = grid.origin_x + (col + 0.5) * grid.scale_x
+            centers[m.key] = (pixel, elevation.key(lat, lon))
+        found = elevation.lookup(client, [c for _, c in centers.values()])
+    out = {
+        key: {
+            "pixel": list(pixel),
+            "center": list(center),
+            "nohrsc_pixel_elev_ft": found.get(center),
+        }
+        for key, (pixel, center) in centers.items()
+    }
+    print(json.dumps(out, indent=2))
+    return 0 if all(v["nohrsc_pixel_elev_ft"] is not None for v in out.values()) else 1
+
+
+def _fmt(value: float | None, pattern: str) -> str:
+    return "-" if value is None else format(value, pattern)
+
+
+def _cmd_verify_summary(args: argparse.Namespace) -> int:
+    """n, bias ratio, MAE, and hit rate per mountain, by elevation band or overall."""
+    from hazelst import verify
+
+    cfg = config.load()
+    conn = _open_db(cfg)
+    try:
+        cells = verify.summary_cells(
+            conn,
+            by=args.by,
+            start=args.start,
+            end=args.to,
+            edition=args.edition,
+            method=args.method,
+            snow_days_only=not args.all_days,
+        )
+        span = conn.execute(
+            "SELECT min(for_date), max(for_date), count(DISTINCT for_date) FROM verification"
+            " WHERE window = ? AND method = ?",
+            (verify.WINDOW, args.method),
+        ).fetchone()
+    finally:
+        conn.close()
+    scope = [
+        f"method {args.method}",
+        f"edition {args.edition}" if args.edition else "earliest edition per day",
+        "all days" if args.all_days else "snow days (forecast or observed >= 0.5 in)",
+    ]
+    if args.start or args.to:
+        scope.append(f"{args.start or '...'}..{args.to or '...'}")
+    print(f"verification 1d: {span[2]} dates ({span[0]}..{span[1]}); " + ", ".join(scope))
+    group = "band" if args.by == "elevation" else "group"
+    header = f"{'mountain':<14} {group:<16} {'n':>5} {'bias':>6} {'mae_in':>7} {'hit':>5}"
+    print(header)
+    print("-" * len(header))
+    for c in cells:
+        print(
+            f"{c.mountain:<14} {c.group:<16} {c.n:>5} {_fmt(c.bias_ratio, '.2f'):>6}"
+            f" {c.mae_in:>7.2f} {c.hit_rate:>5.2f}"
+        )
+    if not cells:
+        print("(no scored rows)")
+    return 0
+
+
 SMOKE_PAGE = """\
 Snow Report - updated 6:42 AM
 Sample page for the hazelst agent smoke test.
@@ -590,6 +704,43 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_st_summary.add_argument("--json", action="store_true", help="print JSON")
     p_st_summary.set_defaults(handler=_cmd_stations_summary)
+
+    p_elev = sub.add_parser("elevations", help="observation elevations (Open-Meteo elevation API)")
+    elev_sub = p_elev.add_subparsers(dest="elevations_command", metavar="<elevations-command>")
+    p_fill = elev_sub.add_parser("fill", help="set snow_report.elev_ft where it is NULL")
+    p_fill.set_defaults(handler=_cmd_elevations_fill)
+    p_pixels = elev_sub.add_parser(
+        "nohrsc-pixels",
+        help="ground elevation of each mountain's NOHRSC pixel center (for config/mountains.json)",
+    )
+    p_pixels.add_argument(
+        "--date",
+        type=date.fromisoformat,
+        default=date(2026, 2, 7),
+        help="end date of the 24 h grid to read the geometry from (default 2026-02-07)",
+    )
+    p_pixels.add_argument("--grid", help="read a saved grid (.tif or .tif.gz) instead")
+    p_pixels.set_defaults(handler=_cmd_elevations_nohrsc)
+
+    p_verify_cmd = sub.add_parser("verify", help="verification results: summary")
+    verify_sub = p_verify_cmd.add_subparsers(dest="verify_command", metavar="<verify-command>")
+    p_summary = verify_sub.add_parser(
+        "summary", help="n, bias ratio, MAE, and hit rate per mountain (and elevation band)"
+    )
+    p_summary.add_argument(
+        "--by",
+        choices=["mountain", "elevation"],
+        default="mountain",
+        help="elevation: one row per observation elevation band",
+    )
+    p_summary.add_argument("--from", dest="start", type=date.fromisoformat)
+    p_summary.add_argument("--to", type=date.fromisoformat)
+    p_summary.add_argument("--edition", help="one edition (default: the earliest per day)")
+    p_summary.add_argument("--method", default="raw_mean", help="default raw_mean")
+    p_summary.add_argument(
+        "--all-days", action="store_true", help="include days with no snow forecast or observed"
+    )
+    p_summary.set_defaults(handler=_cmd_verify_summary)
 
     p_schedule = sub.add_parser("schedule", help="print the job schedule and each slot's next run")
     p_schedule.set_defaults(handler=_cmd_schedule)

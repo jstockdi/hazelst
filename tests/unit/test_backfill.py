@@ -15,7 +15,7 @@ import httpx
 import pytest
 
 from hazelst import backfill, config, db, jobs
-from hazelst.sources import base, ghcn, iem, nohrsc, pns, previous_runs, snocountry
+from hazelst.sources import base, elevation, ghcn, iem, nohrsc, pns, previous_runs, snocountry
 from tests.support import FIXTURES
 from tests.unit.test_obs_sources import LSR_FEB, NOHRSC_24H, PNS_IDS, body
 from tests.unit.test_snocountry import SNOCOUNTRY_BODIES
@@ -90,6 +90,9 @@ class FakeWeb:
             return httpx.Response(200, content=body(NOHRSC_24H))
         if url == ghcn.URL:
             return httpx.Response(200, json=ghcn_body(query))
+        if url == elevation.URL:
+            points = query["latitude"].split(",")
+            return httpx.Response(200, json={"elevation": [300.0] * len(points)})
         return httpx.Response(404, text="not found")
 
 
@@ -157,17 +160,23 @@ def test_backfill_loads_every_source_and_is_idempotent(cfg: config.Config) -> No
     assert first["snocountry"]["rows"]["observation"] > 8 * 1000  # whole histories
     assert first["ghcn"]["requests"] == 3  # 132 stations in batches of 50
     assert first["ghcn"]["rows"] == {"snow_report": 10}  # 5 stations x Feb 6-7
+    assert first["lsr"]["rows"]["elev_ft"] == first["lsr"]["rows"]["snow_report"]
     stored = counts(cfg)
     sent = len(web.requests)
 
     again = FakeWeb()
     second = run_backfill(cfg, again)
     assert again.requests == []  # every response is already stored
-    assert all(second[s]["requests"] == 0 and second[s]["rows"] == {} for s in backfill.STEPS)
+    assert all(
+        second[s]["requests"] == 0 and second[s]["rows"] in ({}, {"elev_ft": 0})
+        for s in backfill.STEPS
+    )
     assert counts(cfg) == stored
+    conn = db.connect(cfg.settings.db_path)
+    assert conn.execute("SELECT count(*) FROM snow_report WHERE elev_ft IS NULL").fetchone()[0] == 0
     # Leads, LSR, listings for 2 days, texts, NOHRSC, one SnoCountry document per mountain,
-    # GHCN batches.
-    assert sent == 5 + 1 + 2 * 3 + 3 + 1 + 8 + 3
+    # GHCN batches; elevation: 2 calls for LSR, 1 for PNS.
+    assert sent == 5 + 1 + 2 * 3 + 3 + 1 + 8 + 3 + 3
 
 
 def test_failed_requests_are_retried_on_the_next_run(cfg: config.Config) -> None:

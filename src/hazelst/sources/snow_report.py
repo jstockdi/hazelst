@@ -84,7 +84,7 @@ def make_row(
         place=place,
         lat=lat,
         lon=lon,
-        elev_ft=None,  # neither PNS nor LSR gives an elevation
+        elev_ft=None,  # neither PNS nor LSR gives one; elevation.fill() looks it up
         ending_at=ending,
         snow_in=snow_in,
         hours=hours,
@@ -99,17 +99,33 @@ _COLUMNS = (
 )
 
 
+_PNS_REPLACES = (
+    " ON CONFLICT (id) DO UPDATE SET product_id = excluded.product_id,"
+    " place = excluded.place, lat = excluded.lat, lon = excluded.lon,"
+    " elev_ft = coalesce(excluded.elev_ft, snow_report.elev_ft),"
+    " ending_at = excluded.ending_at, snow_in = excluded.snow_in, hours = excluded.hours,"
+    " nearest_mountain = excluded.nearest_mountain, distance_mi = excluded.distance_mi"
+)
+
+
 def store(conn: sqlite3.Connection, rows: Iterable[SnowReportRow], kind: Kind) -> int:
     """Write rows; returns how many were inserted or replaced.
 
     PNS rows replace any row with the same id (a later PNS, or the LSR copy of
-    the same observation). LSR rows never replace an existing row. GHCN rows
-    have their own ids (`ghcn:{station}:{date}`) and replace an earlier copy.
+    the same observation), keeping its elevation when the new row has none.
+    LSR rows never replace an existing row. GHCN rows have their own ids
+    (`ghcn:{station}:{date}`) and replace an earlier copy.
     """
     params = [astuple(r) for r in rows]
-    verb = "INSERT OR IGNORE" if kind == "lsr" else "INSERT OR REPLACE"
+    if kind == "pns":
+        verb, conflict = "INSERT", _PNS_REPLACES
+    elif kind == "lsr":
+        verb, conflict = "INSERT OR IGNORE", ""
+    else:
+        verb, conflict = "INSERT OR REPLACE", ""
     before = conn.total_changes
     conn.executemany(
-        f"{verb} INTO snow_report ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", params
+        f"{verb} INTO snow_report ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)" + conflict,
+        params,
     )
     return conn.total_changes - before

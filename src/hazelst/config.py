@@ -82,6 +82,9 @@ class Mountain(BaseModel):
     wind_hold_mph: WindHold
     season_open: date | None = None
     favored_by: tuple[str, ...] = ()
+    # Ground elevation of the center of the NOHRSC pixel containing (lat, lon);
+    # `hazelst elevations nohrsc-pixels` looks it up once.
+    nohrsc_pixel_elev_ft: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def _summit_above_base(self) -> Mountain:
