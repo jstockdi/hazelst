@@ -89,7 +89,7 @@ All sources below are free and keyless (NWS requires a `User-Agent` header).
 | **Resort mountain reports** | Four shared presets, one config entry per resort (see [Resort adapters](#resort-adapters)) | New 24 h / 48 h / 7-day snow, base depth, season total, trails and lifts open, lifts on hold | Accumulation chart, per-mountain notes |
 | **SnoCountry** | `good-cormorant-17.convex.site/api/resort-data?resortId={id}` (see [SnoCountry](#snocountry)) | Resort-reported new snow by date (2019 onward), daily base depth (2012 onward) | Verification; resort fallback; season backfill |
 | **NWS snowfall reports (PNS)** | Live: `api.weather.gov/products/types/PNS/locations/{BTV,ALY,GYX}`; archive: IEM AFOS (see [Observation endpoints](#observation-and-backfill-endpoints)) | `**METADATA**` lines: place, lat/lon, `SNOW_24` or `SNOW` (storm total), inches, provider | Accumulation cross-check; verification; season backfill |
-| **NOAA NOHRSC** | National Snowfall Analysis v2 GeoTIFF, `www.nohrsc.noaa.gov/snowfall_v2/data/{YYYYMM}/sfav2_CONUS_24h_{YYYYMMDD}12.tif` | 24 h, 48 h, 72 h, and season-to-date snowfall at each mountain's pixel | Accumulation fallback; verification |
+| **NOAA NOHRSC** | National Snowfall Analysis v2 GeoTIFF, `www.nohrsc.noaa.gov/snowfall_v2/data/{YYYYMM}/sfav2_CONUS_24h_{YYYYMMDD}12.tif` | 24 h, 48 h, 72 h, and season-to-date snowfall at each mountain's pixel | Context beside verification and accumulation (never the observation) |
 | **Iowa Environmental Mesonet** | LSR GeoJSON `mesonet.agron.iastate.edu/geojson/lsr.php`; PNS text archive `api/1/nws/afos/list.json` + `api/1/nwstext/{product_id}` | Point snowfall reports with coordinates, current and historical | Ground truth; season backfill |
 | **Open-Meteo Previous Runs** | `previous-runs-api.open-meteo.com/v1/forecast`, `{var}_previous_day{N}` | Past forecasts at 1–7 day lead for GFS and GEM; ECMWF precipitation and temperature only | Backfill `skill` before the first storm |
 | **Open-Meteo Historical Forecast** | `historical-forecast-api.open-meteo.com/v1/forecast` | Short-lead model output stitched from successive runs, 2025–26 season | Not used for `skill` (wrong lead time); available for `model_analysis` observations |
@@ -345,7 +345,7 @@ Cranmore's report dated 2026-11-24, pre-season).
 | No 48 h snow | Cranmore | `new_48h_in` is `null`; 48 h accumulation uses NOHRSC |
 | Report date without a time | Cranmore | `reported_at` is midnight local; staleness uses the date |
 | "Overnight" instead of 24 h | Cranmore | Stored as `new_24h_in` |
-| Report site blocked | Stratton (`stratton.com`) | Not needed: the `mtnpowder` feed carries the data. If the feed fails, the Fallbacks rule applies (adapter disabled; PNS / LSR / NOHRSC) |
+| Report site blocked | Stratton (`stratton.com`) | Not needed: the `mtnpowder` feed carries the data. If the feed fails, the Fallbacks rule applies (adapter disabled; SnoCountry's copy of the resort number, else `NO_OBS`; PNS / LSR / NOHRSC stay context) |
 | Off-season values | All | Fixtures are early season: every snow value was `0` or `--`; decimal and range formats beyond Cranmore's archived copy are unconfirmed |
 
 ## Observation and backfill endpoints
@@ -383,8 +383,10 @@ the 2025–26 season, so it serves J22.
 
 For each LSR or PNS point, compute the great-circle distance to every mountain
 in `mountains.json`; store `nearest_mountain` and `distance_mi` in
-`snow_report`. `forecast-verify` uses reports within 5 mi of the mountain
-(data-model.md, observation priority). Reports are mostly valley spotters and
+`snow_report`. `forecast-verify` records every report within 20 mi of each
+mountain's point (distance computed per mountain, not from
+`nearest_mountain`) as context beside the score, never as the observation
+(decisions row 24). Reports are mostly valley spotters and
 read lower than summits; neither product gives an elevation, so `elev_ft` comes
 from the Open-Meteo elevation API ([Report elevation](#report-elevation-j25)). The same
 CoCoRaHS observation can appear in both an LSR and a PNS: deduplicate on
@@ -446,7 +448,7 @@ or `numpy` dependency. The `.nc` versions are NetCDF4/HDF5 and would need
 
 Latency: the 24 h grid ending 12Z on day D appeared at about 00Z on D+1
 (`sfav2_CONUS_24h_2026112512.tif` last-modified 2026-11-26 00:06Z). It feeds
-the 9 PM `forecast-verify` and the next morning's accumulation fallback, not the
+the 9 PM `forecast-verify` context and the next morning's accumulation context, not the
 same morning. Files are reprocessed later (the 2026-02-07 file was regenerated
 2026-02-12), so verification re-reads a grid once after 7 days.
 
@@ -518,8 +520,8 @@ name, `lat` / `lon` / `elev_ft` from `config/stations.json`, `snow_in`,
 `hours = 24`, `nearest_mountain` / `distance_mi` from the station list.
 `ending_at` is 7 AM local on the date for co-op and CoCoRaHS stations (their
 day ends at the morning observation) and midnight ending the date for
-Mount Washington (`USW00014755`, calendar day). The 5 mi rule in
-verification then treats a co-op report like a 24 h PNS report.
+Mount Washington (`USW00014755`, calendar day). The verification context
+then treats a co-op report like a 24 h PNS report (J26: context only).
 
 Implementation (J24, verified 2026-11-26):
 
@@ -532,8 +534,9 @@ Implementation (J24, verified 2026-11-26):
   has one entry per mountain (132 stations, 158 entries: Killington 21,
   Pico 20, Sugarbush 42, Stratton 28, Loon 13, Cranmore 18, Sunday River 9,
   Sugarloaf 7). The `snow_report` row takes the entry with the smallest
-  distance. Within 5 mi (eligible as truth): Cranmore 4 stations, Stratton
-  3, Sugarbush 1; the other five mountains have none.
+  distance. Within 5 mi: Cranmore 4 stations, Stratton 3, Sugarbush 1; the
+  other five mountains have none. Since J26 no station is truth; all within
+  20 mi are context.
 - **Requests:** the service allows at most 100 stations per request
   (HTTP 400 above that); requests carry 50. Values are strings (`"4.2"`); a
   date without `SNOW`, or with a non-numeric value, has no row. `SNWD` is

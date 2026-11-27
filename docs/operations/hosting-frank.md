@@ -162,7 +162,18 @@ today; if one is added, this is the allowlist.
   `elev_ft` (failed lookups; a rerun retries them). Days with no stored report
   are scored as edition `backfill` from the stored Previous Runs forecasts.
   `verify summary` takes `--from`, `--to`, `--edition`, `--method`, and
-  `--all-days` (default: snow days only, earliest edition per day).
+  `--all-days` (default: snow days only, earliest edition per day). Since
+  J26, `--by elevation` prints the resort score (group `resort`) and then the
+  same forecast against the highest context report in each elevation band
+  (context, not a score); `observed_elev_ft` is NULL on rows scored since J26.
+- **Resort truth** (J26, manual, once after the J26 deploy): re-score the
+  backfilled range so every row is scored against the resort's own report
+  (or `NO_OBS`) and carries `context`, then rebuild `skill`:
+
+  ```bash
+  docker exec hazelst hazelst forecast-verify --from 2024-01-20 --to 2026-04-30
+  docker exec hazelst hazelst run skill-learn
+  ```
 - **Failure behavior:** a failed source degrades that section (noted in the page
   footer); a failed Claude call publishes the numbers-only page with "report
   delayed" and retries every 15 minutes until 9 AM.

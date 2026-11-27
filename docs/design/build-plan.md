@@ -49,7 +49,7 @@ Every job thread:
 | Agent SDK has no structured-output option | Put the JSON schema in the prompt, validate with Pydantic, one retry with the validation error; record in `decisions.md` |
 | Agent SDK cannot run on a read-only rootfs | Set `HOME` to a tmpfs path (`/tmp/home`); if that fails, a writable `/data/claude-home` |
 | IEM or NOHRSC endpoint unavailable or changed | Drop that source, show "source unavailable", record in `data-sources.md` |
-| A resort page is blocked or has no parseable data | Disable that adapter; observations fall back to PNS / LSR / NOHRSC; record in `data-sources.md` |
+| A resort page is blocked or has no parseable data | Disable that adapter; that mountain uses SnoCountry's copy of the resort number, else `NO_OBS` / "no report" (PNS / LSR / GHCN / NOHRSC stay context, decisions row 24); record in `data-sources.md` |
 | ECMWF 06Z not available by 8:45 | The 8:15 edition publishes with the 00Z run and says so in the footer |
 | Open-Meteo Historical Forecast lacks a model or season | Backfill the models and dates it has |
 | No snow falls during J14 | "Done when" is met on fixtures; the live check is deferred to the first snow day and noted in the PR |

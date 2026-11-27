@@ -192,46 +192,48 @@ def test_migration_0004_adds_observed_elev_ft(tmp_path: Path) -> None:
         "INSERT INTO verification (for_date, edition, mountain, window, method, result)"
         " VALUES ('2026-02-06', '0700', 'loon', '1d', 'raw_mean', 'HIT')"
     )
-    assert db.migrate(c) == [4]
+    assert db.migrate(c, [m for m in migrations if m.version <= 4]) == [4]
     columns = [r[1] for r in c.execute("PRAGMA table_info(verification)")]
     assert columns[-1] == "observed_elev_ft"
     assert c.execute("SELECT observed_elev_ft FROM verification").fetchone()[0] is None
 
 
-# --- observed_elev_ft per source -------------------------------------------------------
+def test_migration_0005_adds_context(tmp_path: Path) -> None:
+    c = db.connect(tmp_path / "m5.db")
+    migrations = db.load_migrations()
+    assert db.migrate(c, [m for m in migrations if m.version <= 4]) == [1, 2, 3, 4]
+    c.execute(
+        "INSERT INTO verification (for_date, edition, mountain, window, method, result)"
+        " VALUES ('2026-02-06', '0700', 'loon', '1d', 'raw_mean', 'HIT')"
+    )
+    assert db.migrate(c) == [5]
+    columns = [r[1] for r in c.execute("PRAGMA table_info(verification)")]
+    assert columns[-2:] == ["observed_elev_ft", "context"]
+    assert c.execute("SELECT context FROM verification").fetchone()[0] is None
+    indexes = {r[1] for r in c.execute("PRAGMA index_list(snow_report)")}
+    assert "snow_report_ending_at" in indexes
 
 
-def test_observed_elev_ft_per_source(snow_day: sqlite3.Connection) -> None:  # noqa: F811
+# --- elevations in the context ----------------------------------------------------------
+
+
+def test_context_carries_report_and_pixel_elevations(snow_day: sqlite3.Connection) -> None:  # noqa: F811
     with db.transaction(snow_day):
         snow_day.execute("UPDATE snow_report SET elev_ft = 500 + CAST(snow_in * 100 AS INT)")
     rows = verify.verify_date(snow_day, MOUNTAINS, DAY)
     with db.transaction(snow_day):
         verify.store(snow_day, rows)
-    got = {
-        (r[0], r[1]): r[2]
-        for r in snow_day.execute(
-            "SELECT DISTINCT mountain, observed_source, observed_elev_ft FROM verification"
-        )
-    }
-    assert {k for k, _ in got} == set(EXPECTED_OBS)
-    for (mountain, source), elev in got.items():
-        assert source == EXPECTED_OBS[mountain][1]
-        if source in ("resort", "resort_llm"):
-            assert elev is None  # measurement site unknown
-        elif source == "nohrsc":
-            assert elev == BY_KEY[mountain].nohrsc_pixel_elev_ft
-        else:  # pns / lsr: the chosen report's elevation
-            assert elev == 500 + int(EXPECTED_OBS[mountain][0] * 100)
-
-
-def test_observed_elev_ft_rules() -> None:
-    loon = BY_KEY["loon"]
-    point = verify.Observed(3.0, "ghcn", "snow_report:x", 1820)
-    assert verify.observed_elev_ft(point, loon) == 1820
-    assert verify.observed_elev_ft(verify.Observed(3.0, "lsr", "x"), loon) is None  # no lookup
-    assert verify.observed_elev_ft(verify.Observed(3.0, "nohrsc", "x"), loon) == 2228
-    assert verify.observed_elev_ft(verify.Observed(3.0, "snocountry", "x"), loon) is None
-    assert verify.observed_elev_ft(None, loon) is None
+    # The score's own elevation is unknown: resort measurement sites are not published.
+    assert {r.observed_elev_ft for r in rows} == {None}
+    for mountain, context in snow_day.execute(
+        "SELECT DISTINCT mountain, context FROM verification"
+    ):
+        items = json.loads(context)
+        assert items[0]["source"] == "nohrsc"
+        assert items[0]["elev_ft"] == BY_KEY[mountain].nohrsc_pixel_elev_ft
+        for item in items[1:]:
+            assert item["elev_ft"] == 500 + int(item["snow_in"] * 100)
+            assert 0 <= item["distance_mi"] <= verify.CONTEXT_MI
 
 
 # --- backfill edition -----------------------------------------------------------------
@@ -300,54 +302,76 @@ def insert_verification(
     mountain: str,
     forecast: float,
     observed: float | None,
-    elev: int | None,
+    context: list[tuple[float, int | None]] = (),  # type: ignore[assignment]
     method: str = "raw_mean",
 ) -> None:
+    """A row scored against a resort value, with context reports as (snow_in, elev_ft)."""
     error, ratio, result = verify.score(forecast, observed)
+    items = [{"source": "ghcn", "place": "x", "snow_in": v, "elev_ft": e} for v, e in context]
     conn.execute(
         "INSERT INTO verification (for_date, edition, mountain, window, method, forecast_in,"
-        " observed_in, observed_source, error_in, ratio, result, tags, observed_elev_ft)"
-        " VALUES (?, ?, ?, '1d', ?, ?, ?, 'lsr', ?, ?, ?, '[]', ?)",
-        (for_date, edition, mountain, method, forecast, observed, error, ratio, result, elev),
+        " observed_in, observed_source, error_in, ratio, result, tags, context)"
+        " VALUES (?, ?, ?, '1d', ?, ?, ?, 'resort', ?, ?, ?, '[]', ?)",
+        (
+            for_date,
+            edition,
+            mountain,
+            method,
+            forecast,
+            observed,
+            error,
+            ratio,
+            result,
+            json.dumps(items),
+        ),
     )
 
 
 def test_summary_by_elevation_bands_and_earliest_edition(conn: sqlite3.Connection) -> None:
     with db.transaction(conn):
-        insert_verification(conn, "2026-02-01", "0700", "loon", 4.0, 2.0, 900)  # HIT
-        insert_verification(conn, "2026-02-01", "0815", "loon", 9.0, 2.0, 900)  # later edition
-        insert_verification(conn, "2026-02-02", "0700", "loon", 2.0, 8.0, 3000)  # MISS
-        insert_verification(conn, "2026-02-03", "backfill", "loon", 1.0, 3.0, 3100)  # HIT
-        insert_verification(conn, "2026-02-04", "0700", "loon", 0.2, 0.0, 900)  # dry day
-        insert_verification(conn, "2026-02-05", "0700", "loon", 3.0, None, None)  # NO_OBS
-        insert_verification(conn, "2026-02-01", "0700", "pico", 3.0, 6.0, None)  # MISS
-        insert_verification(conn, "2026-02-01", "0700", "pico", 1.0, 6.0, None, "gfs_seamless")
+        # Loon: the resort reported 2 in; a valley report had 1 in, a high site 3 and 2.5.
+        insert_verification(
+            conn, "2026-02-01", "0700", "loon", 4.0, 2.0, [(1.0, 900), (3.0, 3000), (2.5, 2600)]
+        )
+        insert_verification(conn, "2026-02-01", "0815", "loon", 9.0, 2.0)  # later edition
+        # No resort report: not scored, but the context still compares.
+        insert_verification(conn, "2026-02-02", "0700", "loon", 2.0, None, [(8.0, 900)])
+        insert_verification(conn, "2026-02-03", "backfill", "loon", 1.0, 3.0, [(0.1, None)])
+        insert_verification(conn, "2026-02-04", "0700", "loon", 0.2, 0.0, [(0.0, 900)])  # dry
+        insert_verification(conn, "2026-02-01", "0700", "pico", 3.0, 6.0)  # MISS
+        insert_verification(conn, "2026-02-01", "0700", "pico", 1.0, 6.0, method="gfs_seamless")
     cells = verify.summary_cells(conn, by="elevation")
     got = {(c.mountain, c.group): (c.n, c.bias_ratio, c.mae_in, c.hit_rate) for c in cells}
     assert got == {
-        ("loon", "< 1,500 ft"): (1, 2.0, 2.0, 1.0),
-        ("loon", "> 2,500 ft"): (2, 0.27, 4.0, 0.5),
-        ("pico", "unknown"): (1, 0.5, 3.0, 0.0),
-        ("all", "< 1,500 ft"): (1, 2.0, 2.0, 1.0),
-        ("all", "> 2,500 ft"): (2, 0.27, 4.0, 0.5),
-        ("all", "unknown"): (1, 0.5, 3.0, 0.0),
+        ("loon", "resort"): (2, 1.0, 2.0, 1.0),
+        ("loon", "< 1,500 ft"): (2, 0.67, 4.5, 0.0),
+        ("loon", "> 2,500 ft"): (1, 1.33, 1.0, 1.0),  # the highest report in the band
+        ("loon", "unknown"): (1, 10.0, 0.9, 1.0),
+        ("pico", "resort"): (1, 0.5, 3.0, 0.0),
+        ("all", "resort"): (3, 0.73, 2.33, 0.67),
+        ("all", "< 1,500 ft"): (2, 0.67, 4.5, 0.0),
+        ("all", "> 2,500 ft"): (1, 1.33, 1.0, 1.0),
+        ("all", "unknown"): (1, 10.0, 0.9, 1.0),
     }
     assert [c.mountain for c in cells][-1] == "all"  # totals come last
-    # All days: the dry day joins the low band; one edition only.
-    low = verify.summary_cells(conn, by="elevation", snow_days_only=False)[0]
-    assert (low.mountain, low.group, low.n) == ("loon", "< 1,500 ft", 2)
+    # All days: the dry day joins the resort group and the low band; one edition only.
+    every = verify.summary_cells(conn, by="elevation", snow_days_only=False)
+    assert [(c.group, c.n) for c in every if c.mountain == "loon"][:2] == [
+        ("resort", 3),
+        ("< 1,500 ft", 3),
+    ]
     later = verify.summary_cells(conn, by="elevation", edition="0815")
     assert next((c.mountain, c.group, c.n, c.bias_ratio) for c in later) == (
         "loon",
-        "< 1,500 ft",
+        "resort",
         1,
         4.5,
     )
     overall = verify.summary_cells(conn, by="mountain", end=date(2026, 2, 2))
     assert [(c.mountain, c.group, c.n) for c in overall] == [
-        ("loon", "all", 2),
+        ("loon", "all", 1),
         ("pico", "all", 1),
-        ("all", "all", 3),
+        ("all", "all", 2),
     ]
 
 
@@ -358,14 +382,16 @@ def test_verify_summary_cli(
     c = db.connect(tmp_path / "s.db")
     db.migrate(c)
     with db.transaction(c):
-        insert_verification(c, "2026-02-01", "0700", "loon", 4.0, 2.0, 900)
-        insert_verification(c, "2026-02-02", "0700", "loon", 2.0, 8.0, 3000)
+        insert_verification(c, "2026-02-01", "0700", "loon", 4.0, 2.0, [(1.0, 900)])
+        insert_verification(c, "2026-02-02", "0700", "loon", 2.0, 8.0, [(6.0, 3000)])
     assert cli.main(["verify", "summary", "--by", "elevation"]) == 0
     out = capsys.readouterr().out.splitlines()
     assert out[0].startswith("verification 1d: 2 dates (2026-02-01..2026-02-02)")
-    assert out[1].split() == ["mountain", "band", "n", "bias", "mae_in", "hit"]
-    assert out[3].split() == ["loon", "<", "1,500", "ft", "1", "2.00", "2.00", "1.00"]
-    assert out[4].split() == ["loon", ">", "2,500", "ft", "1", "0.25", "6.00", "0.00"]
+    assert "bands compare the forecast with context reports" in out[1]
+    assert out[2].split() == ["mountain", "group", "n", "bias", "mae_in", "hit"]
+    assert out[4].split() == ["loon", "resort", "2", "0.60", "4.00", "0.50"]
+    assert out[5].split() == ["loon", "<", "1,500", "ft", "1", "4.00", "3.00", "0.00"]
+    assert out[6].split() == ["loon", ">", "2,500", "ft", "1", "0.33", "4.00", "0.00"]
 
 
 def test_forecast_verify_range_scores_backfilled_days(tmp_path: Path) -> None:

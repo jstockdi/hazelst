@@ -414,7 +414,8 @@ def _fmt(value: float | None, pattern: str) -> str:
 
 
 def _cmd_verify_summary(args: argparse.Namespace) -> int:
-    """n, bias ratio, MAE, and hit rate per mountain, by elevation band or overall."""
+    """n, bias ratio, MAE, and hit rate per mountain: the resort score, and by elevation
+    the forecast against the context reports in each band."""
     from hazelst import verify
 
     cfg = config.load()
@@ -444,8 +445,12 @@ def _cmd_verify_summary(args: argparse.Namespace) -> int:
     if args.start or args.to:
         scope.append(f"{args.start or '...'}..{args.to or '...'}")
     print(f"verification 1d: {span[2]} dates ({span[0]}..{span[1]}); " + ", ".join(scope))
-    group = "band" if args.by == "elevation" else "group"
-    header = f"{'mountain':<14} {group:<16} {'n':>5} {'bias':>6} {'mae_in':>7} {'hit':>5}"
+    if args.by == "elevation":
+        print(
+            "resort = the score (forecast vs the resort's report); bands compare the forecast"
+            " with context reports (highest non-resort report per band, not a score)"
+        )
+    header = f"{'mountain':<14} {'group':<16} {'n':>5} {'bias':>6} {'mae_in':>7} {'hit':>5}"
     print(header)
     print("-" * len(header))
     for c in cells:
@@ -725,13 +730,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_verify_cmd = sub.add_parser("verify", help="verification results: summary")
     verify_sub = p_verify_cmd.add_subparsers(dest="verify_command", metavar="<verify-command>")
     p_summary = verify_sub.add_parser(
-        "summary", help="n, bias ratio, MAE, and hit rate per mountain (and elevation band)"
+        "summary",
+        help="n, bias ratio, MAE, and hit rate per mountain (and context by elevation band)",
     )
     p_summary.add_argument(
         "--by",
         choices=["mountain", "elevation"],
         default="mountain",
-        help="elevation: one row per observation elevation band",
+        help="elevation: the resort score, then the forecast against context reports per band",
     )
     p_summary.add_argument("--from", dest="start", type=date.fromisoformat)
     p_summary.add_argument("--to", type=date.fromisoformat)

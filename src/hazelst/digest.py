@@ -15,7 +15,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from hazelst.models import ReportPayload
+from hazelst.models import Accumulation, ReportPayload
 
 PrecipType = Literal["snow", "ice", "rain", "mix", "dry"]
 WindowKey = Literal["1d", "3d", "5d"]
@@ -57,11 +57,27 @@ class DigestAlert(_Model):
     expires: str | None = None
 
 
+class DigestContext(_Model):
+    """A non-resort snow value for one past day: never the mountain's own snowfall."""
+
+    date: dt.date
+    source: str  # nohrsc | pns | lsr | ghcn
+    place: str
+    snow_in: float
+    elev_ft: int | None = None
+    distance_mi: float | None = None
+
+
 class DigestAccumulation(_Model):
+    """Resort-reported snow (`last7_in`: None = no report), and, apart from it, the
+    other sources for the same days (`not_resort_reported`, at most NOHRSC plus the
+    three highest point reports per day)."""
+
     source: str
     last7_in: list[float | None] = Field(default_factory=list)
     season_in: float | None = None
     base_in: float | None = None
+    not_resort_reported: list[DigestContext] = Field(default_factory=list)
 
 
 class DigestMountain(_Model):
@@ -114,6 +130,37 @@ class ReportDigest(_Model):
 
 # --- build ------------------------------------------------------------------------
 
+CONTEXT_PER_DAY = 3  # point reports per day in the digest, highest elevation first
+
+
+def digest_accumulation(acc: Accumulation) -> DigestAccumulation:
+    """The page's accumulation for the writer, with each day's context kept apart."""
+    context: list[DigestContext] = []
+    for day in acc.days:
+        grid = [c for c in day.context if c.source == "nohrsc"]
+        points = sorted(
+            (c for c in day.context if c.source != "nohrsc"),
+            key=lambda c: (c.elev_ft is None, -(c.elev_ft or 0), c.distance_mi or 0),
+        )[:CONTEXT_PER_DAY]
+        context += [
+            DigestContext(
+                date=day.date,
+                source=c.source,
+                place=c.place,
+                snow_in=c.snow_in,
+                elev_ft=c.elev_ft,
+                distance_mi=c.distance_mi,
+            )
+            for c in (*grid, *points)
+        ]
+    return DigestAccumulation(
+        source=acc.source,
+        last7_in=list(acc.last7_in),
+        season_in=acc.season_in,
+        base_in=acc.base_in,
+        not_resort_reported=context,
+    )
+
 
 def from_payload(
     payload: ReportPayload, verification: Sequence[DigestVerification] = ()
@@ -157,11 +204,7 @@ def from_payload(
             ],
             storm_type=m.forecast.storm_type,
             alerts=[DigestAlert(event=e) for e in m.alerts],
-            accumulation=DigestAccumulation(
-                **m.accumulation.model_dump(include=set(DigestAccumulation.model_fields))
-            )
-            if m.accumulation
-            else None,
+            accumulation=digest_accumulation(m.accumulation) if m.accumulation else None,
         )
         for m in payload.mountains
     ]

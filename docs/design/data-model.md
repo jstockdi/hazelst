@@ -121,10 +121,11 @@ CREATE TABLE forecast_day (
 CREATE TABLE verification (
   for_date DATE, edition TEXT,              -- 0700 | 0815 | 1440 | backfill (a day with no report)
   mountain TEXT, window TEXT, method TEXT,  -- window 1d; method raw_mean | corrected | a model id
-  forecast_in REAL, observed_in REAL, observed_source TEXT,  -- resort | resort_llm | snocountry | pns | lsr | ghcn | nohrsc
+  forecast_in REAL, observed_in REAL, observed_source TEXT,  -- resort | resort_llm | snocountry (J26; before: also pns | lsr | ghcn | nohrsc)
   error_in REAL, ratio REAL, result TEXT,   -- HIT | MISS | NO_OBS
   tags JSON,                                -- tags that fired, copied for slicing
-  observed_elev_ft INT,                     -- migration 0004: report elevation (pns | lsr | ghcn), NOHRSC pixel center (nohrsc), NULL otherwise
+  observed_elev_ft INT,                     -- migration 0004: the observation's elevation; NULL since J26 (resort measurement sites are unknown)
+  context JSON,                             -- migration 0005: [{source, place, snow_in, elev_ft, distance_mi, hours, ending_at}]: NOHRSC pixel and PNS / LSR / GHCN within 20 mi, never scored
   PRIMARY KEY (for_date, edition, mountain, window, method)
 );
 CREATE TABLE skill (                        -- rebuilt nightly from verification + forecast_hourly
@@ -176,6 +177,9 @@ CREATE TABLE config_change (                -- threshold / weight changes, same 
 CREATE INDEX fetch_body_sha256 ON fetch (body_sha256);
 CREATE INDEX run_kind_for_date ON run (kind, for_date);
 CREATE INDEX agent_call_created_at ON agent_call (created_at);
+CREATE UNIQUE INDEX observation_snocountry_day ON observation (mountain, source, obs_date)
+  WHERE source = 'snocountry';             -- migration 0003
+CREATE INDEX snow_report_ending_at ON snow_report (ending_at);  -- migration 0005
 ```
 
 ## How the data compounds
@@ -189,7 +193,12 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
    resort report that day (`resort_llm` only without an adapter value), else
    the `snocountry` row for obs_date X + 1 (the same resort number,
    republished); else `NO_OBS`. PNS, LSR, GHCN, and NOHRSC values for the day
-   are recorded beside the score as context (J26), never as the observation.
+   are recorded beside the score as context (J26), never as the observation:
+   `verification.context` lists the NOHRSC 24 h grid ending 12Z on X + 1 at
+   the mountain's pixel, and each PNS / LSR / GHCN report within 20 mi of the
+   mountain's point (24 h reports ending 4–10 AM on X + 1, GHCN co-op days
+   ending 7 AM, and reports of unknown span ending after 6 AM X and by 10 AM
+   X + 1), each with place, `snow_in`, `elev_ft`, and `distance_mi`.
    HIT is within 2″ or 30% of the observation.
    `forecast-verify` runs at 9 PM on X + 1 and scores the newest report
    version of each edition, for the mean and each model; rows are replaced
@@ -233,9 +242,10 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
   no snowfall at lead).
 - **Iowa Environmental Mesonet** archives NWS Local Storm Reports and PNS text
   with snowfall and coordinates — past ground truth for `snow_report`.
-- **NOHRSC** 24 h snowfall grids for the same days — the `observation`
-  fallback the live verification uses, so every backfilled mountain-day has
-  an observation.
+- **NOHRSC** 24 h snowfall grids for the same days — context beside each
+  score (J26), never the observation.
+- **SnoCountry** resort snow history (J23) — the resort-reported values that
+  score backfilled days.
 
 All are free and keyless (confirmed 2026-11-26; endpoints in
 [data-sources.md](data-sources.md#observation-and-backfill-endpoints)). With

@@ -787,7 +787,7 @@ def rescore_range(ctx: JobContext, start: date, end: date) -> None:
     backfilled = verify.backfill_forecasts(ctx.conn, start, end, ctx.cfg.timezone)
     days = rows_total = backfill_days = 0
     sources: dict[str, int] = {}
-    with_elev: dict[str, int] = {}
+    context_sources: dict[str, int] = {}
     day = start
     while day <= end:
         rows = verify.verify_date(ctx.conn, ctx.cfg.mountains, day, ctx.cfg.timezone)
@@ -804,8 +804,8 @@ def rescore_range(ctx: JobContext, start: date, end: date) -> None:
                 if r.method == verify.RAW_MEAN:
                     key = r.observed_source or "none"
                     sources[key] = sources.get(key, 0) + 1
-                    if r.observed_elev_ft is not None:
-                        with_elev[key] = with_elev.get(key, 0) + 1
+                    for name in sorted({c["source"] for c in json.loads(r.context)}):
+                        context_sources[name] = context_sources.get(name, 0) + 1
         day += timedelta(days=1)
     ctx.summary["rescored"] = {
         "from": start.isoformat(),
@@ -814,7 +814,7 @@ def rescore_range(ctx: JobContext, start: date, end: date) -> None:
         "backfill_days": backfill_days,
         "rows": rows_total,
         "model_mean_observed_source": dict(sorted(sources.items())),
-        "model_mean_with_observed_elev_ft": dict(sorted(with_elev.items())),
+        "model_mean_with_context": dict(sorted(context_sources.items())),
     }
     log_event(run_id=ctx.run_id, step="forecast-verify", rescored=ctx.summary["rescored"])
 

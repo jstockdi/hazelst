@@ -285,25 +285,25 @@ def insert_snocountry(
     snocountry.store(c, [row], 0)
 
 
-def test_verification_order_resort_snocountry_points_nohrsc(
+def test_verification_order_resort_then_snocountry(
     snow_day: sqlite3.Connection,
 ) -> None:
     with db.transaction(snow_day):
         insert_snocountry(snow_day, "killington", 7.0)  # resort 3.0 still wins
-        insert_snocountry(snow_day, "stratton", 4.0)  # beats the LSR (1.9)
-        insert_snocountry(snow_day, "cranmore", 2.0)  # beats the PNS (1.3)
-        insert_snocountry(snow_day, "loon", 5.0)  # beats NOHRSC (1.88)
+        insert_snocountry(snow_day, "stratton", 4.0)
+        insert_snocountry(snow_day, "cranmore", 2.0)
+        insert_snocountry(snow_day, "loon", 5.0)
         insert_snocountry(snow_day, "sugarloaf", 0.0, inferred=True)  # a zero day counts
-        insert_snocountry(snow_day, "sunday_river", None)  # base only: falls through
+        insert_snocountry(snow_day, "sunday_river", None)  # base only: no report
     found = {m.key: verify.observed(snow_day, m.key, DAY) for m in MOUNTAINS}
+    # Pico (stale resort report) and Sunday River have no resort value: NO_OBS, even
+    # though NOHRSC and spotter reports exist for both.
     assert {k: (o.snow_in, o.source) for k, o in found.items() if o} == {
         "killington": (3.0, "resort"),
-        "pico": (2.55, "nohrsc"),
         "sugarbush": (2.5, "resort_llm"),
         "stratton": (4.0, "snocountry"),
         "loon": (5.0, "snocountry"),
         "cranmore": (2.0, "snocountry"),
-        "sunday_river": (0.49, "nohrsc"),
         "sugarloaf": (0.0, "snocountry"),
     }
 

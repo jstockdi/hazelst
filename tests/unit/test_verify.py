@@ -16,7 +16,7 @@ import httpx
 import pytest
 
 from hazelst import config, db, jobs, verify, web
-from hazelst.models import Accumulation
+from hazelst.models import Accumulation, ContextReport
 from hazelst.render import page
 from hazelst.sources import base, iem, nohrsc, pns, snow_report
 from tests.pages import recorded_payload
@@ -46,6 +46,7 @@ FORECAST = {
     "sugarloaf": 0.0,
 }
 EDITION_SHIFT = {"0700": 0.0, "0815": 0.5, "1440": -0.5}
+BY_KEY = {m.key: m for m in MOUNTAINS}
 
 
 # --- scoring -----------------------------------------------------------------------
@@ -180,40 +181,100 @@ def build_snow_day(tmp_path: Path) -> sqlite3.Connection:
     return conn
 
 
+# Only resort-reported values score (decisions row 24); every other mountain is NO_OBS.
 EXPECTED_OBS = {
     "killington": (3.0, "resort"),  # earliest report of the morning
-    "pico": (2.55, "nohrsc"),  # stale resort report ignored; no point report within 5 mi
     "sugarbush": (2.5, "resort_llm"),
-    "stratton": (1.9, "lsr"),  # Bondville 2.4 WNW, 3.4 mi: LSR copy of a later ALY PNS
-    "loon": (1.88, "nohrsc"),
-    "cranmore": (1.3, "pns"),  # North Conway 1.4 SSW, 2.0 mi, the higher of two reports
-    "sunday_river": (0.49, "nohrsc"),
-    "sugarloaf": (0.15, "nohrsc"),
 }
 
 
-def test_observation_priority(snow_day: sqlite3.Connection) -> None:
+def test_observed_is_resort_reported_only(snow_day: sqlite3.Connection) -> None:
     found = {m.key: verify.observed(snow_day, m.key, DAY) for m in MOUNTAINS}
-    # NOHRSC values are stored rounded to 0.01 in, so they compare exactly.
     assert {k: (o.snow_in, o.source) for k, o in found.items() if o} == EXPECTED_OBS
-    assert NOHRSC_EXPECTED["pico"] == EXPECTED_OBS["pico"][0]
+    # Pico's resort report is stale: NOHRSC and spotter reports exist but never stand in.
+    assert found["pico"] is None
+    assert {c.source for c in verify.context(snow_day, BY_KEY["pico"], DAY)} == {
+        "nohrsc",
+        "pns",
+        "lsr",
+    }
+    # NOHRSC values are stored rounded to 0.01 in, so they compare exactly.
+    grid = verify.context(snow_day, BY_KEY["pico"], DAY)[0]
+    assert (grid.source, grid.snow_in) == ("nohrsc", NOHRSC_EXPECTED["pico"])
 
 
-def test_point_reports_need_the_morning_window_and_5_miles(
-    snow_day: sqlite3.Connection,
-) -> None:
-    # Cranmore's 24 h reports end at 7 and 8 AM on Feb 7: they count for Feb 6 only.
-    assert verify.observed(snow_day, "cranmore", date(2026, 2, 5)) is None
-    assert verify.observed(snow_day, "cranmore", date(2026, 2, 7)) is None
-    with db.transaction(snow_day):
-        snow_day.execute(
-            "UPDATE snow_report SET distance_mi = 5.1 WHERE nearest_mountain = 'cranmore'"
+def test_observed_never_returns_a_non_resort_source(tmp_path: Path) -> None:
+    """Point reports at the summit and a NOHRSC value for every day still score nothing."""
+    conn = db.connect(tmp_path / "o.db")
+    db.migrate(conn)
+    k = BY_KEY["killington"]
+    rows = [
+        snow_report.make_row(
+            product_id=product,
+            place="Killington summit",
+            lat=k.lat,
+            lon=k.lon,
+            ending_at=datetime(2026, 2, 7, 12, 0, tzinfo=UTC),
+            snow_in=8.0,
+            hours=24,
+            mountains=MOUNTAINS,
         )
-    obs = verify.observed(snow_day, "cranmore", DAY)
-    assert obs is not None and obs.source == "nohrsc"
+        for product in ("202602071200-KBTV-NOUS41-PNSBTV", "202602071300-KBTV-NWUS51-LSRBTV")
+    ]
+    with db.transaction(conn):
+        snow_report.store(conn, rows[:1], "pns")
+        snow_report.store(conn, rows[1:], "lsr")
+        insert_resort(
+            conn, "killington", "2026-02-07", "2026-02-07T12:00:00+00:00", 5.0, source="nohrsc"
+        )
+        insert_resort(
+            conn,
+            "killington",
+            "2026-02-07",
+            "2026-02-07T11:00:00+00:00",
+            6.0,
+            source="model_analysis",
+        )
+    assert verify.observed(conn, "killington", DAY) is None
+    assert {c.source for c in verify.context(conn, k, DAY)} == {"nohrsc", "pns"}
+    with db.transaction(conn):
+        insert_resort(
+            conn, "killington", "2026-02-07", "2026-02-07T18:00:00+00:00", 2.0, source="snocountry"
+        )
+    obs = verify.observed(conn, "killington", DAY)
+    assert obs is not None and (obs.snow_in, obs.source) == (2.0, "snocountry")
+    assert obs.source in verify.RESORT_SOURCES
 
 
-def test_lsr_of_unknown_span_counts_when_no_24h_report(tmp_path: Path) -> None:
+def test_context_per_source(snow_day: sqlite3.Connection) -> None:
+    ctx = verify.context(snow_day, BY_KEY["cranmore"], DAY)
+    assert ctx[0] == ContextReport(
+        source="nohrsc", place="NOHRSC 24 h grid", snow_in=1.0, elev_ft=1063
+    )
+    points = ctx[1:]
+    assert [c.distance_mi for c in points] == sorted(c.distance_mi or 0 for c in points)
+    assert all(c.source == "pns" and c.hours == 24 for c in points)
+    first = points[0]
+    assert (first.place, first.snow_in, first.distance_mi) == ("North Conway, NH", 1.0, 1.1)
+    # Every point report within 20 mi of the mountain's own point, whichever is nearest.
+    sugarbush = verify.context(snow_day, BY_KEY["sugarbush"], DAY)
+    assert max(c.distance_mi or 0 for c in sugarbush) == 20.0
+    assert {c.source for c in sugarbush} == {"nohrsc", "pns", "lsr"}
+    assert [c.source for c in verify.context(snow_day, BY_KEY["loon"], DAY)] == ["nohrsc"]
+
+
+def test_context_keeps_the_morning_window_and_20_miles(snow_day: sqlite3.Connection) -> None:
+    cranmore = BY_KEY["cranmore"]
+    # Cranmore's 24 h reports end at 7 and 8 AM on Feb 7: they belong to Feb 6 only.
+    for other in (date(2026, 2, 5), date(2026, 2, 7)):
+        assert not [c for c in verify.context(snow_day, cranmore, other) if c.source == "pns"]
+    with db.transaction(snow_day):
+        snow_day.execute("UPDATE snow_report SET lat = lat + 1 WHERE place LIKE 'North Conway%'")
+    places = {c.place for c in verify.context(snow_day, cranmore, DAY)}
+    assert not any(p.startswith("North Conway") for p in places)
+
+
+def test_lsr_of_unknown_span_is_context(tmp_path: Path) -> None:
     conn = db.connect(tmp_path / "l.db")
     db.migrate(conn)
     row = snow_report.make_row(
@@ -228,10 +289,12 @@ def test_lsr_of_unknown_span_counts_when_no_24h_report(tmp_path: Path) -> None:
     )
     with db.transaction(conn):
         snow_report.store(conn, [row], "lsr")
-    obs = verify.observed(conn, "killington", DAY)
-    assert obs is not None and (obs.snow_in, obs.source) == (4.2, "lsr")
+    assert verify.observed(conn, "killington", DAY) is None
+    (ctx,) = verify.context(conn, BY_KEY["killington"], DAY)
+    assert (ctx.source, ctx.snow_in, ctx.hours) == ("lsr", 4.2, None)
+    assert ctx.ending_at == "2026-02-06T23:00:00+00:00"
     # Before 6 AM on the day it belongs to the day before.
-    assert verify.observed(conn, "killington", date(2026, 2, 7)) is None
+    assert verify.context(conn, BY_KEY["killington"], date(2026, 2, 7)) == []
 
 
 def test_verification_rows_for_each_edition(snow_day: sqlite3.Connection) -> None:
@@ -250,15 +313,37 @@ def test_verification_rows_for_each_edition(snow_day: sqlite3.Connection) -> Non
     assert json.loads(k.tags) == ["nw_upslope"]
     s = mean[("0815", "sugarbush")]  # 7.0 forecast vs 2.5 extracted
     assert (s.forecast_in, s.observed_source, s.result) == (7.0, "resort_llm", "MISS")
-    assert mean[("1440", "cranmore")].observed_source == "pns"
+    c = mean[("1440", "cranmore")]
+    assert (c.observed_in, c.observed_source, c.result) == (None, None, "NO_OBS")
+    assert {r.observed_source for r in rows} <= {*verify.RESORT_SOURCES, None}
+    assert all(r.observed_elev_ft is None for r in rows)
+    # The context is stored beside the score, the same for every edition and method.
+    ctx = json.loads(c.context)
+    assert ctx[0] == {
+        "source": "nohrsc",
+        "place": "NOHRSC 24 h grid",
+        "snow_in": 1.0,
+        "elev_ft": 1063,
+        "distance_mi": None,
+        "hours": None,
+        "ending_at": None,
+    }
+    assert {r.context for r in rows if r.mountain == "cranmore"} == {c.context}
+    assert json.loads(k.context)[0]["source"] == "nohrsc"
     # The newest version of each edition is scored (run ids 100-102, not 1100-1102).
     stored = snow_day.execute(
         "SELECT edition, count(*) FROM verification WHERE for_date = ? GROUP BY 1",
         (DAY.isoformat(),),
     ).fetchall()
     assert dict(stored) == {"0700": 24, "0815": 24, "1440": 24}
-    # Cranmore (4 in vs 1.3 in) and Sugarbush miss in every edition.
-    assert verify.summarize(rows) == {e: {"HIT": 6, "MISS": 2} for e in EDITIONS}
+    assert (
+        snow_day.execute(
+            "SELECT count(*) FROM verification WHERE context IS NULL OR context = '[]'"
+        ).fetchone()[0]
+        == 0
+    )
+    # Killington hits and Sugarbush misses in every edition; the rest have no resort report.
+    assert verify.summarize(rows) == {e: {"HIT": 1, "MISS": 1, "NO_OBS": 6} for e in EDITIONS}
     # Re-scoring replaces rows instead of adding them.
     with db.transaction(snow_day):
         verify.store(snow_day, verify.verify_date(snow_day, MOUNTAINS, DAY))
@@ -282,7 +367,8 @@ def test_summary_for_the_footer(snow_day: sqlite3.Connection) -> None:
     summary = verify.latest_summary(snow_day, date(2026, 2, 8))
     assert summary is not None and summary.for_date == DAY
     assert page.verification_counts(summary) == (
-        "7:00 AM 6 HIT · 2 MISS; 8:15 AM 6 HIT · 2 MISS; 2:40 PM 6 HIT · 2 MISS"
+        "7:00 AM 1 HIT · 1 MISS · 6 no report; 8:15 AM 1 HIT · 1 MISS · 6 no report;"
+        " 2:40 PM 1 HIT · 1 MISS · 6 no report"
     )
 
 
@@ -291,48 +377,110 @@ def test_summary_for_the_footer(snow_day: sqlite3.Connection) -> None:
 
 def test_accumulation_for_the_next_morning(snow_day: sqlite3.Connection) -> None:
     acc = verify.accumulation(snow_day, MOUNTAINS, date(2026, 2, 7))
+    # Every mountain has context for Feb 6, so each is listed.
     assert set(acc) == {m.key for m in MOUNTAINS}
     k = acc["killington"]
-    # The 7 days before Feb 7 are Jan 31 .. Feb 6; only Feb 6 has observations.
+    # The 7 days before Feb 7 are Jan 31 .. Feb 6; only Feb 6 has a resort report.
     assert k.last7_in == [None, None, None, None, None, None, 3.0]
     assert (k.source, k.season_in, k.base_in) == ("resort", 83.0, None)
     assert k.sources == ["resort"]
+    assert [d.date for d in k.days] == [date(2026, 1, 31), *(date(2026, 2, n) for n in range(1, 7))]
+    feb6 = k.days[-1]
+    assert (feb6.snow_in, feb6.source) == (3.0, "resort")
+    assert feb6.context[0].source == "nohrsc" and feb6.context[0].snow_in == 3.17
+    # Cranmore has no resort report: no number, no season, the context beside it.
     c = acc["cranmore"]
-    assert (c.source, c.last7_in[-1], c.season_in, c.sources) == ("pns", 1.3, None, ["pns"])
-    assert acc["loon"].last7_in[-1] == 1.9 and acc["loon"].source == "nohrsc"
+    assert c.last7_in == [None] * 7 and (c.source, c.season_in, c.sources) == ("none", None, [])
+    assert not c.has_resort_data
+    assert c.days[-1].snow_in is None
+    assert {x.source for x in c.days[-1].context} == {"nohrsc", "pns"}
+    # No NOHRSC season fallback.
+    assert acc["loon"].season_in is None and acc["loon"].last7_in[-1] is None
+
+
+def _with_accumulation(snow_day: sqlite3.Connection, for_date: date):  # type: ignore[no-untyped-def]
+    acc = verify.accumulation(snow_day, MOUNTAINS, for_date)
+    payload = recorded_payload()
+    return payload.model_copy(
+        update={
+            "mountains": [
+                m.model_copy(update={"accumulation": acc.get(m.key)}) for m in payload.mountains
+            ],
+        }
+    )
 
 
 def test_accumulation_chart_renders(snow_day: sqlite3.Connection) -> None:
-    acc = verify.accumulation(snow_day, MOUNTAINS, date(2026, 2, 7))
     with db.transaction(snow_day):
         verify.store(snow_day, verify.verify_date(snow_day, MOUNTAINS, DAY))
-    payload = recorded_payload()
-    payload = payload.model_copy(
-        update={
-            "mountains": [
-                m.model_copy(update={"accumulation": acc[m.key]}) for m in payload.mountains
-            ],
-            "verification": verify.latest_summary(snow_day, date(2026, 2, 7)),
-        }
+    payload = _with_accumulation(snow_day, date(2026, 2, 7)).model_copy(
+        update={"verification": verify.latest_summary(snow_day, date(2026, 2, 7))}
     )
     assert page.accumulation_state(payload)[0] == "chart"
     html = page.render_report(payload)
     assert 'aria-label="Observed season snowfall by mountain"' in html
-    assert "Killington</text>" in html
+    # Only mountains with a resort number are charted.
+    chart = html[html.index('aria-label="Observed season snowfall') :]
+    chart = chart[: chart.index("</svg>")]
+    assert "Killington</text>" in chart and "Sugarbush</text>" in chart
+    assert "Cranmore</text>" not in chart
+    assert "Accumulation: resort reports, resort report pages read by Claude." in html
     assert (
-        "Accumulation: resort reports, resort report pages read by Claude,"
-        " NWS snowfall reports, NWS local storm reports, NOHRSC snowfall analysis." in html
+        "Beside it, not resort-reported: NWS snowfall reports, NWS local storm reports,"
+        " NOHRSC snowfall analysis." in html
     )
     assert "Verification, Fri 6 Feb (next 24 h, model mean" in html
     assert "Verification: none yet." not in html
+
+
+def test_accumulation_shows_no_report_with_context_beside_it(
+    snow_day: sqlite3.Connection,
+) -> None:
+    payload = _with_accumulation(snow_day, date(2026, 2, 7))
+    by_day = {m.name: m for m in page.accumulation_by_day(payload)}
+    cranmore = by_day["Cranmore"]
+    assert cranmore.summary == "no report"
+    feb6 = cranmore.days[-1]
+    assert (feb6.label, feb6.resort) == ("Fri 6", "no report")
+    assert feb6.context[0] == "NOHRSC 1\u2033 (pixel 1,063 ft)"
+    assert feb6.context[1].startswith("PNS ")
+    assert feb6.more == 4  # 7 point reports within 20 mi, 3 shown
+    killington = by_day["Killington"]
+    assert killington.summary == "3\u2033 resort-reported · 6 days no report"
+    assert killington.days[-1].resort == "3\u2033 resort"
+    assert killington.days[0].resort == "no report" and killington.days[0].context == []
+    html = page.render_report(payload)
+    assert "<h2>By day</h2>" in html
+    assert "NOHRSC 1″ (pixel 1,063 ft)" in html
+    assert "+4 more in the JSON" in html
+
+
+def test_context_label() -> None:
+    station = ContextReport(
+        source="ghcn", place="STOWE 2.1 SSE", snow_in=3.0, elev_ft=720, distance_mi=4.2, hours=24
+    )
+    assert page.context_label(station) == "GHCN STOWE 2.1 SSE 3\u2033 (720 ft, 4.2 mi)"
+    spotter = ContextReport(source="lsr", place="Warren", snow_in=1.5, distance_mi=5.0)
+    assert page.context_label(spotter) == "LSR Warren 1.5\u2033 (elevation unknown, 5 mi)"
+
+
+def test_accumulation_empty_without_resort_reports(snow_day: sqlite3.Connection) -> None:
+    with db.transaction(snow_day):
+        snow_day.execute("DELETE FROM observation WHERE source IN ('resort', 'resort_llm')")
+    payload = _with_accumulation(snow_day, date(2026, 2, 7))
+    state, text = page.accumulation_state(payload)
+    assert state == "empty"
+    assert text.startswith("No resort snow reports for the last 7 days")
+    html = page.render_report(payload)
+    assert "<h2>By day</h2>" in html and "no report" in html
 
 
 def test_accumulation_empty_without_observations(tmp_path: Path) -> None:
     conn = db.connect(tmp_path / "e.db")
     db.migrate(conn)
     assert verify.accumulation(conn, MOUNTAINS, date(2026, 2, 7)) == {}
-    acc = Accumulation(source="nohrsc", last7_in=[0.0] * 7, sources=["nohrsc"])
-    assert acc.sources == ["nohrsc"]
+    acc = Accumulation(source="resort", last7_in=[0.0] * 7, sources=["resort"])
+    assert acc.days == [] and acc.has_resort_data
 
 
 # --- the job -------------------------------------------------------------------------
@@ -353,9 +501,11 @@ def test_forecast_verify_job(tmp_path: Path) -> None:
     assert scored["2026-02-06"]["rows"] == 72
     assert set(scored["2026-02-06"]["model_mean"]) == set(EDITIONS)
     assert scored["2026-01-30"]["rows"] == 0
+    # The recorded resort pages are unavailable, so nothing is scored; NOHRSC (read by
+    # the job) and the spotter reports are stored as context only.
     rows = conn.execute(
         "SELECT edition, count(*) FROM verification WHERE for_date = '2026-02-06'"
-        " AND result != 'NO_OBS' GROUP BY 1"
+        " AND result = 'NO_OBS' AND json_array_length(context) > 0 GROUP BY 1"
     ).fetchall()
     assert dict(rows) == {"0700": 24, "0815": 24, "1440": 24}
     run = conn.execute("SELECT kind, status FROM run WHERE id = ?", (summary["run_id"],)).fetchone()

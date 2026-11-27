@@ -16,8 +16,9 @@ A sample is one model's summit snow forecast for one mountain-day (6 AM to
   (`verification`, model mean row of the earliest edition), so the learned
   truth is the scored truth. Days without a `verification` row (a season
   backfill, or a day that was never reported) use `verify.observed`, the same
-  priority rule. Tags are the ones that fired on the day, copied from
-  `verification`.
+  rule: only the resort's own report counts (decisions row 24), so a day
+  without one is no sample. Tags are the ones that fired on the day, copied
+  from `verification`.
 - Only snow days count: the observation or the model's forecast is at least
   0.5 inch. A dry day forecast dry says nothing about bias.
 
