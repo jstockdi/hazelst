@@ -96,7 +96,7 @@ CREATE TABLE observation (                  -- one row per source per mountain p
   trails_open INT, trails_total INT, lifts_open INT, lifts_hold INT,
   surface TEXT, raw JSON
 );
-CREATE TABLE snow_report (                  -- point reports from NWS PNS / LSR
+CREATE TABLE snow_report (                  -- point reports: NWS PNS / LSR, GHCN-Daily stations
   id TEXT PRIMARY KEY, product_id TEXT, place TEXT, -- id: "lat,lon,ending_at,snow_in" (lat/lon to 2 dp)
   lat REAL, lon REAL, elev_ft INT, ending_at TEXT,
   snow_in REAL, hours INT,
@@ -121,7 +121,7 @@ CREATE TABLE forecast_day (
 CREATE TABLE verification (
   for_date DATE, edition TEXT,              -- 0700 | 0815 | 1440
   mountain TEXT, window TEXT, method TEXT,  -- window 1d; method raw_mean | corrected | a model id
-  forecast_in REAL, observed_in REAL, observed_source TEXT,  -- resort | resort_llm | snocountry | pns | lsr | nohrsc
+  forecast_in REAL, observed_in REAL, observed_source TEXT,  -- resort | resort_llm | snocountry | pns | lsr | ghcn | nohrsc
   error_in REAL, ratio REAL, result TEXT,   -- HIT | MISS | NO_OBS
   tags JSON,                                -- tags that fired, copied for slicing
   PRIMARY KEY (for_date, edition, mountain, window, method)
@@ -184,7 +184,7 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
 2. **forecast-verify** scores each mountain's 1d forecast from each edition
    (7:00, 8:15, 2:40; raw mean and each model)
    against the best available observation: resort 24 h > SnoCountry >
-   PNS/LSR within 5 mi > NOHRSC > none. Resort, SnoCountry, and NOHRSC values
+   PNS/LSR/GHCN within 5 mi > NOHRSC > none. Resort, SnoCountry, and NOHRSC values
    are `observation` rows; PNS and LSR
    points stay in `snow_report` (with `nearest_mountain` and `distance_mi`) and
    are not copied into `observation`. Day X (6 AM X to 6 AM X + 1) reads
