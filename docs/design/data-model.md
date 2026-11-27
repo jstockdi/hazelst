@@ -184,19 +184,13 @@ CREATE INDEX agent_call_created_at ON agent_call (created_at);
    168 h to `forecast_hourly`, plus observations from up to four sources.
 2. **forecast-verify** scores each mountain's 1d forecast from each edition
    (7:00, 8:15, 2:40; raw mean and each model)
-   against the best available observation: resort 24 h > SnoCountry >
-   PNS/LSR/GHCN within 5 mi > NOHRSC > none. Resort, SnoCountry, and NOHRSC values
-   are `observation` rows; PNS and LSR
-   points stay in `snow_report` (with `nearest_mountain` and `distance_mi`) and
-   are not copied into `observation`. Day X (6 AM X to 6 AM X + 1) reads
-   obs_date X + 1: the earliest non-stale resort report that day (`resort_llm`
-   only without an adapter value); else the `snocountry` row for obs_date
-   X + 1; else the highest PNS / LSR / GHCN report within
-   5 mi (`observed_source` `pns`, `lsr`, or `ghcn`; on a tie the GHCN copy is
-   named), using 24 h reports ending 4–10 AM on X + 1 (GHCN co-op and CoCoRaHS
-   days end at 7 AM; Mount Washington's calendar day never qualifies), or reports of unknown span
-   (LSRs, storm totals) ending in the window by 10 AM; else the NOHRSC 24 h
-   grid ending 12Z on X + 1. HIT is within 2″ or 30% of the observation.
+   against the resort's own reported snow and nothing else (decisions row 24):
+   day X (6 AM X to 6 AM X + 1) reads obs_date X + 1, the earliest non-stale
+   resort report that day (`resort_llm` only without an adapter value), else
+   the `snocountry` row for obs_date X + 1 (the same resort number,
+   republished); else `NO_OBS`. PNS, LSR, GHCN, and NOHRSC values for the day
+   are recorded beside the score as context (J26), never as the observation.
+   HIT is within 2″ or 30% of the observation.
    `forecast-verify` runs at 9 PM on X + 1 and scores the newest report
    version of each edition, for the mean and each model; rows are replaced
    when a date is re-scored. `hazelst forecast-verify --from D --to D`
