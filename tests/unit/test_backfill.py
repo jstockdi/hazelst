@@ -20,6 +20,7 @@ from hazelst.sources import (
     base,
     elevation,
     ghcn,
+    historical_forecast,
     iem,
     nohrsc,
     open_meteo,
@@ -81,6 +82,38 @@ def previous_runs_body(query: dict[str, str]) -> list[dict[str, Any]]:
     return out
 
 
+FINE_SNOW_PER_HOUR = 0.2
+
+
+def historical_forecast_body(query: dict[str, str]) -> list[dict[str, Any]]:
+    """Every mountain, one finer model (unsuffixed variables), for the requested dates."""
+    start = datetime.fromisoformat(query["start_date"]).replace(tzinfo=UTC)
+    days = (date.fromisoformat(query["end_date"]) - start.date()).days + 1
+    times = [(start + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M") for h in range(24 * days)]
+    out = []
+    for _ in query["latitude"].split(","):
+        hourly: dict[str, list[Any]] = {"time": times}
+        units: dict[str, str] = {"time": "iso8601"}
+        for var, unit, value in (
+            ("snowfall", "inch", FINE_SNOW_PER_HOUR),
+            ("precipitation", "inch", 0.03),
+            ("temperature_2m", "°F", 20.0),
+        ):
+            hourly[var] = [value for _ in times]
+            units[var] = unit
+        out.append({"utc_offset_seconds": 0, "hourly": hourly, "hourly_units": units})
+    return out
+
+
+@pytest.fixture(autouse=True)
+def no_pacing(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    """Record the backfill's paced waits instead of sleeping."""
+    waits: list[float] = []
+    monkeypatch.setattr(backfill, "sleep", waits.append)
+    monkeypatch.setattr(backfill, "_last_paced", None)
+    return waits
+
+
 class FakeWeb:
     """Serves the backfill's requests and counts them."""
 
@@ -94,6 +127,8 @@ class FakeWeb:
         assert request.headers["User-Agent"].startswith("hazelst-forecast")
         if url == previous_runs.URL:
             return httpx.Response(200, json=previous_runs_body(query))
+        if url == historical_forecast.URL:
+            return httpx.Response(200, json=historical_forecast_body(query))
         if url == iem.LSR_URL:
             return httpx.Response(200, content=body(LSR_FEB))
         if url == pns.ARCHIVE_LIST_URL:
@@ -223,6 +258,10 @@ def test_backfill_loads_every_source_and_is_idempotent(cfg: config.Config) -> No
     web = FakeWeb()
     first = run_backfill(cfg, web)
     assert first["previous_runs"]["rows"] == {"forecast_hourly": 5 * 8 * 2 * 48}
+    fine = first["historical_forecast"]
+    assert fine["requests"] == 5  # one per finer model
+    assert fine["rows"]["forecast_hourly"] == 5 * 8 * 48
+    assert fine["rows"]["forecast_hourly:ncep_hrrr_conus"] == 8 * 48
     assert first["lsr"]["rows"]["snow_report"] > 0
     assert first["pns"]["rows"]["discussion"] == 3
     assert first["nohrsc"]["rows"] == {"observation": 8}
@@ -245,9 +284,9 @@ def test_backfill_loads_every_source_and_is_idempotent(cfg: config.Config) -> No
     assert counts(cfg) == stored
     conn = db.connect(cfg.settings.db_path)
     assert conn.execute("SELECT count(*) FROM snow_report WHERE elev_ft IS NULL").fetchone()[0] == 0
-    # Leads, LSR, listings for 2 days, texts, NOHRSC, one SnoCountry document per mountain,
-    # GHCN batches; elevation: 2 calls for LSR, 1 for PNS.
-    assert sent == 5 + 1 + 2 * 3 + 3 + 1 + 8 + 3 + 3
+    # Leads, finer models, LSR, listings for 2 days, texts, NOHRSC, one SnoCountry document
+    # per mountain, GHCN batches; elevation: 2 calls for LSR, 1 for PNS.
+    assert sent == 5 + 5 + 1 + 2 * 3 + 3 + 1 + 8 + 3 + 3
 
 
 def test_failed_requests_are_retried_on_the_next_run(cfg: config.Config) -> None:
@@ -276,9 +315,17 @@ def test_backfill_seeds_skill_per_mountain_and_model(cfg: config.Config) -> None
     ).fetchall()
     keys = {m.key for m in cfg.mountains}
     assert {(r[0], r[1]) for r in cells} == {
-        (m, model) for m in keys for model in ("gfs_seamless", "gem_seamless")
+        (m, model)
+        for m in keys
+        for model in ("gfs_seamless", "gem_seamless", *open_meteo.FINE_MODELS)
     }
-    assert {r[2] for r in cells} == {"1d", "2-3d", "4-5d"}
+    assert {r[2] for r in cells if r[1] in ("gfs_seamless", "gem_seamless")} == {
+        "1d",
+        "2-3d",
+        "4-5d",
+    }
+    # The finer models' stitched short-lead series stands in for lead day 1 only.
+    assert {r[2] for r in cells if open_meteo.is_fine(r[1])} == {"1d"}
     # Lead day N carries 0.1 x N in/h: day 1 forecasts 2.4 in, verified against the
     # resort-reported 6 in from SnoCountry (ahead of NOHRSC's 3.17 in).
     killington = conn.execute(
@@ -292,3 +339,85 @@ def test_backfill_seeds_skill_per_mountain_and_model(cfg: config.Config) -> None
 def test_season_backfill_needs_a_range(cfg: config.Config) -> None:
     with pytest.raises(jobs.JobError, match="start and end"):
         jobs.run_job(cfg, "season-backfill", DAY)
+
+
+def test_historical_forecast_window_starts_at_each_model_archive() -> None:
+    first = date(2024, 10, 1)
+    assert historical_forecast.window("ncep_nbm_conus", first, date(2024, 10, 31)) == (
+        date(2024, 10, 8),
+        date(2024, 10, 31),
+    )
+    assert historical_forecast.window("ecmwf_aifs025_single", first, date(2024, 10, 31)) is None
+    assert historical_forecast.window("ncep_hrrr_conus", first, first) == (first, first)
+
+
+def test_historical_forecast_rows_stand_in_for_lead_day_1() -> None:
+    mountains = config.load({}).mountains[:2]
+    query = {
+        k: str(v)
+        for k, v in historical_forecast.params(
+            mountains, "gem_hrdps_continental", DAY, DAY + timedelta(days=1)
+        ).items()
+    }
+    fetched = base.Fetched(
+        historical_forecast.SOURCE,
+        historical_forecast.URL,
+        query,
+        200,
+        "2026-11-27T00:00:00+00:00",
+        0,
+        json.dumps(historical_forecast_body(query)).encode(),
+        {
+            "mountains": [m.key for m in mountains],
+            "elevation": "summit",
+            "model": "gem_hrdps_continental",
+        },
+    )
+    rows = historical_forecast.normalize(fetched)
+    assert len(rows) == 2 * 48
+    first = rows[0]
+    assert (first.model, first.elevation, first.issued_at, first.lead_h) == (
+        "gem_hrdps_continental",
+        "summit",
+        None,
+        0,
+    )
+    assert (first.snowfall_in, first.precip_in, first.temp_f) == (0.2, 0.03, 20.0)
+
+
+def test_historical_forecast_paces_requests_and_stops_at_429(
+    cfg: config.Config, no_pacing: list[float]
+) -> None:
+    class Limited(FakeWeb):
+        def __call__(self, request: httpx.Request) -> httpx.Response:
+            url = str(request.url.copy_with(query=None))
+            if url == historical_forecast.URL and "gem_hrdps" in str(request.url):
+                self.requests.append(url)
+                return httpx.Response(429, text="Too many requests")
+            return super().__call__(request)
+
+    web = Limited()
+    headers = base.make_client().headers
+    client = httpx.Client(headers=headers, transport=httpx.MockTransport(web))
+    summary = jobs.run_job(
+        cfg,
+        "season-backfill",
+        DAY,
+        client=client,
+        options={"start": DAY, "end": DAY, "steps": ("historical_forecast",)},
+    )
+    fine = summary["historical_forecast"]
+    # ecmwf_ifs and HRRR load; HRDPS answers 429 and the step stops before NBM and AIFS.
+    assert fine["requests"] == 3 and fine["rate_limited"] is True
+    assert fine["rows"]["forecast_hourly"] == 2 * 8 * 48
+    assert len(no_pacing) == 2  # waits before the second and third request
+    assert all(0 < w <= historical_forecast.REQUEST_INTERVAL_S for w in no_pacing)
+    resumed = jobs.run_job(
+        cfg,
+        "season-backfill",
+        DAY,
+        client=httpx.Client(headers=headers, transport=httpx.MockTransport(FakeWeb())),
+        options={"start": DAY, "end": DAY, "steps": ("historical_forecast",)},
+    )
+    assert resumed["historical_forecast"]["requests"] == 3  # HRDPS, NBM, AIFS
+    assert resumed["historical_forecast"]["cached"] == 2

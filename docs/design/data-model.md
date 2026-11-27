@@ -62,7 +62,7 @@ CREATE TABLE fetch (
 -- Normalized: forecasts ---------------------------------------------------
 CREATE TABLE forecast_hourly (
   fetch_id INT REFERENCES fetch, mountain TEXT REFERENCES mountain,
-  model TEXT,                               -- gfs_seamless | ecmwf_ifs025 | gem_seamless
+  model TEXT,                               -- gfs_seamless | ecmwf_ifs025 | gem_seamless; finer (J29): ecmwf_ifs | ncep_hrrr_conus | gem_hrdps_continental | ncep_nbm_conus | ecmwf_aifs025_single
   elevation TEXT,                           -- summit | base
   issued_at TEXT,                           -- model run time from Open-Meteo meta.json, not fetch time
   valid_at TEXT, lead_h INT,
@@ -106,7 +106,7 @@ CREATE TABLE snow_report (                  -- point reports: NWS PNS / LSR, GHC
 -- Derived ------------------------------------------------------------------
 CREATE TABLE forecast_window (
   run_id INT, mountain TEXT, window TEXT,   -- 1d | 3d | 5d
-  method TEXT,                              -- raw_mean | corrected | resort_ratio
+  method TEXT,                              -- raw_mean | corrected | resort_ratio; 1d only (J29): ifs9_ratio | hrrr_ratio | hrdps_ratio | nbm_ratio | aifs_ratio | fine_ratio | nbm_raw
   snow_in REAL, lo_in REAL, hi_in REAL, confidence TEXT,
   by_model JSON, base_snow_in REAL, nws_in REAL, nws_ice_in REAL,
   PRIMARY KEY (run_id, mountain, window, method)
@@ -121,7 +121,7 @@ CREATE TABLE forecast_day (
 );
 CREATE TABLE verification (
   for_date DATE, edition TEXT,              -- 0700 | 0815 | 1440 | backfill (a day with no report)
-  mountain TEXT, window TEXT, method TEXT,  -- window 1d; method raw_mean | corrected | resort_ratio | a model id
+  mountain TEXT, window TEXT, method TEXT,  -- window 1d; method raw_mean | corrected | resort_ratio | a finer-model candidate (J29) | a model id
   forecast_in REAL, observed_in REAL, observed_source TEXT,  -- resort | resort_llm | snocountry (J26; before: also pns | lsr | ghcn | nohrsc)
   error_in REAL, ratio REAL, result TEXT,   -- HIT | MISS | NO_OBS
   tags JSON,                                -- tags that fired, copied for slicing
@@ -252,13 +252,21 @@ CREATE INDEX snow_report_ending_at ON snow_report (ending_at);  -- migration 000
    `raw_mean` (live editions from `forecast_window`; the `backfill` edition
    with ratios fitted leaving the day's season out). Where `method_gate`
    chose it (step 6), the page's headline, range, chart, and table use it.
+   **Finer models (J29)**: `ingest-forecast` also stores five finer models
+   (`forecast_hourly.model` above), and `season-backfill` loads them from the
+   Historical Forecast API at nominal `lead_h` 0 (lead day 1 only). They get
+   their own `snow_ratio` cells and `skill` rows (`1d` only from the
+   backfill), never enter `raw_mean` or `resort_ratio`, and are scored by
+   model id and as day-1 candidates (`forecast_window` 1d rows, `verification`
+   methods; forecast-method.md, "Finer models for day 1").
 6. **Method choice** (`method.py`, J28) — `hazelst method choose` and the
    nightly `skill-learn` score each candidate method against `raw_mean` on
    the held-out season (fit on earlier seasons, test on the newest complete
    one, the `ratio backtest` days), or on the current season's live
    verified snow days once a mountain has 20, and rewrite `method_gate`. A
    method is chosen when its 1d MAE is at least 0.05″ below `raw_mean`'s
-   and lowest (forecast-method.md, "Method choice").
+   and lowest (forecast-method.md, "Method choice"). A finer-model winner is
+   chosen for day 1 only, beside the global winner for days 2–5 (J29).
 7. **Knowledge** — `knowledge-review` (Monday 3:00 AM) sends `knowledge-propose`
    the `skill` cells with n ≥ 3 (and each cell's values at the previous call,
    read from that call's `agent_call.input`), the week's MISSes with tags and

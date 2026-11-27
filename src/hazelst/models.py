@@ -71,6 +71,9 @@ class MountainForecast(_Model):
     storm_type: StormType
     # The method behind snow_in, range, by_model, and the days' snow (`method_gate`, method.py).
     method: ForecastMethod = "raw_mean"
+    # A finer-model candidate behind day 1 and the 1d window (fine.py), when chosen;
+    # days 2-5 stay on `method`.
+    day1_method: str | None = None
 
 
 class ModelRun(_Model):

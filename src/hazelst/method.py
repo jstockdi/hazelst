@@ -3,10 +3,13 @@
 forecast-method.md, "Method choice":
 
 - **Candidates.** `raw_mean` and every other method `report-build` stores in
-  `forecast_window` that the held-out test can score (today `resort_ratio`
-  and `corrected`; finer-model methods join when they are stored and scored).
-  `corrected` never becomes the headline (forecast-method.md, "Corrected
-  value"): its row's `chosen` means the page shows it beneath the headline.
+  `forecast_window` that the held-out test can score (`resort_ratio`,
+  `corrected`), plus the finer-model day-1 candidates (`ratio.FINE_METHODS`,
+  J29) whether or not a report has stored them yet. A finer-model candidate
+  whose model has fewer than 15 fit days at a mountain is left out there
+  (`ratio.thin_methods`). `corrected` never becomes the headline
+  (forecast-method.md, "Corrected value"): its row's `chosen` means the page
+  shows it beneath the headline.
 - **Held-out season.** Seasons run 1 Nov - 30 Apr. The test season is the
   newest season that ended before the decision date; the fit uses every day
   through the 30 Apr before it (`ratio.held_out`, the same days and values as
@@ -21,6 +24,10 @@ forecast-method.md, "Method choice":
   below `raw_mean`'s and it has the lowest MAE among the headline candidates;
   a tie for lowest keeps `raw_mean`. `corrected` is shown when its MAE is at
   least 0.05 inch below `raw_mean`'s.
+- **Day 1.** When the winner is a finer-model candidate, it is chosen for day
+  1 only, and the same rule over the global candidates alone picks the method
+  for the windows and days 2-5; both rows are `chosen` (`Choice.day1`,
+  `Choice.headline`).
 """
 
 from __future__ import annotations
@@ -28,7 +35,7 @@ from __future__ import annotations
 import sqlite3
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 
 from hazelst import corrected, learn, ratio, verify
@@ -62,6 +69,7 @@ class Choice:
 
     headline: dict[str, str]
     beside: dict[str, set[str]]
+    day1: dict[str, str] = field(default_factory=dict)  # a finer-model candidate for day 1
 
     def uses(self, method: str) -> list[str]:
         """Mountains whose headline is `method`."""
@@ -100,6 +108,24 @@ def stored_methods(conn: sqlite3.Connection) -> set[str]:
     return found | {RAW_MEAN}
 
 
+def candidates(conn: sqlite3.Connection) -> set[str]:
+    """The stored methods and the finer-model day-1 candidates."""
+    return stored_methods(conn) | set(ratio.FINE_METHODS)
+
+
+def decide_day1(maes: Mapping[str, float]) -> tuple[str, set[str], str | None]:
+    """(headline method, methods beside it, finer-model day-1 method or None).
+
+    The rule runs over every candidate; when a finer-model candidate wins, it
+    takes day 1 and the rule over the global candidates picks the headline.
+    """
+    headline, beside = decide(maes)
+    if headline not in ratio.FINE_METHODS:
+        return headline, beside, None
+    global_headline, _ = decide({m: v for m, v in maes.items() if m not in ratio.FINE_METHODS})
+    return global_headline, beside, headline
+
+
 def decide(maes: Mapping[str, float]) -> tuple[str, set[str]]:
     """(headline method, methods shown beside it) from each candidate's MAE on the same days."""
     raw = maes.get(RAW_MEAN)
@@ -127,7 +153,7 @@ def _rows(
 ) -> list[GateRow]:
     """Gate rows for one mountain from each method's absolute errors on the same days."""
     maes = {m: sum(e) / len(e) for m, e in errors.items() if e}
-    headline, beside = decide(maes)
+    headline, beside, day1 = decide_day1(maes)
     raw = maes.get(RAW_MEAN)
     test_from, test_to = span if span else (None, None)
     out = []
@@ -141,7 +167,7 @@ def _rows(
                 n=len(errors[method]),
                 mae_in=round(maes[method], 3),
                 raw_mean_mae_in=None if raw is None else round(raw, 3),
-                chosen=method == headline or method in beside,
+                chosen=method in (headline, day1) or method in beside,
             )
         )
     if not out:
@@ -168,9 +194,10 @@ def held_out_errors(
     wanted = set(candidates)
     out: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     for d in found.days:
+        thin = set(found.thin.get(d.mountain, ()))
         for name, value in d.forecasts.items():
             method = ratio.LIVE_NAMES.get(name, name)
-            if method in wanted:
+            if method in wanted and method not in thin:
                 out[d.mountain][method].append(abs(value - d.observed))
     return (test_from, test_to), out
 
@@ -231,13 +258,15 @@ def choose(
     tz: str = TIMEZONE,
 ) -> list[GateRow]:
     """Gate rows for every mountain as of `as_of` (module docstring)."""
-    candidates = stored_methods(conn)
-    span, held = held_out_errors(conn, mountains, candidates, as_of, tz)
+    wanted = candidates(conn)
+    span, held = held_out_errors(conn, mountains, wanted, as_of, tz)
     season_from, season_to = current_season(as_of)
     live_to = min(season_to, as_of - timedelta(days=1))
+    ratios = ratio.Ratios.load(conn)
     out: list[GateRow] = []
     for m in mountains:
-        days, live = live_errors(conn, m.key, candidates, (season_from, live_to))
+        live_wanted = wanted - ratio.thin_methods(ratios, m.key)
+        days, live = live_errors(conn, m.key, live_wanted, (season_from, live_to))
         if len(days) >= LIVE_DAYS:
             out += _rows(m.key, live, (days[0], days[-1]))
         else:
@@ -275,11 +304,14 @@ def load(conn: sqlite3.Connection) -> Choice:
     """The chosen methods; a mountain without a chosen headline row uses `raw_mean`."""
     headline: dict[str, str] = {}
     beside: dict[str, set[str]] = defaultdict(set)
+    day1: dict[str, str] = {}
     for mountain, method in conn.execute(
         "SELECT mountain, method FROM method_gate WHERE chosen = 1"
     ):
         if method in BESIDE:
             beside[mountain].add(method)
+        elif method in ratio.FINE_METHODS:
+            day1[mountain] = method
         else:
             headline[mountain] = method
-    return Choice(headline=headline, beside=dict(beside))
+    return Choice(headline=headline, beside=dict(beside), day1=day1)

@@ -1,9 +1,11 @@
-"""Open-Meteo forecast: summit and base hourly series for every mountain, three models.
+"""Open-Meteo forecast: summit and base hourly series for every mountain.
 
-One call per elevation covers all mountains (comma-separated coordinates; the
-response is a list in the same order). Each ingest also fetches each model's
-`meta.json` so `forecast_hourly.issued_at` is the model run time, not the
-fetch time. See docs/design/data-sources.md.
+Two model sets: the three global models (`MODELS`), which feed every window,
+and the finer models (`FINE_MODELS`, J29), which compete for day 1 only. One
+call per elevation and set covers all mountains (comma-separated coordinates;
+the response is a list in the same order). Each ingest also fetches each
+model's `meta.json` so `forecast_hourly.issued_at` is the model run time, not
+the fetch time. See docs/design/data-sources.md.
 """
 
 from __future__ import annotations
@@ -28,13 +30,25 @@ SINGLE_RUN_URL = "https://single-runs-api.open-meteo.com/v1/forecast"
 META_URL = "https://api.open-meteo.com/data/{meta_id}/static/meta.json"
 
 MODELS: tuple[str, ...] = ("gfs_seamless", "ecmwf_ifs025", "gem_seamless")
+# Finer models (J29, decisions row 30): collected every run, candidates for day 1 only.
+FINE_MODELS: tuple[str, ...] = (
+    "ecmwf_ifs",  # ECMWF IFS HRES 9 km
+    "ncep_hrrr_conus",  # NCEP HRRR CONUS 3 km
+    "gem_hrdps_continental",  # GEM HRDPS Continental 2.5 km
+    "ncep_nbm_conus",  # NCEP NBM CONUS (native snowfall)
+    "ecmwf_aifs025_single",  # ECMWF AIFS 0.25 degree
+)
 # meta.json id that carries each model's run time. gfs_seamless blends HRRR
-# into the first hours; its run time is the GFS run, and HRRR is recorded too.
+# into the first hours; its run time is the GFS run.
 META_IDS: dict[str, str] = {
     "gfs_seamless": "ncep_gfs013",
     "ecmwf_ifs025": "ecmwf_ifs025",
     "gem_seamless": "cmc_gem_gdps_15km",
-    "hrrr": "ncep_hrrr_conus",
+    "ecmwf_ifs": "ecmwf_ifs",
+    "ncep_hrrr_conus": "ncep_hrrr_conus",
+    "gem_hrdps_continental": "cmc_gem_hrdps",
+    "ncep_nbm_conus": "ncep_nbm_conus",
+    "ecmwf_aifs025_single": "ecmwf_aifs025_single",
 }
 
 Elevation = Literal["summit", "base"]
@@ -55,8 +69,18 @@ VARIABLES: dict[str, str] = {
     "wind_direction_850hPa": "wd850",
 }
 
+# The fine-model call: day 1 needs snow and summit temperature only (ratio bands),
+# and fewer variables and days keep the call's weight under Open-Meteo's limits.
+FINE_VARIABLES: tuple[str, ...] = ("snowfall", "precipitation", "temperature_2m")
+FINE_PAST_DAYS = 1
+FINE_FORECAST_DAYS = 3
+
 PAST_DAYS = 7
 FORECAST_DAYS = 7
+
+
+def is_fine(model: str) -> bool:
+    return model in FINE_MODELS
 
 
 class NormalizeError(ValueError):
@@ -118,8 +142,22 @@ def forecast_params(
     }
 
 
+def fine_params(mountains: Sequence[Mountain], elevation: Elevation) -> dict[str, Any]:
+    """The finer models' call: day-1 variables, one past day, three forecast days."""
+    params = forecast_params(mountains, elevation, FINE_MODELS)
+    params.update(
+        {
+            "hourly": ",".join(FINE_VARIABLES),
+            "past_days": FINE_PAST_DAYS,
+            "forecast_days": FINE_FORECAST_DAYS,
+        }
+    )
+    return params
+
+
 def fetch(client: httpx.Client, mountains: Sequence[Mountain]) -> list[Fetched]:
-    """Each model's meta.json, then the summit and base forecast for every mountain."""
+    """Each model's meta.json, then the summit and base forecast for every mountain:
+    the global models, then the finer models (meta `models`)."""
     out: list[Fetched] = []
     for model, meta_id in META_IDS.items():
         out.append(
@@ -141,7 +179,22 @@ def fetch(client: httpx.Client, mountains: Sequence[Mountain]) -> list[Fetched]:
                 meta={"elevation": elevation, "mountains": keys},
             )
         )
+    for elevation in ELEVATIONS:
+        out.append(
+            get(
+                client,
+                SOURCE,
+                FORECAST_URL,
+                fine_params(mountains, elevation),
+                meta={"elevation": elevation, "mountains": keys, "models": list(FINE_MODELS)},
+            )
+        )
     return out
+
+
+def is_fine_fetch(fetched: Fetched) -> bool:
+    """A forecast fetch of the finer models (its failure does not fail the ingest)."""
+    return bool(fetched.meta.get("models")) and all(is_fine(str(m)) for m in fetched.meta["models"])
 
 
 def fetch_single_runs(
@@ -183,6 +236,8 @@ def label(fetched: Fetched) -> str:
         return f"meta-{fetched.meta['model']}"
     if "model" in fetched.meta:
         return f"forecast-{fetched.meta['elevation']}-{fetched.meta['model']}"
+    if is_fine_fetch(fetched):
+        return f"forecast-{fetched.meta['elevation']}-fine"
     return f"forecast-{fetched.meta['elevation']}"
 
 
@@ -295,10 +350,11 @@ def _valid_at(time: str) -> datetime:
 def normalize(fetched: Fetched, runs: Mapping[str, RunTime]) -> list[HourlyRow]:
     """Rows for every mountain, model, and hour with at least one value.
 
-    `fetched` is one forecast response (one elevation); `runs` maps each model
-    to its run time (a model missing from `runs` gets `issued_at` NULL). A
-    single-run response names its model and run in `fetched.meta` and has
-    unsuffixed variable names.
+    `fetched` is one forecast response (one elevation; its models are
+    `meta.models`, else the global `MODELS`); `runs` maps each model to its
+    run time (a model missing from `runs` gets `issued_at` NULL). A single-run
+    response names its model and run in `fetched.meta` and has unsuffixed
+    variable names.
     """
     data = fetched.json()
     locations: list[dict[str, Any]] = data if isinstance(data, list) else [data]
@@ -309,7 +365,10 @@ def normalize(fetched: Fetched, runs: Mapping[str, RunTime]) -> list[HourlyRow]:
     if len(locations) != len(keys):
         raise NormalizeError(f"{len(locations)} locations for {len(keys)} mountains")
     single = fetched.meta.get("model")
-    models: tuple[str, ...] = (str(single),) if single else MODELS
+    listed = fetched.meta.get("models")
+    models: tuple[str, ...] = (
+        (str(single),) if single else tuple(str(m) for m in listed) if listed else MODELS
+    )
     if single and "run" in fetched.meta:
         at = datetime.fromisoformat(str(fetched.meta["run"]))
         runs = {str(single): RunTime(str(single), at, at, at, 0)}
