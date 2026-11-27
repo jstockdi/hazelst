@@ -14,6 +14,7 @@ row NULL and is counted; the next fill retries it.
 from __future__ import annotations
 
 import sqlite3
+import time
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
@@ -27,6 +28,8 @@ URL = "https://api.open-meteo.com/v1/elevation"
 MAX_POINTS = 100
 FT_PER_M = 3.28084
 KEY_DECIMALS = 3
+# 100 points every 12 s is 500 calls a minute, under Open-Meteo's 600.
+BATCH_INTERVAL_S = 12.0
 
 Key = tuple[float, float]
 
@@ -49,22 +52,37 @@ def _coords(values: Iterable[float]) -> str:
     return ",".join(f"{v:.{KEY_DECIMALS}f}" for v in values)
 
 
+def sleep(seconds: float) -> None:
+    """Pause between batches (patched in tests)."""
+    time.sleep(seconds)
+
+
 def lookup(client: httpx.Client, points: Sequence[Key]) -> dict[Key, int | None]:
-    """Elevation in feet for each point; None for a point whose request failed."""
+    """Elevation in feet for each point; None for a point whose request failed.
+
+    Open-Meteo counts each point as one call (about 600 per minute and 5,000
+    per hour), so batches are sent at least `BATCH_INTERVAL_S` apart, and an
+    HTTP 429 stops the lookup: the remaining points stay None for a later fill.
+    """
     out: dict[Key, int | None] = {}
-    for batch in _batches(list(dict.fromkeys(points))):
-        params = {
-            "latitude": _coords(p[0] for p in batch),
-            "longitude": _coords(p[1] for p in batch),
-        }
+    limited = False
+    for i, batch in enumerate(_batches(list(dict.fromkeys(points)))):
         values: list[object] = []
-        try:
-            fetched = base.get(client, SOURCE, URL, params)
-            if fetched.http_status == 200:
-                body = fetched.json()
-                values = list(body.get("elevation") or []) if isinstance(body, dict) else []
-        except (base.SourceError, ValueError):
-            values = []
+        if not limited:
+            if i:
+                sleep(BATCH_INTERVAL_S)
+            params = {
+                "latitude": _coords(p[0] for p in batch),
+                "longitude": _coords(p[1] for p in batch),
+            }
+            try:
+                fetched = base.get(client, SOURCE, URL, params)
+                limited = fetched.http_status == 429
+                if fetched.http_status == 200:
+                    body = fetched.json()
+                    values = list(body.get("elevation") or []) if isinstance(body, dict) else []
+            except (base.SourceError, ValueError):
+                values = []
         if len(values) != len(batch):
             values = [None] * len(batch)
         for point, value in zip(batch, values, strict=True):
