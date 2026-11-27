@@ -69,6 +69,7 @@ M5                                J14 ─▶ J15 ─▶ J16
 M6          J09 + J11 ─▶ J17 ─▶ J18 ─▶ J19 ─▶ J20 ─▶ J21
 M7                                                  J21 ─▶ J22
 M8                                                         J22 ─▶ J23
+M9                                                         J22 ─▶ J24, J25 (parallel with J23)
 ```
 
 After J03, the forecast track (J05–J09), the Claude track (J10), and the
@@ -140,6 +141,17 @@ accumulation empty state if J14 is not done.
 | Job | Name | Scope | Done when |
 |-----|------|-------|-----------|
 | J23 | `snocountry-history` | New source `sources/snocountry.py`: `GET https://good-cormorant-17.convex.site/api/resort-data?resortId={id}` (fallback `https://snocountry.com/.netlify/functions/snowreport-resort?resortId={id}`), one call per mountain, raw response kept in `fetch`. `snocountry_id` per mountain in `config/mountains.json` (Killington 802007, Pico 802014, Stratton 802019, Sugarbush 802023, Cranmore 603007, Loon 603014, Sugarloaf 207008, Sunday River 207009). Rows go to `observation` with `source = 'snocountry'` per data-sources.md [SnoCountry](data-sources.md#snocountry). Migration 0003: unique index on `observation (mountain, source, obs_date)` for `source = 'snocountry'`; writes upsert. `season-backfill` loads the full history (2019-11 onward for new snow, 2012 onward for base depth); `ingest-obs` fetches it at each run as the resort fallback. `forecast-verify` source order: resort > snocountry > PNS / LSR > NOHRSC. After merge: deploy to frank, run the backfill for 2019-11-01..2026-04-30, re-run `forecast-verify` and `skill-learn` over the backfilled range | `observation` has `snocountry` rows for all 8 mountains; counts per mountain per season match the source (tests on saved fixtures); inferred zeros only on base-depth days; re-running the backfill leaves counts unchanged; `verification.observed_source = 'snocountry'` appears for backfilled days; `skill` rebuilt |
+
+### M9 — Elevation-aware ground truth
+
+J24 and J25 run in parallel with J23. Migration numbers are fixed: J23 0003,
+J25 0004. J26 (forecast points) is planned after an owner decision on the
+point rule.
+
+| Job | Name | Scope | Done when |
+|-----|------|-------|-----------|
+| J24 | `station-truth` | New source `sources/ghcn.py`: GHCN-Daily `SNOW` and `SNWD` from the NCEI Access Data Service (`https://www.ncei.noaa.gov/access/services/data/v1?dataset=daily-summaries&stations={ids}&dataTypes=SNOW,SNWD&startDate=…&endDate=…&format=json&units=standard`, no token). Stations: every GHCN station within 20 mi of a mountain's configured point with `SNOW` reported since 2024-01-20 (from `ghcnd-stations.txt` and `ghcnd-inventory.txt`), plus Mount Washington `USW00014755` for Loon, Cranmore, Sunday River, and Sugarloaf; the list is generated once and committed as `config/stations.json` (id, name, lat, lon, elev_ft, mountain, distance_mi). Rows go to `snow_report` per data-sources.md [GHCN-Daily stations](data-sources.md#ghcn-daily-stations). `season-backfill --sources ghcn` loads 2024-01-20 onward; `ingest-obs` fetches the last 10 days each run (co-op reports arrive late). Verification eligibility is unchanged (the existing 5 mi PNS / LSR rule, reported as `observed_source = 'ghcn'`); stations beyond 5 mi are context, not truth. `hazelst stations summary --season 2025` prints, per mountain, season snowfall per station sorted by elevation, next to the SnoCountry season total | `config/stations.json` committed; `snow_report` has GHCN rows with `elev_ft` for every listed station with data; rerun leaves counts unchanged; the summary prints for all 8 mountains; tests on saved fixtures |
+| J25 | `report-elevation` | Every point observation carries an elevation. `snow_report.elev_ft` for PNS / LSR rows comes from the Open-Meteo elevation API (`https://api.open-meteo.com/v1/elevation?latitude=…&longitude=…`, up to 100 points per call) at insert, and a one-off `hazelst elevations fill` fills existing rows. Migration 0004 adds `verification.observed_elev_ft INT`: the report's elevation for `pns` / `lsr`, the pixel-center elevation for `nohrsc` (looked up once per mountain and stored in `config/mountains.json` as `nohrsc_pixel_elev_ft`), NULL for `resort` / `snocountry` (measurement site unknown). `hazelst verify summary --by elevation` prints n, bias ratio, MAE, and hit rate per mountain per band (< 1,500 ft, 1,500–2,500 ft, > 2,500 ft, unknown). After merge: deploy, fill, re-run `forecast-verify` for 2024-01-20..2026-04-30 | No PNS / LSR row has NULL `elev_ft` (except failed lookups, counted); `observed_elev_ft` set on every `pns` / `lsr` / `nohrsc` verification row; the summary prints on frank |
 
 ## Owner actions
 

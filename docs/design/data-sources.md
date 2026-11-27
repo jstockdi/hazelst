@@ -448,6 +448,28 @@ Rows: one `observation` per mountain per report date, `source = 'snocountry'`,
 - Season sums can differ from other aggregators (Killington 2023-24: 223″
   here, 157″ on OnTheSnow); scores use the daily values, not season sums.
 
+### GHCN-Daily stations
+
+Daily snowfall (`SNOW`, in) and snow depth (`SNWD`, in) from co-op, CoCoRaHS,
+and first-order stations, via the NCEI Access Data Service (no token):
+
+`GET https://www.ncei.noaa.gov/access/services/data/v1?dataset=daily-summaries&stations={id,id,…}&dataTypes=SNOW,SNWD&startDate={YYYY-MM-DD}&endDate={YYYY-MM-DD}&format=json&units=standard`
+
+Rows: one `snow_report` per station per date with `SNOW` present:
+`id = 'ghcn:{station}:{date}'`, `product_id = 'GHCN'`, `place` = station
+name, `lat` / `lon` / `elev_ft` from `config/stations.json`, `snow_in`,
+`hours = 24`, `nearest_mountain` / `distance_mi` from the station list.
+`ending_at` is 7 AM local on the date for co-op and CoCoRaHS stations (their
+day ends at the morning observation) and midnight ending the date for
+Mount Washington (`USW00014755`, calendar day). The 5 mi rule in
+verification then treats a co-op report like a 24 h PNS report.
+
+Examples near each mountain (elevation, distance from the configured point):
+Lonesome Lake Hut 2,746 ft, 8 mi (Loon); Hermit Lake Snowplot 3,749 ft,
+16 mi (Cranmore); Shrewsbury 0.8 W 1,463 ft, 7 mi (Killington); Bondville
+1,712 ft (Stratton); Warren 2.8 E 1,821 ft (Sugarbush). Sunday River and
+Sugarloaf have valley stations only (Bethel 790 ft, Kingfield 598 ft).
+
 ### How `ingest-obs` reads these sources (J12)
 
 Each `ingest-obs` run for report date D:
