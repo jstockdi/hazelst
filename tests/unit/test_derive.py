@@ -18,7 +18,7 @@ AS_OF = START + timedelta(hours=1)
 
 
 def hourly(
-    model: str = "gfs_seamless",
+    model: str = "gfs_global",
     elevation: str = "summit",
     issued: datetime = START - timedelta(hours=5),
     values: dict[str, float | None] | None = None,
@@ -88,9 +88,9 @@ def test_daily_buckets_sum_to_windows() -> None:
     assert k.windows["3d"].snow_in == pytest.approx(sum(d.snow_in for d in k.days[:3]))
     assert k.windows["5d"].snow_in == pytest.approx(sum(d.snow_in for d in k.days))
     assert k.windows["5d"].by_model == {
-        "gfs_seamless": 6.0,
+        "gfs_global": 6.0,
         "ecmwf_ifs025": 12.0,
-        "gem_seamless": 18.0,
+        "gem_global": 18.0,
     }
     assert k.windows["5d"].range == (6.0, 18.0)
     assert k.windows["1d"].range == (1.2, 3.6)
@@ -107,13 +107,13 @@ def test_day_by_model_lists_global_and_finer_models_with_a_full_day() -> None:
     rows += hourly("ecmwf_ifs", snowfall_in=0.25)
     k = run(rows).mountain("killington")
     assert k.days[0].by_model == {
-        "gfs_seamless": 1.2,
+        "gfs_global": 1.2,
         "ecmwf_ifs025": 2.4,
-        "gem_seamless": 3.6,
+        "gem_global": 3.6,
         "ecmwf_ifs": 6.0,
         "ncep_hrrr_conus": 4.8,
     }
-    assert list(k.days[1].by_model) == ["gfs_seamless", "ecmwf_ifs025", "gem_seamless", "ecmwf_ifs"]
+    assert list(k.days[1].by_model) == ["gfs_global", "ecmwf_ifs025", "gem_global", "ecmwf_ifs"]
     assert k.days[0].snow_in == 2.4
     assert "ecmwf_ifs" not in k.windows["1d"].by_model
 
@@ -136,24 +136,24 @@ def test_confidence(lo: float, hi: float, expected: str) -> None:
 
 def test_stale_model_excluded_from_mean_and_range() -> None:
     rows = (
-        hourly("gfs_seamless", snowfall_in=0.1)
+        hourly("gfs_global", snowfall_in=0.1)
         + hourly("ecmwf_ifs025", snowfall_in=0.1)
-        + hourly("gem_seamless", snowfall_in=0.5, issued=AS_OF - timedelta(hours=19))
+        + hourly("gem_global", snowfall_in=0.5, issued=AS_OF - timedelta(hours=19))
     )
     forecast = run(rows)
-    assert forecast.used_models == ["gfs_seamless", "ecmwf_ifs025"]
+    assert forecast.used_models == ["gfs_global", "ecmwf_ifs025"]
     assert [r.stale for r in forecast.models] == [False, False, True]
     w = forecast.mountain("killington").windows["1d"]
     assert w.snow_in == 2.4
     assert w.range == (2.4, 2.4)
-    assert w.by_model["gem_seamless"] == 12.0  # still listed
+    assert w.by_model["gem_global"] == 12.0  # still listed
 
 
 def test_all_models_stale_keeps_all() -> None:
     old = AS_OF - timedelta(hours=30)
-    rows = hourly("gfs_seamless", issued=old) + hourly("ecmwf_ifs025", issued=old)
+    rows = hourly("gfs_global", issued=old) + hourly("ecmwf_ifs025", issued=old)
     forecast = run(rows)
-    assert forecast.used_models == ["gfs_seamless", "ecmwf_ifs025"]
+    assert forecast.used_models == ["gfs_global", "ecmwf_ifs025"]
     assert all(r.stale for r in forecast.models)
 
 
@@ -324,7 +324,8 @@ def sample_day() -> tuple[Forecast, dict[str, dict]]:  # type: ignore[type-arg]
 
     The prototype fetched at 10:44 AM EST from the live API: GFS 06Z blended
     with the latest HRRR, ECMWF 06Z, GEM 00Z. The fixtures hold GFS 06Z
-    (gfs_seamless with its own 06Z HRRR blend), ECMWF 06Z, and GEM 00Z, so
+    (recorded as gfs_seamless with its own 06Z HRRR blend, relabeled gfs_global in
+    J34; tests/fixtures/open_meteo/README.md), ECMWF 06Z, and GEM 00Z, so
     ECMWF matches exactly and GFS differs in the first two days. NWS grids
     from that morning were not saved, so NWS values are not compared.
     """

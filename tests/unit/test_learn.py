@@ -23,7 +23,7 @@ from tests.unit.test_schedule import recorded
 CFG = config.load({})
 MOUNTAINS = CFG.mountains
 DAY0 = date(2026, 1, 5)
-MODELS = ("gfs_seamless", "ecmwf_ifs025", "gem_seamless")
+MODELS = ("gfs_global", "ecmwf_ifs025", "gem_global")
 
 
 @pytest.fixture
@@ -123,23 +123,31 @@ def test_model_forecasts_lead_days_coverage_and_averaging(conn: sqlite3.Connecti
     a = anchor(day)
     # Morning run (06Z on the day): lead 5 h at 6 AM -> lead day 1; 0.25 in/h -> 6 in.
     f1 = add_fetch(conn)
-    add_series(conn, f1, "killington", "gfs_seamless", a - timedelta(hours=5), a, 24, 0.25)
+    add_series(conn, f1, "killington", "gfs_global", a - timedelta(hours=5), a, 24, 0.25)
     # A second ingest of the same lead day (00Z run, lead 11 h): 0.5 in/h -> 12 in; averaged.
     f2 = add_fetch(conn)
-    add_series(conn, f2, "killington", "gfs_seamless", a - timedelta(hours=11), a, 24, 0.5)
+    add_series(conn, f2, "killington", "gfs_global", a - timedelta(hours=11), a, 24, 0.5)
     # Two days earlier (lead 53 h) -> lead day 3.
     f3 = add_fetch(conn)
-    add_series(conn, f3, "killington", "gfs_seamless", a - timedelta(hours=53), a, 24, 0.1)
+    add_series(conn, f3, "killington", "gfs_global", a - timedelta(hours=53), a, 24, 0.1)
     # A partial day (12 h) and past hours (negative lead) are skipped.
     f4 = add_fetch(conn)
-    add_series(conn, f4, "pico", "gfs_seamless", a - timedelta(hours=5), a, 12, 1.0)
+    add_series(conn, f4, "pico", "gfs_global", a - timedelta(hours=5), a, 12, 1.0)
     f5 = add_fetch(conn)
-    add_series(conn, f5, "loon", "gfs_seamless", a + timedelta(hours=30), a, 24, 1.0)
+    add_series(conn, f5, "loon", "gfs_global", a + timedelta(hours=30), a, 24, 1.0)
     out = learn.model_forecasts(conn)
     assert out == {
-        ("killington", "gfs_seamless", 1, day): pytest.approx(9.0),
-        ("killington", "gfs_seamless", 3, day): pytest.approx(2.4),
+        ("killington", "gfs_global", 1, day): pytest.approx(9.0),
+        ("killington", "gfs_global", 3, day): pytest.approx(2.4),
     }
+
+
+def test_model_forecasts_ignore_retired_model_ids(conn: sqlite3.Connection) -> None:
+    a = anchor(DAY0)
+    f = add_fetch(conn)
+    add_series(conn, f, "killington", "gfs_global", a - timedelta(hours=5), a, 24, 0.25)
+    add_series(conn, f, "killington", "gem_seamless", a - timedelta(hours=5), a, 24, 0.5)
+    assert set(learn.model_forecasts(conn)) == {("killington", "gfs_global", 1, DAY0)}
 
 
 def test_samples_use_scored_truth_and_wait_for_observations(conn: sqlite3.Connection) -> None:
@@ -150,7 +158,7 @@ def test_samples_use_scored_truth_and_wait_for_observations(conn: sqlite3.Connec
             conn,
             f,
             "killington",
-            "gfs_seamless",
+            "gfs_global",
             anchor(d) - timedelta(hours=5),
             anchor(d),
             24,
@@ -175,7 +183,7 @@ def test_samples_use_scored_truth_and_wait_for_observations(conn: sqlite3.Connec
 
 
 def sample(day: int, f: float, o: float, tags: tuple[str, ...] = (), lead: int = 1) -> learn.Sample:
-    return learn.Sample("sugarbush", "gfs_seamless", lead, DAY0 + timedelta(days=day), f, o, tags)
+    return learn.Sample("sugarbush", "gfs_global", lead, DAY0 + timedelta(days=day), f, o, tags)
 
 
 def test_build_counts_snow_days_and_slices_by_tag() -> None:
@@ -223,13 +231,13 @@ def window(snow: float, by_model: dict[str, float | None]) -> ForecastWindow:
     )
 
 
-def forecast(models: tuple[str, ...] = ("gfs_seamless", "gem_seamless")) -> Forecast:
+def forecast(models: tuple[str, ...] = ("gfs_global", "gem_global")) -> Forecast:
     mf = MountainForecast(
         key="sugarbush",
         windows={
-            "1d": window(5.0, {"gfs_seamless": 6.0, "gem_seamless": 4.0}),
-            "3d": window(9.0, {"gfs_seamless": 10.0, "gem_seamless": 8.0}),
-            "5d": window(11.0, {"gfs_seamless": 12.0, "gem_seamless": 10.0}),
+            "1d": window(5.0, {"gfs_global": 6.0, "gem_global": 4.0}),
+            "3d": window(9.0, {"gfs_global": 10.0, "gem_global": 8.0}),
+            "5d": window(11.0, {"gfs_global": 12.0, "gem_global": 10.0}),
         },
         days=[],
         storm_type="none",
@@ -249,8 +257,8 @@ def forecast(models: tuple[str, ...] = ("gfs_seamless", "gem_seamless")) -> Fore
 def skill_rows(n: int, buckets: tuple[str, ...] = learn.BUCKETS) -> list[learn.SkillRow]:
     out = []
     for bucket in buckets:
-        out.append(learn.SkillRow("sugarbush", "gfs_seamless", bucket, "", n, 2.0, 1.0, 0.5))
-        out.append(learn.SkillRow("sugarbush", "gem_seamless", bucket, "", n, 0.5, 3.0, 0.5))
+        out.append(learn.SkillRow("sugarbush", "gfs_global", bucket, "", n, 2.0, 1.0, 0.5))
+        out.append(learn.SkillRow("sugarbush", "gem_global", bucket, "", n, 0.5, 3.0, 0.5))
     return out
 
 
@@ -266,7 +274,7 @@ def test_corrected_value_from_ten_snow_days(conn: sqlite3.Connection) -> None:
     out = corrected.correct(forecast(), corrected.load_cells(conn))["sugarbush"]
     # 1d: GFS 6 / 2 = 3 (weight 1), GEM 4 / 0.5 = 8 (weight 1/3) -> (3 + 8/3) / (4/3) = 4.25.
     assert out["1d"].snow_in == 4.2  # round(4.25, 1) rounds half to even
-    assert out["1d"].by_model == {"gfs_seamless": 3.0, "gem_seamless": 8.0}
+    assert out["1d"].by_model == {"gfs_global": 3.0, "gem_global": 8.0}
     assert (out["1d"].lo_in, out["1d"].hi_in) == (3.0, 8.0)
     # 3d adds days 2-3: GFS 4 / 2 = 2, GEM 4 / 0.5 = 8 -> 3.5; 4.25 + 3.5 = 7.75.
     assert out["3d"].snow_in == pytest.approx(7.8)
@@ -279,21 +287,21 @@ def test_window_needs_every_segment_and_skips_stale_models(conn: sqlite3.Connect
     cells = corrected.load_cells(conn)
     assert set(corrected.correct(forecast(), cells)["sugarbush"]) == {"1d"}
     # GEM is stale (not in used_models): only GFS is blended.
-    only_gfs = corrected.correct(forecast(models=("gfs_seamless",)), cells)["sugarbush"]
+    only_gfs = corrected.correct(forecast(models=("gfs_global",)), cells)["sugarbush"]
     assert only_gfs["1d"].snow_in == 3.0
-    assert only_gfs["1d"].by_model == {"gfs_seamless": 3.0}
+    assert only_gfs["1d"].by_model == {"gfs_global": 3.0}
 
 
 def test_tag_cells_do_not_drive_the_correction(conn: sqlite3.Connection) -> None:
-    rows = [learn.SkillRow("sugarbush", "gfs_seamless", "1d", "nw_upslope", 30, 2.0, 1.0, 0.5)]
+    rows = [learn.SkillRow("sugarbush", "gfs_global", "1d", "nw_upslope", 30, 2.0, 1.0, 0.5)]
     learn.store(conn, rows, datetime.now(UTC))
     assert corrected.load_cells(conn) == {}
 
 
 def test_bias_scale_is_clamped(conn: sqlite3.Connection) -> None:
-    rows = [learn.SkillRow("sugarbush", "gfs_seamless", "1d", "", 10, 40.0, 1.0, 0.1)]
+    rows = [learn.SkillRow("sugarbush", "gfs_global", "1d", "", 10, 40.0, 1.0, 0.1)]
     learn.store(conn, rows, datetime.now(UTC))
-    out = corrected.correct(forecast(("gfs_seamless",)), corrected.load_cells(conn))
+    out = corrected.correct(forecast(("gfs_global",)), corrected.load_cells(conn))
     assert out["sugarbush"]["1d"].snow_in == 1.5  # 6 / 4, not 6 / 40
 
 
@@ -322,7 +330,7 @@ def test_skill_learn_job_rebuilds_skill(tmp_path: Path) -> None:
     for i in range(12):
         d = DAY0 + timedelta(days=i)
         f = add_fetch(conn)
-        for model, rate in (("gfs_seamless", 0.5), ("gem_seamless", 0.25)):
+        for model, rate in (("gfs_global", 0.5), ("gem_global", 0.25)):
             add_series(
                 conn, f, "sugarbush", model, anchor(d) - timedelta(hours=5), anchor(d), 24, rate
             )
@@ -333,7 +341,7 @@ def test_skill_learn_job_rebuilds_skill(tmp_path: Path) -> None:
     conn.commit()
     summary = jobs.run_job(cfg, "skill-learn", DAY0 + timedelta(days=20))
     assert summary["samples"] == 24 and summary["skill"] == 4
-    assert summary["ready"] == ["sugarbush/gem_seamless/1d", "sugarbush/gfs_seamless/1d"]
+    assert summary["ready"] == ["sugarbush/gem_global/1d", "sugarbush/gfs_global/1d"]
     rows = {
         (r[0], r[1]): r[2:]
         for r in conn.execute(
@@ -341,10 +349,10 @@ def test_skill_learn_job_rebuilds_skill(tmp_path: Path) -> None:
         )
     }
     assert rows == {
-        ("gem_seamless", ""): (12, 1.0, 0.0, 1.0),
-        ("gem_seamless", "nw_upslope"): (12, 1.0, 0.0, 1.0),
-        ("gfs_seamless", ""): (12, 2.0, 6.0, 0.0),
-        ("gfs_seamless", "nw_upslope"): (12, 2.0, 6.0, 0.0),
+        ("gem_global", ""): (12, 1.0, 0.0, 1.0),
+        ("gem_global", "nw_upslope"): (12, 1.0, 0.0, 1.0),
+        ("gfs_global", ""): (12, 2.0, 6.0, 0.0),
+        ("gfs_global", "nw_upslope"): (12, 2.0, 6.0, 0.0),
     }
 
 

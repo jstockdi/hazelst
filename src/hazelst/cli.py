@@ -515,11 +515,13 @@ def _cmd_ratio_backtest(args: argparse.Namespace) -> int:
         " without skill cells"
     )
     print(
-        "methods: raw_mean = Open-Meteo snowfall (7:1), models' mean; flat_10 = snow water x 10;"
+        "methods: raw_mean = Open-Meteo snowfall (7:1), global models' mean (GFS, GEM global);"
+        " flat_10 = snow water x 10;"
         " ratio_temp = resort_ratio by temperature band; ratio_upslope = resort_ratio with the"
         " nw_upslope split; corrected = bias-scaled models blended by 1 / MAE;"
-        " <model>_ratio = one finer model's snow water x its own ratio (Historical Forecast,"
-        " short lead); fine_ratio = their mean; nbm_raw = NBM native snowfall"
+        " <model>_ratio = one finer model's snow water x its own ratio (hrrr, hrdps, nbm:"
+        " Previous Runs, the global models' lead; ifs9, aifs: Historical Forecast, short lead);"
+        " fine_ratio = their mean; nbm_raw = NBM native snowfall"
     )
     fallback = {m: n for m, n in result.fine_fallback_days.items() if n}
     if fallback:
@@ -828,7 +830,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_backfill = sub.add_parser(
         "season-backfill",
-        help="load a past range (Previous Runs, Historical Forecast for the finer models,"
+        help="load a past range (Previous Runs, Historical Forecast for ECMWF 9 km and AIFS,"
         " IEM LSR / PNS, NOHRSC, SnoCountry, GHCN-Daily), then rebuild skill",
     )
     p_backfill.add_argument("--from", dest="start", type=date.fromisoformat, required=True)

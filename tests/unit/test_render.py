@@ -177,7 +177,7 @@ def with_method(m: MountainReport, **update: object) -> MountainReport:
     return m.model_copy(update={"forecast": m.forecast.model_copy(update=update)})
 
 
-GLOBAL = ["gfs_seamless", "ecmwf_ifs025", "gem_seamless"]
+GLOBAL = ["gfs_global", "ecmwf_ifs025", "gem_global"]
 
 
 def test_timeline_past_cells_blank_zero_and_amounts() -> None:
@@ -229,13 +229,13 @@ def test_timeline_forecast_cells() -> None:
 @pytest.mark.parametrize(
     ("snow", "values", "expected"),
     [
-        (5.0, {"gfs_seamless": 8.0, "ecmwf_ifs025": 2.0, "gem_seamless": 6.0}, (2.0, 8.0)),
-        (4.0, {"gfs_seamless": 3.0, "ecmwf_ifs025": 4.0, "gem_seamless": 4.4}, None),  # < 1.5″
-        (1.0, {"gfs_seamless": 0.2, "ecmwf_ifs025": 1.7}, (0.2, 1.7)),  # exactly 1.5″
-        (6.0, {"gfs_seamless": 4.5, "ecmwf_ifs025": 7.0}, None),  # 2.5″ < half of 6″
-        (6.0, {"gfs_seamless": 3.0, "ecmwf_ifs025": 6.0}, (3.0, 6.0)),  # 3″ = half of 6″
-        (5.0, {"gfs_seamless": 5.0}, None),  # one model is no spread
-        (5.0, {"gfs_seamless": 5.0, "ncep_hrrr_conus": 12.0}, None),  # finer models don't count
+        (5.0, {"gfs_global": 8.0, "ecmwf_ifs025": 2.0, "gem_global": 6.0}, (2.0, 8.0)),
+        (4.0, {"gfs_global": 3.0, "ecmwf_ifs025": 4.0, "gem_global": 4.4}, None),  # < 1.5″
+        (1.0, {"gfs_global": 0.2, "ecmwf_ifs025": 1.7}, (0.2, 1.7)),  # exactly 1.5″
+        (6.0, {"gfs_global": 4.5, "ecmwf_ifs025": 7.0}, None),  # 2.5″ < half of 6″
+        (6.0, {"gfs_global": 3.0, "ecmwf_ifs025": 6.0}, (3.0, 6.0)),  # 3″ = half of 6″
+        (5.0, {"gfs_global": 5.0}, None),  # one model is no spread
+        (5.0, {"gfs_global": 5.0, "ncep_hrrr_conus": 12.0}, None),  # finer models don't count
     ],
 )
 def test_spread_rule(
@@ -256,10 +256,10 @@ def test_spread_shows_under_the_amount_and_wins_over_the_type_word() -> None:
     m = with_models(
         m,
         [
-            {"gfs_seamless": 3.2, "ecmwf_ifs025": 0.0, "gem_seamless": 0.8},
-            {"gfs_seamless": 7.6, "ecmwf_ifs025": 1.6, "gem_seamless": 6.3},
-            {"gfs_seamless": 3.0, "ecmwf_ifs025": 8.0},
-            {"gfs_seamless": 4.0, "ecmwf_ifs025": 4.5},
+            {"gfs_global": 3.2, "ecmwf_ifs025": 0.0, "gem_global": 0.8},
+            {"gfs_global": 7.6, "ecmwf_ifs025": 1.6, "gem_global": 6.3},
+            {"gfs_global": 3.0, "ecmwf_ifs025": 8.0},
+            {"gfs_global": 4.0, "ecmwf_ifs025": 4.5},
         ],
     )
     page_ = p.model_copy(update={"mountains": [m]})
@@ -281,15 +281,15 @@ def test_drawer_rows_order_and_nws() -> None:
         p.mountains[0],
         [
             {
-                "gfs_seamless": 3.2,
+                "gfs_global": 3.2,
                 "ecmwf_ifs025": 0.0,
-                "gem_seamless": 0.8,
+                "gem_global": 0.8,
                 "ncep_hrrr_conus": 3.0,
                 "ecmwf_ifs": 0.3,
             },
-            {"gfs_seamless": 7.6, "ecmwf_ifs025": 1.6, "gem_seamless": 6.3, "ecmwf_ifs": 2.0},
-            {"gfs_seamless": 0.0, "ecmwf_ifs025": 0.0, "gem_seamless": 0.0},
-            {"gfs_seamless": 0.0, "ecmwf_ifs025": 0.0, "gem_seamless": 0.0},
+            {"gfs_global": 7.6, "ecmwf_ifs025": 1.6, "gem_global": 6.3, "ecmwf_ifs": 2.0},
+            {"gfs_global": 0.0, "ecmwf_ifs025": 0.0, "gem_global": 0.0},
+            {"gfs_global": 0.0, "ecmwf_ifs025": 0.0, "gem_global": 0.0},
             {"ncep_nbm_conus": 9.0},  # day 5 is not shown, so NBM has no row
         ],
     )

@@ -29,9 +29,9 @@ from hazelst.render import charts
 # Drawer rows in this order (global, then finer); a model missing here shows last,
 # under its Open-Meteo key.
 MODEL_NAMES = {
-    "gfs_seamless": "GFS",
+    "gfs_global": "GFS",
     "ecmwf_ifs025": "ECMWF",
-    "gem_seamless": "GEM",
+    "gem_global": "GEM",
     "ecmwf_ifs": "ECMWF 9 km",
     "ncep_hrrr_conus": "HRRR",
     "gem_hrdps_continental": "HRDPS",

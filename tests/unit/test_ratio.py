@@ -38,7 +38,7 @@ def lead_day(
     day: date,
     water: dict[str, float],
     *,
-    model: str = "gfs_seamless",
+    model: str = "gfs_global",
     upslope: bool = False,
 ) -> LeadDay:
     dw = DayWater(round(sum(water.values()) * 7, 3), water)
@@ -75,14 +75,14 @@ def test_fit_is_resort_snow_over_snow_water_per_cell() -> None:
         (r.mountain, r.model, r.temp_band, r.upslope): r
         for r in ratio.fit(pairs, DAY0 + timedelta(days=2))
     }
-    mild = cells[("loon", "gfs_seamless", "15-25", BOTH_SIDES)]
+    mild = cells[("loon", "gfs_global", "15-25", BOTH_SIDES)]
     assert (mild.ratio, mild.n) == (round(10 / 0.75, 2), 2)
-    assert cells[("loon", "gfs_seamless", "<=15", BOTH_SIDES)].ratio == 20.0  # 6 / 0.3
-    assert cells[("loon", "gfs_seamless", "25-32", BOTH_SIDES)].ratio == 20.0  # 2 / 0.1
-    every = cells[("loon", "gfs_seamless", ALL_BANDS, BOTH_SIDES)]
+    assert cells[("loon", "gfs_global", "<=15", BOTH_SIDES)].ratio == 20.0  # 6 / 0.3
+    assert cells[("loon", "gfs_global", "25-32", BOTH_SIDES)].ratio == 20.0  # 2 / 0.1
+    every = cells[("loon", "gfs_global", ALL_BANDS, BOTH_SIDES)]
     assert (every.ratio, every.n) == (round(18 / 1.15, 2), 3)
-    assert cells[("loon", "gfs_seamless", ALL_BANDS, "no")].n == 3
-    assert ("loon", "gfs_seamless", ALL_BANDS, "yes") not in cells
+    assert cells[("loon", "gfs_global", ALL_BANDS, "no")].n == 3
+    assert ("loon", "gfs_global", ALL_BANDS, "yes") not in cells
     assert cells[(ALL_MOUNTAINS, MEAN_MODEL, ALL_BANDS, BOTH_SIDES)].n == 3
     assert {r.fitted_through for r in cells.values()} == {"2026-01-07"}
 
@@ -120,10 +120,10 @@ def test_thin_band_uses_the_all_mountain_value_for_that_band() -> None:
         *days_at("stowe", 14, {"25-32": 0.5}, 4.0),
     ]
     r = ratio.Ratios(ratio.fit(pairs, DAY0))
-    assert r.ratio("loon", "gfs_seamless", "15-25", None) == 12.0
-    assert r.ratio("loon", "gfs_seamless", "<=15", None) == round(142 / 8.5, 2)
+    assert r.ratio("loon", "gfs_global", "15-25", None) == 12.0
+    assert r.ratio("loon", "gfs_global", "<=15", None) == round(142 / 8.5, 2)
     # Pooled 25-32 has only 14 days: the mountain's own all-band value.
-    own = r.resolve("loon", "gfs_seamless", "25-32", None)
+    own = r.resolve("loon", "gfs_global", "25-32", None)
     assert own is not None and (own.mountain, own.temp_band) == ("loon", ALL_BANDS)
     # A model with no cells of its own (ECMWF) uses the models' mean.
     assert r.model_key("ecmwf_ifs025") == MEAN_MODEL
@@ -134,15 +134,15 @@ def test_upslope_split_needs_fifteen_days_on_each_side() -> None:
     upslope = days_at("sugarbush", 15, {"<=15": 0.5}, 9.0, upslope=True)  # 18:1
     other = days_at("sugarbush", 14, {"<=15": 0.5}, 5.0)  # 10:1
     r = ratio.Ratios(ratio.fit([*upslope, *other], DAY0))
-    assert not r.splits("sugarbush", "gfs_seamless")
+    assert not r.splits("sugarbush", "gfs_global")
     both = round(205 / 14.5, 2)
-    assert r.ratio("sugarbush", "gfs_seamless", "<=15", "yes") == both
+    assert r.ratio("sugarbush", "gfs_global", "<=15", "yes") == both
     more = days_at("sugarbush", 1, {"<=15": 0.5}, 5.0)
     r = ratio.Ratios(ratio.fit([*upslope, *other, *more], DAY0))
-    assert r.splits("sugarbush", "gfs_seamless")
-    assert r.ratio("sugarbush", "gfs_seamless", "<=15", "yes") == 18.0
-    assert r.ratio("sugarbush", "gfs_seamless", "<=15", "no") == 10.0
-    assert r.ratio("sugarbush", "gfs_seamless", "<=15", None) == 14.0  # temperature only
+    assert r.splits("sugarbush", "gfs_global")
+    assert r.ratio("sugarbush", "gfs_global", "<=15", "yes") == 18.0
+    assert r.ratio("sugarbush", "gfs_global", "<=15", "no") == 10.0
+    assert r.ratio("sugarbush", "gfs_global", "<=15", None) == 14.0  # temperature only
 
 
 def test_split_side_with_a_thin_band_uses_the_mountains_band_value() -> None:
@@ -152,8 +152,8 @@ def test_split_side_with_a_thin_band_uses_the_mountains_band_value() -> None:
         *days_at("sugarbush", 2, {"15-25": 0.5}, 7.0, upslope=True),
     ]
     r = ratio.Ratios(ratio.fit(pairs, DAY0))
-    assert r.splits("sugarbush", "gfs_seamless")
-    used = r.resolve("sugarbush", "gfs_seamless", "15-25", "yes")
+    assert r.splits("sugarbush", "gfs_global")
+    used = r.resolve("sugarbush", "gfs_global", "15-25", "yes")
     assert used is not None and (used.mountain, used.upslope, used.n) == ("sugarbush", "", 17)
 
 
@@ -216,20 +216,29 @@ def add_report(conn: sqlite3.Connection, mountain: str, day: date, snow_in: floa
 
 
 def test_lead_days_split_water_by_band_and_tag_upslope(conn: sqlite3.Connection) -> None:
-    add_hours(conn, DAY0, "loon", snow={"gfs_seamless": 0.14, "gem_seamless": 0.07}, temp=10)
-    add_hours(conn, DAY0 + timedelta(days=1), "loon", snow={"gfs_seamless": 0.07}, temp=10,
+    add_hours(conn, DAY0, "loon", snow={"gfs_global": 0.14, "gem_global": 0.07}, temp=10)
+    add_hours(conn, DAY0 + timedelta(days=1), "loon", snow={"gfs_global": 0.07}, temp=10,
               upslope=True)  # fmt: skip
-    add_hours(conn, DAY0 + timedelta(days=2), "loon", snow={"gfs_seamless": 0.07}, temp=10,
+    add_hours(conn, DAY0 + timedelta(days=2), "loon", snow={"gfs_global": 0.07}, temp=10,
               lead_start=30)  # fmt: skip
     days = ratio.lead_days(conn)
     assert set(days) == {("loon", DAY0), ("loon", DAY0 + timedelta(days=1))}  # lead day 2 left out
     first = days[("loon", DAY0)]
     assert not first.upslope
-    gfs = first.models["gfs_seamless"]
+    gfs = first.models["gfs_global"]
     assert gfs.snow_in == pytest.approx(3.36)
     assert gfs.water == pytest.approx({"<=15": 0.24, "15-25": 0.24})
     assert first.models[MEAN_MODEL].snow_in == pytest.approx((3.36 + 1.68) / 2)
     assert days[("loon", DAY0 + timedelta(days=1))].upslope
+
+
+def test_lead_days_ignore_retired_model_ids(conn: sqlite3.Connection) -> None:
+    # Before J34 the global set was gfs_seamless / gem_seamless; those rows stay stored
+    # but are neither a model nor part of the mean.
+    add_hours(conn, DAY0, "loon", snow={"gfs_global": 0.14, "gfs_seamless": 0.7}, temp=10)
+    day = ratio.lead_days(conn)[("loon", DAY0)]
+    assert set(day.models) == {"gfs_global", MEAN_MODEL}
+    assert day.models[MEAN_MODEL].snow_in == pytest.approx(3.36)
 
 
 # --- live forecast: days sum to windows, gate, page ----------------------------------------
@@ -331,15 +340,15 @@ def test_skill_learn_job_fits_snow_ratio(tmp_path: Path) -> None:
     db.sync_mountains(conn, cfg.mountains)
     for i in range(16):
         d = DAY0 + timedelta(days=i)
-        add_hours(conn, d, "loon", snow={"gfs_seamless": 0.07}, temp=10)  # 0.24 in water
+        add_hours(conn, d, "loon", snow={"gfs_global": 0.07}, temp=10)  # 0.24 in water
         add_report(conn, "loon", d, 3.6)  # 15:1
-    add_hours(conn, DAY0 + timedelta(days=30), "loon", snow={"gfs_seamless": 0.07}, temp=10)
+    add_hours(conn, DAY0 + timedelta(days=30), "loon", snow={"gfs_global": 0.07}, temp=10)
     add_report(conn, "loon", DAY0 + timedelta(days=30), 9.0)  # after D - 2: not read
     conn.commit()
     summary = jobs.run_job(cfg, "skill-learn", DAY0 + timedelta(days=18))
     assert summary["snow_ratio_mountains"] == ["loon"]
     r = ratio.Ratios.load(conn)
-    assert r.ratio("loon", "gfs_seamless", "<=15", None) == 15.0
+    assert r.ratio("loon", "gfs_global", "<=15", None) == 15.0
     assert r.ratio("loon", "ecmwf_ifs025", "15-25", None) == 15.0
     assert {c.fitted_through for c in r.cells.values()} == {"2026-01-21"}
 
@@ -352,7 +361,7 @@ def two_seasons(conn: sqlite3.Connection) -> None:
     for start, obs in ((date(2025, 1, 5), 2.4), (date(2026, 1, 5), 4.8)):
         for i in range(16):
             d = start + timedelta(days=i)
-            add_hours(conn, d, "loon", snow={"gfs_seamless": 0.07}, temp=10)
+            add_hours(conn, d, "loon", snow={"gfs_global": 0.07}, temp=10)
             add_report(conn, "loon", d, obs)
     conn.commit()
 

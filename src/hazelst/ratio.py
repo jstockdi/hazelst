@@ -156,16 +156,18 @@ def lead_days(
     of the models, GFS direction). Several fetches of a day are averaged; the
     day is upslope when at least half of them tag it. The mean and the tag
     read the global models only; a fetch of the finer models alone adds their
-    forecasts and no upslope vote.
+    forecasts and no upslope vote. Only the configured models count
+    (`open_meteo.KNOWN_MODELS`).
     """
     local_day = learn._local_day_fn(tz)
+    known, known_params = open_meteo.known_models_sql()
     sql = (
         "SELECT fetch_id, mountain, model, valid_at, lead_h, snowfall_in, temp_f,"
         " t850_f, rh850, ws850_mph, wd850 FROM forecast_hourly"
         " WHERE elevation = 'summit' AND lead_h IS NOT NULL AND lead_h >= 0 AND lead_h < 48"
-        " AND snowfall_in IS NOT NULL"
+        f" AND snowfall_in IS NOT NULL AND {known}"
     )
-    params: list[object] = []
+    params: list[object] = list(known_params)
     if start is not None:
         sql += " AND valid_at >= ?"
         params.append((start - timedelta(days=1)).isoformat())

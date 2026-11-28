@@ -45,7 +45,7 @@ def two_seasons(conn: sqlite3.Connection) -> None:
     for start, obs in ((date(2025, 1, 5), 2.4), (date(2026, 1, 5), 4.8)):
         for i in range(16):
             d = start + timedelta(days=i)
-            add_hours(conn, d, "loon", snow={"gfs_seamless": 0.07}, temp=10)
+            add_hours(conn, d, "loon", snow={"gfs_global": 0.07}, temp=10)
             add_report(conn, "loon", d, obs)
     conn.commit()
 
@@ -254,7 +254,7 @@ def fine_seasons(conn: sqlite3.Connection) -> None:
     for start, obs in ((date(2025, 1, 5), 2.4), (date(2026, 1, 5), 4.8)):
         for i in range(16):
             d = start + timedelta(days=i)
-            add_hours(conn, d, "loon", snow={"gfs_seamless": 0.07}, temp=10)
+            add_hours(conn, d, "loon", snow={"gfs_global": 0.07}, temp=10)
             add_hours(conn, d, "loon", snow={"ncep_hrrr_conus": 0.14}, temp=10)
             add_report(conn, "loon", d, obs)
     # NBM only in the held-out season: no fit days, so `nbm_raw` and `nbm_ratio` are thin.

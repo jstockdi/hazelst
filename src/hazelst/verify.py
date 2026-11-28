@@ -406,6 +406,15 @@ def verify_date(
     return rows
 
 
+def drop_backfill(conn: sqlite3.Connection, for_date: date) -> int:
+    """Delete `for_date`'s `backfill` edition rows (before it is re-scored whole)."""
+    cur = conn.execute(
+        "DELETE FROM verification WHERE for_date = ? AND edition = ?",
+        (for_date.isoformat(), BACKFILL_EDITION),
+    )
+    return cur.rowcount
+
+
 def store(conn: sqlite3.Connection, rows: Iterable[VerificationRow]) -> int:
     params = [astuple(r) for r in rows]
     conn.executemany(

@@ -47,11 +47,16 @@ def ghcn_body(query: dict[str, str]) -> list[dict[str, Any]]:
 
 DAY = date(2026, 2, 6)
 SNOW_PER_HOUR = 0.1
+FINE_SNOW_PER_HOUR = 0.2
 
 
 def previous_runs_body(query: dict[str, str]) -> list[dict[str, Any]]:
-    """Every mountain, GFS and GEM (and an all-null ECMWF), for the requested dates."""
+    """Every mountain, the requested models (and an all-null ECMWF), for the requested dates.
+
+    Global models carry 0.1 x lead in/h, finer models `FINE_SNOW_PER_HOUR`.
+    """
     lead = int(query["hourly"].split(",")[0].rsplit("previous_day", 1)[1])
+    pressure = "temperature_850hPa" in query["hourly"].split(",")
     start = datetime.fromisoformat(query["start_date"]).replace(tzinfo=UTC)
     days = (date.fromisoformat(query["end_date"]) - start.date()).days + 1
     times = [(start + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M") for h in range(24 * days)]
@@ -59,9 +64,10 @@ def previous_runs_body(query: dict[str, str]) -> list[dict[str, Any]]:
     for _ in query["latitude"].split(","):
         hourly: dict[str, list[Any]] = {"time": times}
         units: dict[str, str] = {"time": "iso8601"}
-        for model in ("gfs_seamless", "gem_seamless", "ecmwf_ifs025"):
+        for model in (*query["models"].split(","), "ecmwf_ifs025"):
+            snow = FINE_SNOW_PER_HOUR if open_meteo.is_fine(model) else SNOW_PER_HOUR * lead
             for var, unit, value in (
-                ("snowfall", "inch", SNOW_PER_HOUR * lead),
+                ("snowfall", "inch", snow),
                 ("precipitation", "inch", 0.01),
                 ("temperature_2m", "°F", 20.0),
             ):
@@ -69,7 +75,7 @@ def previous_runs_body(query: dict[str, str]) -> list[dict[str, Any]]:
                 missing = model == "ecmwf_ifs025" and var == "snowfall"
                 hourly[name] = [None if missing else value for _ in times]
                 units[name] = unit
-            if lead == 1:  # unsuffixed 850 hPa variables (the API has no _previous_dayN form)
+            if pressure:  # unsuffixed 850 hPa variables (the API has no _previous_dayN form)
                 for var, unit, value in (
                     ("temperature_850hPa", "°F", 10.0),
                     ("relative_humidity_850hPa", "%", 90.0),
@@ -80,9 +86,6 @@ def previous_runs_body(query: dict[str, str]) -> list[dict[str, Any]]:
                     units[f"{var}_{model}"] = unit
         out.append({"utc_offset_seconds": 0, "hourly": hourly, "hourly_units": units})
     return out
-
-
-FINE_SNOW_PER_HOUR = 0.2
 
 
 def historical_forecast_body(query: dict[str, str]) -> list[dict[str, Any]]:
@@ -195,7 +198,7 @@ def test_previous_runs_normalize_lead_and_models() -> None:
         {"mountains": [m.key for m in mountains], "elevation": "summit", "lead_day": 3},
     )
     rows = previous_runs.normalize(fetched)
-    assert {r.model for r in rows} == {"gfs_seamless", "gem_seamless"}  # no ECMWF snowfall
+    assert {r.model for r in rows} == {"gfs_global", "gem_global"}  # no ECMWF snowfall
     assert len(rows) == 2 * 2 * 48
     first = rows[0]
     assert (first.elevation, first.issued_at, first.lead_h) == ("summit", None, 48)
@@ -203,10 +206,16 @@ def test_previous_runs_normalize_lead_and_models() -> None:
     assert first.valid_at == "2026-02-06T00:00:00+00:00"
 
 
-def _fetched(lead: int, mountains: Sequence[config.Mountain]) -> base.Fetched:
+def _fetched(
+    lead: int,
+    mountains: Sequence[config.Mountain],
+    models: Sequence[str] = previous_runs.MODELS,
+) -> base.Fetched:
     query = {
         k: str(v)
-        for k, v in previous_runs.params(mountains, lead, DAY, DAY + timedelta(days=1)).items()
+        for k, v in previous_runs.params(
+            mountains, lead, DAY, DAY + timedelta(days=1), models
+        ).items()
     }
     return base.Fetched(
         previous_runs.SOURCE,
@@ -216,8 +225,31 @@ def _fetched(lead: int, mountains: Sequence[config.Mountain]) -> base.Fetched:
         "2026-11-26T00:00:00+00:00",
         0,
         json.dumps(previous_runs_body(query)).encode(),
-        {"mountains": [m.key for m in mountains], "elevation": "summit", "lead_day": lead},
+        {
+            "mountains": [m.key for m in mountains],
+            "elevation": "summit",
+            "lead_day": lead,
+            "models": list(models),
+        },
     )
+
+
+def test_previous_runs_requests_global_and_finer_models() -> None:
+    assert previous_runs.requests() == [
+        (("gfs_global", "gem_global"), 1),
+        (("gfs_global", "gem_global"), 2),
+        (("gfs_global", "gem_global"), 3),
+        (("gfs_global", "gem_global"), 4),
+        (("gfs_global", "gem_global"), 5),
+        (("ncep_hrrr_conus", "gem_hrdps_continental", "ncep_nbm_conus"), 1),
+    ]
+    mountains = config.load({}).mountains[:2]
+    fine = previous_runs.params(mountains, 1, DAY, DAY, previous_runs.FINE_MODELS)
+    assert fine["models"] == "ncep_hrrr_conus,gem_hrdps_continental,ncep_nbm_conus"
+    assert "850hPa" not in fine["hourly"] and "wind_speed_unit" not in fine
+    rows = previous_runs.normalize(_fetched(1, mountains, previous_runs.FINE_MODELS))
+    assert {r.model for r in rows} == set(previous_runs.FINE_MODELS)
+    assert {(r.lead_h, r.snowfall_in, r.t850_f) for r in rows} == {(0, 0.2, None)}
 
 
 def test_previous_runs_lead_day_1_adds_the_850_hpa_variables() -> None:
@@ -232,36 +264,92 @@ def test_previous_runs_lead_day_1_adds_the_850_hpa_variables() -> None:
     assert previous_runs.normalize(_fetched(2, mountains))[0].t850_f is None
 
 
+def _store(
+    conn: Any, run_id: int, fetched: base.Fetched, mountains: Sequence[config.Mountain]
+) -> tuple[int, int]:
+    rows = previous_runs.normalize(fetched)
+    with db.transaction(conn):
+        fetch_id = base.store_fetch(conn, run_id, fetched)
+        dropped = previous_runs.drop_superseded(
+            conn,
+            fetch_id,
+            models=str(fetched.params["models"]).split(","),
+            lead_day=int(fetched.meta["lead_day"]),
+            mountains=[m.key for m in mountains],
+            start=DAY,
+            end=DAY + timedelta(days=1),
+        )
+        open_meteo.store(conn, fetch_id, rows)
+    return fetch_id, dropped
+
+
 def test_previous_runs_replace_rows_of_an_earlier_fetch(tmp_path: Path) -> None:
     conn = db.connect(tmp_path / "h.db")
     db.migrate(conn)
     db.sync_mountains(conn, config.load({}).mountains)
     mountains = config.load({}).mountains[:2]
     run_id = db.start_run(conn, "season-backfill", None)
-    ids = []
-    for lead in (1, 1, 2):
-        fetched = _fetched(lead, mountains)
-        rows = previous_runs.normalize(fetched)
-        with db.transaction(conn):
-            fetch_id = base.store_fetch(conn, run_id, fetched)
-            dropped = previous_runs.drop_superseded(conn, fetch_id, rows)
-            open_meteo.store(conn, fetch_id, rows)
-        ids.append((fetch_id, dropped))
-    assert [d for _, d in ids] == [0, 2 * 2 * 48, 0]  # lead 2 leaves lead 1 alone
+    ids = [
+        _store(conn, run_id, _fetched(lead, mountains, models), mountains)
+        for lead, models in (
+            (1, previous_runs.MODELS),
+            (1, previous_runs.MODELS),
+            (2, previous_runs.MODELS),
+            (1, previous_runs.FINE_MODELS),
+        )
+    ]
+    # The second lead-1 fetch replaces the first; lead 2 and the finer models leave it alone.
+    assert [d for _, d in ids] == [0, 2 * 2 * 48, 0, 0]
     per_fetch = dict(
         conn.execute("SELECT fetch_id, count(*) FROM forecast_hourly GROUP BY 1").fetchall()
     )
-    assert per_fetch == {ids[1][0]: 2 * 2 * 48, ids[2][0]: 2 * 2 * 48}
+    assert per_fetch == {ids[1][0]: 2 * 2 * 48, ids[2][0]: 2 * 2 * 48, ids[3][0]: 3 * 2 * 48}
+
+
+def test_previous_runs_replace_a_finer_models_historical_forecast(tmp_path: Path) -> None:
+    conn = db.connect(tmp_path / "h.db")
+    db.migrate(conn)
+    db.sync_mountains(conn, config.load({}).mountains)
+    mountains = config.load({}).mountains[:2]
+    run_id = db.start_run(conn, "season-backfill", None)
+    stitched = []
+    for model in ("ncep_hrrr_conus", "ecmwf_ifs"):
+        # Historical Forecast rows as J29 stored them (any model then), at nominal lead 0.
+        query = {"models": model, "start_date": DAY.isoformat(), "end_date": DAY.isoformat()}
+        fetched = base.Fetched(
+            historical_forecast.SOURCE,
+            historical_forecast.URL,
+            query,
+            200,
+            "2026-11-26T00:00:00+00:00",
+            0,
+            json.dumps(historical_forecast_body({**query, "latitude": "1,2"})).encode(),
+            {"mountains": [m.key for m in mountains], "elevation": "summit", "model": model},
+        )
+        with db.transaction(conn):
+            fetch_id = base.store_fetch(conn, run_id, fetched)
+            open_meteo.store(conn, fetch_id, historical_forecast.normalize(fetched))
+        stitched.append(fetch_id)
+    _, dropped = _store(conn, run_id, _fetched(1, mountains, previous_runs.FINE_MODELS), mountains)
+    assert dropped == 2 * 24  # HRRR's stitched day at both mountains
+    left = dict(
+        conn.execute(
+            "SELECT model, count(*) FROM forecast_hourly WHERE fetch_id IN (?, ?) GROUP BY 1",
+            stitched,
+        ).fetchall()
+    )
+    assert left == {"ecmwf_ifs": 2 * 24}  # no lead-day-1 archive: stays on Historical Forecast
 
 
 def test_backfill_loads_every_source_and_is_idempotent(cfg: config.Config) -> None:
     web = FakeWeb()
     first = run_backfill(cfg, web)
-    assert first["previous_runs"]["rows"] == {"forecast_hourly": 5 * 8 * 2 * 48}
+    # GFS and GEM global at lead days 1-5, then HRRR, HRDPS, and NBM at lead day 1.
+    assert first["previous_runs"]["rows"] == {"forecast_hourly": (5 * 2 + 3) * 8 * 48}
     fine = first["historical_forecast"]
-    assert fine["requests"] == 5  # one per finer model
-    assert fine["rows"]["forecast_hourly"] == 5 * 8 * 48
-    assert fine["rows"]["forecast_hourly:ncep_hrrr_conus"] == 8 * 48
+    assert fine["requests"] == 2  # ECMWF IFS 9 km and AIFS
+    assert fine["rows"]["forecast_hourly"] == 2 * 8 * 48
+    assert fine["rows"]["forecast_hourly:ecmwf_ifs"] == 8 * 48
     assert first["lsr"]["rows"]["snow_report"] > 0
     assert first["pns"]["rows"]["discussion"] == 3
     assert first["nohrsc"]["rows"] == {"observation": 8}
@@ -286,7 +374,7 @@ def test_backfill_loads_every_source_and_is_idempotent(cfg: config.Config) -> No
     assert conn.execute("SELECT count(*) FROM snow_report WHERE elev_ft IS NULL").fetchone()[0] == 0
     # Leads, finer models, LSR, listings for 2 days, texts, NOHRSC, one SnoCountry document
     # per mountain, GHCN batches; elevation: 2 calls for LSR, 1 for PNS.
-    assert sent == 5 + 5 + 1 + 2 * 3 + 3 + 1 + 8 + 3 + 3
+    assert sent == 6 + 2 + 1 + 2 * 3 + 3 + 1 + 8 + 3 + 3
 
 
 def test_failed_requests_are_retried_on_the_next_run(cfg: config.Config) -> None:
@@ -315,21 +403,19 @@ def test_backfill_seeds_skill_per_mountain_and_model(cfg: config.Config) -> None
     ).fetchall()
     keys = {m.key for m in cfg.mountains}
     assert {(r[0], r[1]) for r in cells} == {
-        (m, model)
-        for m in keys
-        for model in ("gfs_seamless", "gem_seamless", *open_meteo.FINE_MODELS)
+        (m, model) for m in keys for model in ("gfs_global", "gem_global", *open_meteo.FINE_MODELS)
     }
-    assert {r[2] for r in cells if r[1] in ("gfs_seamless", "gem_seamless")} == {
+    assert {r[2] for r in cells if r[1] in ("gfs_global", "gem_global")} == {
         "1d",
         "2-3d",
         "4-5d",
     }
-    # The finer models' stitched short-lead series stands in for lead day 1 only.
+    # The finer models are backfilled for lead day 1 only.
     assert {r[2] for r in cells if open_meteo.is_fine(r[1])} == {"1d"}
     # Lead day N carries 0.1 x N in/h: day 1 forecasts 2.4 in, verified against the
     # resort-reported 6 in from SnoCountry (ahead of NOHRSC's 3.17 in).
     killington = conn.execute(
-        "SELECT bias_ratio FROM skill WHERE mountain = 'killington' AND model = 'gfs_seamless'"
+        "SELECT bias_ratio FROM skill WHERE mountain = 'killington' AND model = 'gfs_global'"
         " AND lead_bucket = '1d' AND tag = ''"
     ).fetchone()[0]
     assert killington == pytest.approx(2.4 / 6.0, abs=0.01)
@@ -342,13 +428,14 @@ def test_season_backfill_needs_a_range(cfg: config.Config) -> None:
 
 
 def test_historical_forecast_window_starts_at_each_model_archive() -> None:
-    first = date(2024, 10, 1)
-    assert historical_forecast.window("ncep_nbm_conus", first, date(2024, 10, 31)) == (
-        date(2024, 10, 8),
-        date(2024, 10, 31),
+    assert historical_forecast.MODELS == ("ecmwf_ifs", "ecmwf_aifs025_single")
+    first = date(2025, 2, 1)
+    assert historical_forecast.window("ecmwf_aifs025_single", first, date(2025, 2, 28)) == (
+        date(2025, 2, 20),
+        date(2025, 2, 28),
     )
-    assert historical_forecast.window("ecmwf_aifs025_single", first, date(2024, 10, 31)) is None
-    assert historical_forecast.window("ncep_hrrr_conus", first, first) == (first, first)
+    assert historical_forecast.window("ecmwf_aifs025_single", first, date(2025, 2, 10)) is None
+    assert historical_forecast.window("ecmwf_ifs", first, first) == (first, first)
 
 
 def test_historical_forecast_rows_stand_in_for_lead_day_1() -> None:
@@ -356,7 +443,7 @@ def test_historical_forecast_rows_stand_in_for_lead_day_1() -> None:
     query = {
         k: str(v)
         for k, v in historical_forecast.params(
-            mountains, "gem_hrdps_continental", DAY, DAY + timedelta(days=1)
+            mountains, "ecmwf_ifs", DAY, DAY + timedelta(days=1)
         ).items()
     }
     fetched = base.Fetched(
@@ -370,14 +457,14 @@ def test_historical_forecast_rows_stand_in_for_lead_day_1() -> None:
         {
             "mountains": [m.key for m in mountains],
             "elevation": "summit",
-            "model": "gem_hrdps_continental",
+            "model": "ecmwf_ifs",
         },
     )
     rows = historical_forecast.normalize(fetched)
     assert len(rows) == 2 * 48
     first = rows[0]
     assert (first.model, first.elevation, first.issued_at, first.lead_h) == (
-        "gem_hrdps_continental",
+        "ecmwf_ifs",
         "summit",
         None,
         0,
@@ -391,7 +478,7 @@ def test_historical_forecast_paces_requests_and_stops_at_429(
     class Limited(FakeWeb):
         def __call__(self, request: httpx.Request) -> httpx.Response:
             url = str(request.url.copy_with(query=None))
-            if url == historical_forecast.URL and "gem_hrdps" in str(request.url):
+            if url == historical_forecast.URL and "aifs" in str(request.url):
                 self.requests.append(url)
                 return httpx.Response(429, text="Too many requests")
             return super().__call__(request)
@@ -407,10 +494,10 @@ def test_historical_forecast_paces_requests_and_stops_at_429(
         options={"start": DAY, "end": DAY, "steps": ("historical_forecast",)},
     )
     fine = summary["historical_forecast"]
-    # ecmwf_ifs and HRRR load; HRDPS answers 429 and the step stops before NBM and AIFS.
-    assert fine["requests"] == 3 and fine["rate_limited"] is True
-    assert fine["rows"]["forecast_hourly"] == 2 * 8 * 48
-    assert len(no_pacing) == 2  # waits before the second and third request
+    # ecmwf_ifs loads; AIFS answers 429 and the step stops.
+    assert fine["requests"] == 2 and fine["rate_limited"] is True
+    assert fine["rows"]["forecast_hourly"] == 8 * 48
+    assert len(no_pacing) == 1  # a wait before the second request
     assert all(0 < w <= historical_forecast.REQUEST_INTERVAL_S for w in no_pacing)
     resumed = jobs.run_job(
         cfg,
@@ -419,5 +506,5 @@ def test_historical_forecast_paces_requests_and_stops_at_429(
         client=httpx.Client(headers=headers, transport=httpx.MockTransport(FakeWeb())),
         options={"start": DAY, "end": DAY, "steps": ("historical_forecast",)},
     )
-    assert resumed["historical_forecast"]["requests"] == 3  # HRDPS, NBM, AIFS
-    assert resumed["historical_forecast"]["cached"] == 2
+    assert resumed["historical_forecast"]["requests"] == 1  # AIFS
+    assert resumed["historical_forecast"]["cached"] == 1

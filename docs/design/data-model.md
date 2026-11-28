@@ -62,7 +62,7 @@ CREATE TABLE fetch (
 -- Normalized: forecasts ---------------------------------------------------
 CREATE TABLE forecast_hourly (
   fetch_id INT REFERENCES fetch, mountain TEXT REFERENCES mountain,
-  model TEXT,                               -- gfs_seamless | ecmwf_ifs025 | gem_seamless; finer (J29): ecmwf_ifs | ncep_hrrr_conus | gem_hrdps_continental | ncep_nbm_conus | ecmwf_aifs025_single
+  model TEXT,                               -- gfs_global | ecmwf_ifs025 | gem_global (J34; gfs_seamless | gem_seamless before, kept, not read); finer (J29): ecmwf_ifs | ncep_hrrr_conus | gem_hrdps_continental | ncep_nbm_conus | ecmwf_aifs025_single
   elevation TEXT,                           -- summit | base
   issued_at TEXT,                           -- model run time from Open-Meteo meta.json, not fetch time
   valid_at TEXT, lead_h INT,

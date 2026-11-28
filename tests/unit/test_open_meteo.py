@@ -33,13 +33,13 @@ def test_fixture_params_match_current_request(recorded: list[base.Fetched]) -> N
 
 
 def test_run_times_from_meta(runs: dict[str, open_meteo.RunTime]) -> None:
-    assert set(runs) == {"gfs_seamless", "ecmwf_ifs025", "gem_seamless", "hrrr"}
-    assert runs["gfs_seamless"].initialised_at == datetime(2026, 11, 26, 6, tzinfo=UTC)
-    assert not runs["gfs_seamless"].estimated
+    assert set(runs) == {"gfs_global", "ecmwf_ifs025", "gem_global", "hrrr"}
+    assert runs["gfs_global"].initialised_at == datetime(2026, 11, 26, 6, tzinfo=UTC)
+    assert not runs["gfs_global"].estimated
     assert runs["ecmwf_ifs025"].initialised_at == datetime(2026, 11, 26, 6, tzinfo=UTC)
     # cmc_gem_gdps meta.json stopped updating in May 2026: estimated from the GEM cycle.
-    assert runs["gem_seamless"].estimated
-    assert runs["gem_seamless"].initialised_at == datetime(2026, 11, 26, 0, tzinfo=UTC)
+    assert runs["gem_global"].estimated
+    assert runs["gem_global"].initialised_at == datetime(2026, 11, 26, 0, tzinfo=UTC)
 
 
 def test_effective_run_time_keeps_fresh_meta() -> None:
@@ -79,15 +79,15 @@ def test_normalize_summit(
     assert {r.model for r in rows} == set(open_meteo.MODELS)
     first = rows[0]
     assert first.mountain == "killington"
-    assert first.model == "gfs_seamless"
+    assert first.model == "gfs_global"
     assert first.valid_at == "2026-11-19T00:00:00+00:00"
     assert first.issued_at == "2026-11-26T06:00:00+00:00"
     assert first.lead_h == -174
     # Freezing level comes from GFS only (forecast-method.md).
-    assert all(r.freezing_level_ft is not None for r in rows if r.model == "gfs_seamless")
-    assert all(r.freezing_level_ft is None for r in rows if r.model != "gfs_seamless")
+    assert all(r.freezing_level_ft is not None for r in rows if r.model == "gfs_global")
+    assert all(r.freezing_level_ft is None for r in rows if r.model != "gfs_global")
     # Units: snow depth arrives in feet and is stored in inches; freezing level in feet.
-    gfs = [r for r in rows if r.model == "gfs_seamless"]
+    gfs = [r for r in rows if r.model == "gfs_global"]
     assert max(r.freezing_level_ft or 0 for r in gfs) > 3000
     assert all(r.temp_f is not None and -40 < r.temp_f < 80 for r in rows)
     assert all(r.snowfall_in is None or 0 <= r.snowfall_in < 6 for r in rows)
@@ -98,12 +98,12 @@ def test_normalize_converts_snow_depth_feet_to_inches(
 ) -> None:
     summit = by_label(recorded, "forecast-summit")
     raw = summit.json()[0]
-    assert raw["hourly_units"]["snow_depth_gfs_seamless"] == "ft"
-    feet = raw["hourly"]["snow_depth_gfs_seamless"]
+    assert raw["hourly_units"]["snow_depth_gfs_global"] == "ft"
+    feet = raw["hourly"]["snow_depth_gfs_global"]
     rows = [
         r
         for r in open_meteo.normalize(summit, runs)
-        if r.mountain == "killington" and r.model == "gfs_seamless"
+        if r.mountain == "killington" and r.model == "gfs_global"
     ]
     assert [r.snow_depth_in for r in rows] == [round(v * 12, 3) for v in feet]
 
@@ -132,7 +132,7 @@ def test_store_fetch_dedupes_bodies(tmp_path: Path, recorded: list[base.Fetched]
 
 
 def test_fixture_round_trip(tmp_path: Path, recorded: list[base.Fetched]) -> None:
-    original = by_label(recorded, "meta-gfs_seamless")
+    original = by_label(recorded, "meta-gfs_global")
     base.write_fixture(tmp_path / "x.json.gz", original)
     assert base.read_fixture(tmp_path / "x.json.gz") == original
 

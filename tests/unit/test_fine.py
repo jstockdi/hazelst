@@ -41,14 +41,14 @@ def conn(tmp_path: Path) -> sqlite3.Connection:
 def test_lead_days_keep_the_mean_and_upslope_on_the_global_models(
     conn: sqlite3.Connection,
 ) -> None:
-    add_hours(conn, DAY0, "loon", snow={"gfs_seamless": 0.07, "gem_seamless": 0.14}, temp=10,
+    add_hours(conn, DAY0, "loon", snow={"gfs_global": 0.07, "gem_global": 0.14}, temp=10,
               upslope=True)  # fmt: skip
     # The finer models' fetch: twice as much snow, no 850 hPa tag of their own.
     add_hours(conn, DAY0, "loon", snow={HRRR: 0.28, NBM: 0.21}, temp=10)
     (day,) = ratio.lead_days(conn).values()
     assert day.upslope  # the fine fetch casts no vote
     assert day.models[MEAN_MODEL].snow_in == pytest.approx((1.68 + 3.36) / 2)
-    assert set(day.raw_models()) == {"gfs_seamless", "gem_seamless"}
+    assert set(day.raw_models()) == {"gfs_global", "gem_global"}
     assert list(day.fine_models()) == [HRRR, NBM]
     assert day.models[HRRR].snow_in == pytest.approx(6.72)
 
@@ -57,7 +57,7 @@ def fine_day(mountain: str, day: date, water: float, *, hrrr: float, nbm_snow: f
     g = DayWater(round(water * 7, 3), {"<=15": water})
     h = DayWater(round(hrrr * 7, 3), {"<=15": hrrr})
     n = DayWater(nbm_snow, {"<=15": round(nbm_snow / 7, 4)})
-    return LeadDay(mountain, day, False, {"gfs_seamless": g, MEAN_MODEL: g, HRRR: h, NBM: n})
+    return LeadDay(mountain, day, False, {"gfs_global": g, MEAN_MODEL: g, HRRR: h, NBM: n})
 
 
 def test_each_fine_model_gets_its_own_ratio_and_candidates() -> None:
@@ -69,7 +69,7 @@ def test_each_fine_model_gets_its_own_ratio_and_candidates() -> None:
     r = ratio.Ratios(ratio.fit(pairs, DAY0))
     assert r.ratio("loon", HRRR, "<=15", None) == 12.0
     assert r.ratio("loon", NBM, "<=15", None) == 10.5  # 6 / (4 / 7)
-    assert r.ratio("loon", "gfs_seamless", "<=15", None) == 20.0
+    assert r.ratio("loon", "gfs_global", "<=15", None) == 20.0
     assert ratio.fit_days(r, "loon", HRRR) == 16
     # ECMWF 9 km, HRDPS, AIFS have no fit days: thin, out of the method choice.
     assert ratio.thin_methods(r, "loon") == {"ifs9_ratio", "hrdps_ratio", "aifs_ratio"}
@@ -95,7 +95,7 @@ def two_seasons(conn: sqlite3.Connection) -> None:
     for start, obs in ((date(2025, 1, 5), 2.4), (date(2026, 1, 5), 4.8)):
         for i in range(16):
             d = start + timedelta(days=i)
-            add_hours(conn, d, "loon", snow={"gfs_seamless": 0.07}, temp=10)
+            add_hours(conn, d, "loon", snow={"gfs_global": 0.07}, temp=10)
             add_hours(conn, d, "loon", snow={HRRR: 0.14, NBM: 0.1}, temp=10)
             add_report(conn, "loon", d, obs)
     conn.commit()
