@@ -10,6 +10,7 @@ import pytest
 
 from hazelst.models import Accumulation, AccumulationDay, MountainReport, ReportPayload
 from hazelst.render import charts, page
+from hazelst.sources import open_meteo
 from tests.pages import (
     recorded_narrative,
     recorded_payload,
@@ -305,20 +306,72 @@ def test_drawer_rows_order_and_nws() -> None:
     assert d.rows[1].cells == ["3″", "8″", "0", "0"]
     assert d.rows[5].cells == ["3″", "·", "·", "·"]
     assert (d.nws_1d, d.nws_3d) == ("0", "3″ to Sat")
-    assert d.method == "Hazel St uses the model mean for Killington."
 
 
-def test_drawer_method_line() -> None:
-    m = recorded().mountains[1]
-    assert page.method_line(with_method(m, method="resort_ratio")) == (
-        f"Hazel St uses the resort ratio for {m.name}."
+DRAWER_ORDER = [
+    "Hazel St", "GFS", "ECMWF", "GEM", "ECMWF 9 km", "HRRR", "HRDPS", "NBM", "AIFS", "NWS"
+]  # fmt: skip
+EVERY_MODEL = {k: 1.0 for k in open_meteo.KNOWN_MODELS}
+
+
+def drawer_labels(html: str, key: str) -> list[str]:
+    body = html.split(f'<div class="drawer" id="d-{key}" hidden>')[1].split("\n      </div>")[0]
+    return re.findall(r'<span class="dn">([^<]*)</span>', body)
+
+
+def test_every_model_key_has_a_display_name() -> None:
+    assert set(page.MODEL_NAMES) == set(open_meteo.KNOWN_MODELS)
+    assert set(page.LEGACY_MODELS.values()) <= set(page.MODEL_NAMES)
+    for name in page.MODEL_NAMES.values():
+        assert "_" not in name and name == name.strip()
+
+
+def test_drawer_labels_are_display_names_in_order() -> None:
+    """Every model, given in reverse order: the drawer rows are display names, once each,
+    in the fixed order Hazel St, GFS, ECMWF, GEM, ECMWF 9 km, HRRR, HRDPS, NBM, AIFS, NWS."""
+    p = recorded()
+    shuffled = dict(reversed(list(EVERY_MODEL.items())))
+    p = p.model_copy(update={"mountains": [with_models(m, [shuffled]) for m in p.mountains]})
+    html = page.render_report(p, recorded_narrative())
+    names = set(page.MODEL_NAMES.values()) | {"Hazel St", "NWS"}
+    for m in p.mountains:
+        labels = drawer_labels(html, m.key)
+        assert labels == DRAWER_ORDER
+        assert all("_" not in x and x in names for x in labels)
+
+
+def test_drawer_maps_pre_j34_seamless_ids_to_gfs_and_gem() -> None:
+    """The live 2026-11-27 drawer printed `gem_seamless` / `gfs_seamless` after the finer
+    models; payloads stored before J34 carry those ids as their GFS and GEM series."""
+    m = with_models(
+        recorded().mountains[0],
+        [{"gem_seamless": 0.9, "gfs_seamless": 3.0, "ecmwf_ifs025": 0.0, "ncep_hrrr_conus": 3.0}],
     )
-    day1 = with_method(m, day1_method="hrrr_ratio")
-    assert page.method_line(day1) == (
-        f"Hazel St uses the model mean for {m.name}, the HRRR ratio for day 1."
-    )
-    closed = m.model_copy(update={"is_open": False})
-    assert page.method_line(closed).endswith(". Closed for the season so far.")
+    rows = page.drawer(m, ["Fri 27", "Sat 28", "Sun 29"]).rows
+    assert [(r.name, r.cells[0]) for r in rows] == [
+        ("Hazel St", rows[0].cells[0]), ("GFS", "3″"), ("ECMWF", "0"), ("GEM", ".9″"),
+        ("HRRR", "3″"),
+    ]  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    "by_model",
+    [{"gfs_global": 1.0, "icon_seamless": 2.0}, {"gfs_global": 1.0, "gfs_seamless": 1.0}],
+)
+def test_unmapped_or_doubled_model_fails_the_render(by_model: dict[str, float]) -> None:
+    p = recorded()
+    p = p.model_copy(update={"mountains": [with_models(p.mountains[0], [by_model])]})
+    with pytest.raises(page.UnknownModelError):
+        page.render_report(p, recorded_narrative())
+
+
+def test_no_method_line_in_any_drawer() -> None:
+    p = recorded()
+    p = p.model_copy(update={"mountains": [with_models(m, [EVERY_MODEL]) for m in p.mountains]})
+    html = page.render_report(p, recorded_narrative())
+    assert 'class="meth"' not in html and "Hazel St uses the" not in html
+    css = (Path(page.__file__).parent / "static" / "page.css").read_text()
+    assert ".meth" not in css
 
 
 def test_drawer_markup_is_aligned_with_the_grid() -> None:
@@ -326,7 +379,7 @@ def test_drawer_markup_is_aligned_with_the_grid() -> None:
     rule, then one cell per forecast day (NWS: 1 + 2 + 1); no repeated date header."""
     css = (Path(page.__file__).parent / "static" / "page.css").read_text()
     assert (
-        ".grid{display:grid;grid-template-columns:minmax(88px,1.4fr) repeat(3,1fr) 10px"
+        ".grid{display:grid;grid-template-columns:minmax(max-content,1.4fr) repeat(3,1fr) 10px"
         " repeat(4,1fr);"
     ) in css
     assert ".drawer{grid-column:1/-1;display:grid;grid-template-columns:subgrid;" in css
@@ -335,7 +388,7 @@ def test_drawer_markup_is_aligned_with_the_grid() -> None:
     p = recorded()
     html = page.render_report(p, recorded_narrative())
     drawers = re.findall(
-        r'<div class="drawer" id="d-(\w+)" hidden>(.*?)<p class="meth">', html, re.S
+        r'<div class="drawer" id="d-(\w+)" hidden>\n(.*?)\n      </div>', html, re.S
     )
     assert len(drawers) == len(p.mountains)
     for _, body in drawers:
@@ -403,4 +456,5 @@ def test_old_payload_without_model_values_renders() -> None:
     t = page.snow_timeline(p)
     assert all(c.sub in ("", "rain", "ice", "mix") for r in t.rows for c in r.days)
     assert all([x.name for x in r.drawer.rows] == ["Hazel St"] for r in t.rows)
-    assert "Hazel St uses the" in page.render_report(p, recorded_narrative())
+    html = page.render_report(p, recorded_narrative())
+    assert all(drawer_labels(html, m.key) == ["Hazel St", "NWS"] for m in p.mountains)

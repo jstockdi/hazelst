@@ -330,7 +330,10 @@ def test_report_build_stores_resort_ratio_and_shows_it_where_chosen(
     from hazelst.render import page
 
     rendered = page.render_report(ReportPayload.model_validate_json(html), recorded_narrative())
-    assert "resort ratio" in rendered and "model mean" in rendered
+    assert (
+        '<div class="drawer" id="d-killington" hidden>' in rendered
+    )  # renders; no method line (J36)
+    assert "Hazel St uses the" not in rendered
 
 
 def test_skill_learn_job_fits_snow_ratio(tmp_path: Path) -> None:
