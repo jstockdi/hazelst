@@ -46,7 +46,14 @@ from hazelst.digest import DigestDay, DigestMountain, ReportDigest
 from hazelst.models import Elevation, PrecipType
 
 Rule = Literal[
-    "headline", "mountains", "snow_number", "precip_type", "best_bet", "storm_type", "cautions"
+    "headline",
+    "mountains",
+    "snow_number",
+    "precip_type",
+    "best_bet",
+    "storm_type",
+    "cautions",
+    "voice",
 ]
 
 SNOW_TOLERANCE_IN = 0.5
@@ -766,6 +773,34 @@ def check_cautions(draft: ReportDraft, digest: ReportDigest) -> list[CheckError]
     return errors
 
 
+# Banned in every section (owner, J37): "Today is the day here", "Saturday's the day".
+IS_THE_DAY = re.compile(r"\bis\s+the\s+day\b|\b\w+[’']s\s+the\s+day\b", re.I)
+
+
+def _texts(draft: ReportDraft) -> list[tuple[str, str]]:
+    """Every prose field of a draft as (section, text)."""
+    return [
+        ("headline", draft.headline),
+        *((("best_bet", draft.best_bet.why),) if draft.best_bet else ()),
+        ("storm", draft.storm),
+        *((f"mountains.{k}", v) for k, v in draft.mountains.items()),
+        *((f"cautions[{i}]", v) for i, v in enumerate(draft.cautions)),
+    ]
+
+
+def check_voice(draft: ReportDraft, digest: ReportDigest) -> list[CheckError]:
+    """No "X is the day" in any section; say what the day brings instead."""
+    return [
+        CheckError(
+            "voice",
+            f'{section} says {match.group(0)!r}; never write "X is the day",'
+            " say what the day brings",
+        )
+        for section, text in _texts(draft)
+        if (match := IS_THE_DAY.search(text))
+    ]
+
+
 RULES = (
     check_headline,
     check_mountains,
@@ -774,6 +809,7 @@ RULES = (
     check_best_bet,
     check_storm_types,
     check_cautions,
+    check_voice,
 )
 
 

@@ -545,3 +545,18 @@ def test_a_leading_claim_keeps_the_clause_context() -> None:
         "Loon Fri 27",
         "Killington Fri 27",
     ]
+
+
+def test_is_the_day_fails_in_every_section() -> None:
+    # Owner rule (J37): no "X is the day" anywhere, not only in the headline.
+    assert rules(check(draft(loon="Today is the day here: snow up top Saturday."), digest())) == [
+        "voice"
+    ]
+    (error,) = check(with_storm("Saturday's the day: snow at Loon."), digest())
+    assert str(error) == (
+        'voice: storm says "Saturday\'s the day"; never write "X is the day",'
+        " say what the day brings"
+    )
+    bet = {"mountain": "loon", "day": "2026-11-28", "why": "Saturday is the day for Loon."}
+    assert rules(check(with_draft(best_bet=bet), digest())) == ["voice"]
+    assert check(draft(loon="Saturday: snow up top, the day's only snow."), digest()) == []

@@ -14,6 +14,9 @@ like, then what spoils it.
 - Use weather jargon only when it explains a decision, and name at most one
   storm type. Not "cold upper low" or "Mississippi Valley through western New
   York"; say what it does ("rain Monday at all eight, then a hard refreeze").
+- Never write "X is the day" ("Today is the day here", "Saturday is the
+  day"), in any section. Say what the day brings ("Today: 3.5″ of heavy, wet
+  snow up top").
 - Never explain our method, the models, or which numbers the report uses.
 - Credit NWS only when it disagrees with us or adds something, once, in plain
   words: "though NWS Burlington says 1″", "NWS has a third of that".
@@ -101,7 +104,7 @@ its facts.
   "mountains": {
     "killington": "Today: 1.2″ of wet snow mixed with rain up top, rain at the base. Sunday glazes the upper mountain with freezing rain, Monday is rain with gusts to 41 mph; dry otherwise.",
     "pico": "Today: 0.7″ of wet snow and rain up top, rain at the base. Sunday is freezing rain on the upper mountain and Monday is rain; dry otherwise.",
-    "sugarbush": "Today is the day here: 3.5″ of heavy, wet snow mixed with rain up top, rain at the base. Monday is rain; dry otherwise.",
+    "sugarbush": "Today: 3.5″ of heavy, wet snow mixed with rain up top, rain at the base. Monday is rain; dry otherwise.",
     "stratton": "Today: 0.8″ of wet snow and rain up top, rain at the base. Monday is rain with gusts to 44 mph that could slow the summit lift; dry otherwise.",
     "loon": "Today: a trace of wet snow up top, rain at the base. Monday is rain with gusts to 47 mph that could stop summit lifts; dry otherwise.",
     "cranmore": "Monday is rain, with freezing rain at the summit; dry otherwise.",
@@ -145,5 +148,6 @@ that fails comes back with the errors. To pass:
   "upslope" only when the digest names them.
 - Cautions name every active alert by its exact event name and every
   `wind_hold_likely` day.
+- "is the day" anywhere in the draft fails.
 
 Follow the rules and regional knowledge below.
