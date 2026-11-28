@@ -11,14 +11,16 @@ header{padding:20px 16px 14px;max-width:44rem;margin:0 auto}
 h1{font:600 22px/1.25 Fraunces,Georgia,serif;margin:6px 0 0;letter-spacing:-.01em}
 main{max-width:44rem;margin:0 auto;padding:0 10px 24px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 8px 8px}
-/* Snow grid: name | 3 resort-reported days | now rule | 4 forecast days; drawers use subgrid. */
-.grid{display:grid;grid-template-columns:minmax(88px,1.4fr) repeat(3,1fr) 10px repeat(4,1fr);column-gap:3px;row-gap:4px;align-items:stretch;font-variant-numeric:tabular-nums}
+/* Snow grid: name | 3 resort-reported days | now rule | 4 forecast days; drawers use subgrid.
+   The name column is as wide as the longest name, which never wraps (J36). */
+.grid{display:grid;grid-template-columns:minmax(max-content,1.4fr) repeat(3,1fr) 10px repeat(4,1fr);column-gap:3px;row-gap:4px;align-items:stretch;font-variant-numeric:tabular-nums}
+@media (max-width:400px){main{padding:0 6px 24px}section.card{padding:10px 4px 8px}}
 .hd{font-size:12px;line-height:1.15;text-align:center;color:var(--mute);padding:2px 0 6px;font-weight:600}
 .hd.past{color:var(--faint)}
 .hd.fut{background:var(--tint);border-radius:8px 8px 0 0}
-.nm{all:unset;box-sizing:border-box;width:100%;cursor:pointer;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:space-between;padding-left:4px;min-height:44px;line-height:1.15}
+.nm{all:unset;box-sizing:border-box;width:100%;cursor:pointer;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:6px;white-space:nowrap;padding-left:4px;min-height:44px;line-height:1.15}
 .nm:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:6px}
-.nm .chev{font-style:normal;color:var(--faint);font-size:18px;transition:transform .15s;margin-right:2px}
+.nm .chev{font-style:normal;color:var(--faint);font-size:18px;transition:transform .15s;margin-right:2px;flex:none}
 .nm.open .chev{transform:rotate(90deg);color:var(--accent)}
 .c{display:flex;align-items:center;justify-content:center;min-height:44px}
 .grid > .c.f{background:var(--tint)}
@@ -35,9 +37,8 @@ main{max-width:44rem;margin:0 auto;padding:0 10px 24px}
 .dr .dn{grid-column:1/5;padding-left:10px;color:var(--mute);font-weight:500;white-space:nowrap}
 .dr > span:not(.dn):not(.nowl), .dr > b{text-align:center}
 .dr.ours .dn,.dr.ours b{color:var(--ink);font-weight:700}
-.dr .span2{grid-column:span 2;color:var(--mute)}
+.dr .span2{grid-column:span 2;color:var(--mute);white-space:nowrap}
 .dr .nowl{align-self:stretch}
-.meth{grid-column:1/-1;font-size:12px;color:var(--mute);margin:6px 0 0;padding:4px 10px 0}
 /* Written report (narrative.md): best bet, then the sections. */
 .report{margin-top:12px;padding:14px 16px 4px}
 .call{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:4px}

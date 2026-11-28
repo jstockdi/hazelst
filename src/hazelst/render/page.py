@@ -26,8 +26,9 @@ from hazelst.models import (
 )
 from hazelst.render import charts
 
-# Drawer rows in this order (global, then finer); a model missing here shows last,
-# under its Open-Meteo key.
+# Drawer rows in this order: the global models, then the finer models. Every model a
+# payload can carry has a name here (`open_meteo.KNOWN_MODELS`); `drawer` raises on any
+# other key so no Open-Meteo id reaches the page.
 MODEL_NAMES = {
     "gfs_global": "GFS",
     "ecmwf_ifs025": "ECMWF",
@@ -38,6 +39,8 @@ MODEL_NAMES = {
     "ncep_nbm_conus": "NBM",
     "ecmwf_aifs025_single": "AIFS",
 }
+# Payloads stored before J34 carry the seamless ids as their GFS and GEM series.
+LEGACY_MODELS = {"gfs_seamless": "gfs_global", "gem_seamless": "gem_global"}
 EDITIONS = {"0700": "7:00 AM", "0815": "8:15 AM", "1440": "2:40 PM"}
 ACCUMULATION_MIN_IN = 0.5
 
@@ -228,7 +231,6 @@ class Drawer:
     rows: list[DrawerRow]  # Hazel St, then each model with a value on a shown day
     nws_1d: str
     nws_3d: str  # "3″ to Sun", or "·"
-    method: str  # "Hazel St uses the model mean for Killington."
 
 
 @dataclass(frozen=True)
@@ -299,26 +301,32 @@ def _past(m: MountainReport, days: Sequence[date]) -> list[tuple[float | None, s
     return [(by_date[d].snow_in, by_date[d].source) if d in by_date else (None, None) for d in days]
 
 
-def method_line(m: MountainReport) -> str:
-    """ "Hazel St uses the model mean for Killington." (and day 1's finer-model method)."""
-    f = m.forecast
-    line = f"Hazel St uses the {METHOD_LABELS.get(f.method, f.method)} for {m.name}"
-    if f.day1_method:
-        line += f", the {METHOD_LABELS.get(f.day1_method, f.day1_method)} for day 1"
-    return line + ("." if m.is_open else ". Closed for the season so far.")
+class UnknownModelError(ValueError):
+    """A payload model key with no drawer name in `MODEL_NAMES`."""
+
+
+def drawer_models(by_model: dict[str, float]) -> dict[str, float]:
+    """A day's model values keyed by `MODEL_NAMES` key (pre-J34 seamless ids mapped).
+
+    Raises `UnknownModelError` on a key with no name, or a model given twice."""
+    out: dict[str, float] = {}
+    for key, value in by_model.items():
+        model = LEGACY_MODELS.get(key, key)
+        if model not in MODEL_NAMES:
+            raise UnknownModelError(f"model {key!r} has no drawer name in MODEL_NAMES")
+        if model in out:
+            raise UnknownModelError(f"model {model!r} appears twice (as {key!r})")
+        out[model] = value
+    return out
 
 
 def drawer(m: MountainReport, day_labels: Sequence[str]) -> Drawer:
     """The model drawer: Hazel St, each model with a value on a shown day, NWS."""
     days = m.forecast.days[:TIMELINE_DAYS]
-    order = list(MODEL_NAMES)
-    found = {k for d in days for k in d.by_model}
-    models = sorted(found, key=lambda k: (order.index(k) if k in order else len(order), k))
+    values = [drawer_models(d.by_model) for d in days]
+    models = [k for k in MODEL_NAMES if any(k in v for v in values)]
     rows = [DrawerRow("Hazel St", [cell_text(d.snow_in) for d in days], ours=True)]
-    rows += [
-        DrawerRow(MODEL_NAMES.get(k, k), [cell_text(d.by_model.get(k)) for d in days])
-        for k in models
-    ]
+    rows += [DrawerRow(MODEL_NAMES[k], [cell_text(v.get(k)) for v in values]) for k in models]
     nws_1d = m.forecast.windows["1d"].nws_in if "1d" in m.forecast.windows else None
     nws_3d = m.forecast.windows["3d"].nws_in if "3d" in m.forecast.windows else None
     through = day_labels[2].split(" ")[0] if len(day_labels) > 2 else ""
@@ -326,7 +334,6 @@ def drawer(m: MountainReport, day_labels: Sequence[str]) -> Drawer:
         rows=rows,
         nws_1d=cell_text(nws_1d),
         nws_3d="·" if nws_3d is None else f"{cell_text(nws_3d)} to {through}",
-        method=method_line(m),
     )
 
 

@@ -41,6 +41,7 @@ from hazelst.agents import conditions_extract, knowledge_propose
 from hazelst.agents.client import AgentCallFailed, AgentClient, AgentUnavailable
 from hazelst.agents.schemas import ReportDraft
 from hazelst.models import Narrative, ReportPayload
+from hazelst.render import page
 from hazelst.render.payload import build_payload
 from hazelst.sources import (
     base,
@@ -754,6 +755,10 @@ def build_report(ctx: JobContext, kind: str) -> None:
         ),
         verification=verify.latest_summary(ctx.conn, ctx.for_date),
     )
+    try:
+        page.snow_timeline(payload)  # the page must render before a narrative is paid for
+    except page.UnknownModelError as exc:
+        raise JobError(f"the page does not render: {exc}") from exc
     written = write_narrative(ctx, payload, kind)
     with db.transaction(ctx.conn):
         derive.store(ctx.conn, ctx.run_id, raw)

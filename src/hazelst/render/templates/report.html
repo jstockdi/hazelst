@@ -19,7 +19,6 @@
       <div class="drawer" id="d-{{ r.key }}" hidden>
 {% for d in r.drawer.rows %}        <div class="dr{{ ' ours' if d.ours }}"><span class="dn">{{ d.name }}</span><span class="nowl"></span>{% for v in d.cells %}{% if d.ours %}<b>{{ v }}</b>{% else %}<span>{{ v }}</span>{% endif %}{% endfor %}</div>
 {% endfor %}        <div class="dr"><span class="dn">NWS</span><span class="nowl"></span><span>{{ r.drawer.nws_1d }}</span><span class="span2">{{ r.drawer.nws_3d }}</span><span>·</span></div>
-        <p class="meth">{{ r.drawer.method }}</p>
       </div>
 {% endfor %}
     </div>

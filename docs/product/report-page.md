@@ -10,7 +10,7 @@ today; `/archive` lists days newest first.
 |---|---------|----------|--------|
 | 0 | **Header** | Small "HAZEL ST" wordmark (accent); the headline in Fraunces 22px; no date or issue line | Front matter |
 | 1 | **Snow grid** | One white card, no heading. Columns: name │ the **3 days before the report date**, resort-reported only (decisions row 24) │ a **now rule** │ **4 forecast days** from 6 AM on the report date, on a tinted background. One shared date header; one 44 px row per mountain; rows sort by forecast snow over the 4 days, ties in roster order. Cells below | `accumulation.days` (past), `forecast.days` (future) |
-| 2 | **Model drawer** | Tap a mountain name (a button with a chevron) to open a full-width row under it; closed by default, one tap per drawer, no hover. Rows: **Hazel St** (bold, the headline values), GFS, ECMWF, GEM, then each finer model with a value on a shown day, then **NWS** (the 1-day value under day 1; the 3-day value across days 2–3 as "3″ to Sun"). The drawer uses CSS subgrid, so each value sits under its day column and there is no second date header; the model name spans the name and past columns. One line under it: "Hazel St uses the <method> for <mountain>." (plus the day-1 method when a finer model is chosen; "Closed for the season so far." before opening day) | `forecast.days[].by_model`, `windows.1d/3d.nws_in`, `forecast.method`, `day1_method` |
+| 2 | **Model drawer** | Tap a mountain name (a button with a chevron) to open a full-width row under it; closed by default, one tap per drawer, no hover. Rows: **Hazel St** (bold, the headline values), GFS, ECMWF, GEM, then each finer model with a value on a shown day, then **NWS** (the 1-day value under day 1; the 3-day value across days 2–3 as "3″ to Sun"). The drawer uses CSS subgrid, so each value sits under its day column and there is no second date header; the model name spans the name and past columns. Nothing under the NWS row (J36 removed the method line) | `forecast.days[].by_model`, `windows.1d/3d.nws_in` |
 | 3 | **The report** | A second card after the grid: best bet (mountain + day + why) → The storm → Mountain by mountain → Cautions, with only those section names as headings | Narrative markdown in `report` |
 | 4 | **Footer** | One centered line: "Fri 27 Nov 2026 · 2:40 PM · Archive · JSON" (the issue time only when the report has no edition) | `date`, `edition` |
 
@@ -54,9 +54,16 @@ sources, and verification stay in the JSON.
 - Precip words on unfilled cells: rain `#0f6b57`, ice and mix `#6d28d9`; on a
   filled cell the word takes the cell's text colour.
 - The model list is data-driven: the drawer shows every model in the day's
-  `by_model`, in `MODEL_NAMES` order (global, then finer); the spread uses
-  `used_models`.
-- Closed mountains stay listed; the drawer line says so.
+  `by_model`, once each, under its display name, in `MODEL_NAMES` order:
+  GFS, ECMWF, GEM, ECMWF 9 km, HRRR, HRDPS, NBM, AIFS (J36). Payloads stored
+  before J34 carry `gfs_seamless` / `gem_seamless` as their GFS and GEM
+  series and show under those names. A key with no display name fails the
+  render (`UnknownModelError`), and `report-build` / `report-refresh` render
+  the timeline before publishing, so the job fails instead of printing an
+  Open-Meteo id. The spread uses `used_models`.
+- Closed mountains stay listed.
+- The name column fits every mountain name on one line at 360 px, with a gap
+  before the chevron.
 - Payloads stored before J35 have no `by_model`: no in-cell range, and the
   drawer shows Hazel St and NWS only.
 
