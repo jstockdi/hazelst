@@ -1,4 +1,5 @@
 import os
+import re
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from datetime import date as date_t
@@ -9,7 +10,12 @@ import pytest
 
 from hazelst.models import Accumulation, AccumulationDay, MountainReport, ReportPayload
 from hazelst.render import charts, page
-from tests.pages import recorded_narrative, recorded_payload, sample_narrative, sample_payload
+from tests.pages import (
+    recorded_narrative,
+    recorded_payload,
+    sample_narrative,
+    sample_payload,
+)
 
 GOLDEN = Path(__file__).resolve().parents[1] / "golden"
 UPDATE = os.environ.get("HAZELST_UPDATE_GOLDEN") == "1"
@@ -33,30 +39,13 @@ def check_golden(name: str, html: str) -> None:
 
 
 def test_golden_sample_run_page() -> None:
-    """2026-11-25 with the sample run's narrative: the mockup C layout."""
+    """2026-11-25 with the sample run's narrative (the J35 layout)."""
     check_golden("2026-11-25.html", page.render_report(sample(), sample_narrative()))
 
 
 def test_golden_recorded_page() -> None:
     """2026-11-26 7:00 AM edition from recorded data, with a short narrative."""
     check_golden("2026-11-26.html", page.render_report(recorded(), recorded_narrative()))
-
-
-def test_sections_in_order() -> None:
-    html = page.render_report(sample(), sample_narrative())
-    marks = [
-        "Best bet",
-        "<h2>The storm</h2>",
-        "<h2>Mountain by mountain</h2>",
-        "<h2>Cautions</h2>",
-        "Snow · reported and forecast",
-        'class="tl"',
-        "Forecast · what falls next",
-        'id="fct"',
-        'class="foot"',
-    ]
-    positions = [html.index(m) for m in marks]
-    assert positions == sorted(positions)
 
 
 def test_no_third_party_requests() -> None:
@@ -77,45 +66,6 @@ def test_parse_narrative() -> None:
     assert n.headline.startswith("Ski the cold, quiet Thanksgiving morning")
     assert n.best_bet is not None and n.best_bet.mountain == "Sunday River"
     assert n.body_md.lstrip().startswith("## The storm")
-
-
-def test_forecast_table_sorted_by_5d_and_hides_zero_ranges() -> None:
-    p = recorded()
-    html = page.render_report(p, recorded_narrative())
-    table = html[html.index('id="fct"') :]
-    order = [m.name for m in page.sorted_by_5d(p.mountains)]
-    assert [table.index(f'class="name">{n}') for n in order] == sorted(
-        table.index(f'class="name">{n}') for n in order
-    )
-    zero = [m for m in p.mountains if m.forecast.windows["1d"].range == (0.0, 0.0)]
-    assert zero, "fixture day should have a zero-width range"
-    assert "<small>0\N{EN DASH}0</small>" not in table
-
-
-def test_edition_label_in_footer_not_band() -> None:
-    p = recorded()
-    assert page.edition_label(p) == "Thu 26 Nov 2026 · 7:00 AM"
-    later = p.model_copy(
-        update={"edition": "1440", "issued": datetime(2026, 11, 26, 22, 43, tzinfo=UTC)}
-    )
-    assert page.edition_label(later) == "Thu 26 Nov 2026 · 2:40 PM"  # no issue time
-    assert page.edition_label(p.model_copy(update={"edition": None})) == "Thu 26 Nov 2026 · 7:00 AM"
-    html = page.render_report(later, recorded_narrative())
-    assert 'class="when"' not in html
-    assert '<p>Thu 26 Nov 2026 · 2:40 PM</p>\n    <p><a href="/archive">Archive</a>' in html
-
-
-def test_closed_mountain_listed() -> None:
-    p = recorded()
-    closed = p.model_copy(
-        update={
-            "mountains": [m.model_copy(update={"is_open": m.key != "pico"}) for m in p.mountains]
-        }
-    )
-    html = page.render_report(closed, recorded_narrative())
-    assert "Pico<small>model mean</small><small>closed</small>" in html
-    # The timeline shows only the name; "closed" is in the forecast table.
-    assert '<div role="rowheader" class="tl-n">Pico</div>' in html
 
 
 @pytest.mark.parametrize(
@@ -204,48 +154,6 @@ def test_timeline_sorted_by_4_day_forecast_ties_in_roster_order() -> None:
     assert t.past_days == [("Mon", "23"), ("Tue", "24"), ("Wed", "25")]
 
 
-def test_timeline_past_always_shown_with_no_report_and_zero() -> None:
-    p = recorded()
-    mountains = [
-        with_past(m, p.date, [None, 0.0, 0.3]) if m.key == "loon" else m for m in p.mountains
-    ]
-    t = page.snow_timeline(p.model_copy(update={"mountains": mountains}))
-    loon = next(r for r in t.rows if r.name == "Loon")
-    assert [(c.kind, c.text) for c in loon.past] == [
-        ("nr", "\u2013"),
-        ("past", "0"),
-        ("past", ".3\u2033"),
-    ]
-    assert loon.past[2].title == "Wed 25 · resort reported 0.3\u2033 (resort)"
-    # A mountain without any accumulation is all "no report", and no row collapses.
-    assert all(len(r.past) == 3 for r in t.rows)
-    other = next(r for r in t.rows if r.name == "Killington")
-    assert {c.kind for c in other.past} == {"nr"}
-    html = page.render_report(p.model_copy(update={"mountains": mountains}), recorded_narrative())
-    assert 'class="c nr"' in html and "No resort reported snow" not in html
-
-
-def test_timeline_forecast_cells() -> None:
-    p = recorded()
-    m = with_days(p.mountains[0], [0.2, 0.1, 2.0, 7.0], ["rain", "dry", "mix", "ice"])
-    days = page.snow_timeline(p.model_copy(update={"mountains": [m]})).rows[0].days
-    assert [(c.text, c.word) for c in days] == [
-        ("", "rain"),
-        ("\u00b7", ""),
-        ("2\u2033", "mix"),
-        ("7\u2033", "ice"),
-    ]
-    assert all(c.kind == "fut" for c in days)
-    assert days[0].word_color == page.WET_COLORS["rain"]
-    assert days[2].word_color == page.WET_COLORS["mix"]
-    assert days[3].word_color == "#ffffff"  # dark bin: the word takes the text color
-    title = days[0].title
-    assert title.startswith(f"{m.forecast.days[0].label} · 0.2\u2033 snow · rain · ")
-    assert "\u2033 liquid" in title
-    if m.forecast.days[0].hi_f is not None:
-        assert f"high {m.forecast.days[0].hi_f}\u00b0F" in title
-
-
 def test_timeline_day1_method_in_title() -> None:
     p = recorded()
     m = p.mountains[0]
@@ -257,40 +165,242 @@ def test_timeline_day1_method_in_title() -> None:
     assert "day 1" not in days[1].title
 
 
-def test_now_rule_is_plain_with_vertical_header() -> None:
-    html = page.render_report(recorded(), recorded_narrative())
-    assert '<div role="columnheader" class="tl-nowh"><span>Now</span></div>' in html
-    rule = html[html.index('<div class="tl-now"') :]
-    assert rule.startswith('<div class="tl-now" style="grid-row:2 / span 8"></div>')
+def with_models(m: MountainReport, by_day: Sequence[dict[str, float]]) -> MountainReport:
+    days = [
+        d.model_copy(update={"by_model": by_day[i] if i < len(by_day) else {}})
+        for i, d in enumerate(m.forecast.days)
+    ]
+    return m.model_copy(update={"forecast": m.forecast.model_copy(update={"days": days})})
 
 
-def test_timeline_markup_fits_390px() -> None:
-    """Fixed widths are only the 70 px names and the 3 px rule; day columns shrink to fit."""
+def with_method(m: MountainReport, **update: object) -> MountainReport:
+    return m.model_copy(update={"forecast": m.forecast.model_copy(update=update)})
+
+
+GLOBAL = ["gfs_seamless", "ecmwf_ifs025", "gem_seamless"]
+
+
+def test_timeline_past_cells_blank_zero_and_amounts() -> None:
+    p = recorded()
+    mountains = [
+        with_past(m, p.date, [None, 0.0, 0.3]) if m.key == "loon" else m for m in p.mountains
+    ]
+    t = page.snow_timeline(p.model_copy(update={"mountains": mountains}))
+    loon = next(r for r in t.rows if r.name == "Loon")
+    # No report is blank; a reported zero, and anything under 0.5″, is a faint "0".
+    assert [(c.text, c.background) for c in loon.past] == [("", ""), ("0", ""), ("0", "")]
+    assert loon.past[2].title == "Wed 25 · resort reported 0.3″ (resort)"
+    assert all(len(r.past) == 3 for r in t.rows)
+    filled = page.snow_timeline(
+        p.model_copy(
+            update={
+                "mountains": [
+                    with_past(m, p.date, [0.6, 3.4, 12.0]) if m.key == "loon" else m
+                    for m in p.mountains
+                ]
+            }
+        )
+    )
+    loon = next(r for r in filled.rows if r.name == "Loon")
+    assert [(c.text, c.background) for c in loon.past] == [
+        (".6″", "#f3f8c9"),
+        ("3″", "#7fcdbb"),
+        ("12″", "#253494"),
+    ]
+
+
+def test_timeline_forecast_cells() -> None:
+    p = recorded()
+    m = with_days(p.mountains[0], [0.2, 0.1, 2.0, 7.0], ["rain", "dry", "mix", "ice"])
+    m = with_models(m, [{}] * 4)
+    days = page.snow_timeline(p.model_copy(update={"mountains": [m]})).rows[0].days
+    assert [(c.text, c.sub, c.word) for c in days] == [
+        ("", "", "rain"),
+        ("0", "", ""),
+        ("2″", "mix", ""),
+        ("7″", "ice", ""),
+    ]
+    assert days[0].color == page.WET_COLORS["rain"] and not days[0].background
+    assert days[3].background == "#2c7fb8" and days[3].color == "#ffffff"
+    title = days[0].title
+    assert title.startswith(f"{m.forecast.days[0].label} · 0.2″ snow · rain · ")
+
+
+@pytest.mark.parametrize(
+    ("snow", "values", "expected"),
+    [
+        (5.0, {"gfs_seamless": 8.0, "ecmwf_ifs025": 2.0, "gem_seamless": 6.0}, (2.0, 8.0)),
+        (4.0, {"gfs_seamless": 3.0, "ecmwf_ifs025": 4.0, "gem_seamless": 4.4}, None),  # < 1.5″
+        (1.0, {"gfs_seamless": 0.2, "ecmwf_ifs025": 1.7}, (0.2, 1.7)),  # exactly 1.5″
+        (6.0, {"gfs_seamless": 4.5, "ecmwf_ifs025": 7.0}, None),  # 2.5″ < half of 6″
+        (6.0, {"gfs_seamless": 3.0, "ecmwf_ifs025": 6.0}, (3.0, 6.0)),  # 3″ = half of 6″
+        (5.0, {"gfs_seamless": 5.0}, None),  # one model is no spread
+        (5.0, {"gfs_seamless": 5.0, "ncep_hrrr_conus": 12.0}, None),  # finer models don't count
+    ],
+)
+def test_spread_rule(
+    snow: float, values: dict[str, float], expected: tuple[float, float] | None
+) -> None:
+    day = (
+        recorded()
+        .mountains[0]
+        .forecast.days[0]
+        .model_copy(update={"snow_in": snow, "by_model": values})
+    )
+    assert page.model_spread(day, GLOBAL) == expected
+
+
+def test_spread_shows_under_the_amount_and_wins_over_the_type_word() -> None:
+    p = recorded()
+    m = with_days(p.mountains[0], [1.3, 5.2, 4.0, 4.0], ["snow", "snow", "mix", "mix"])
+    m = with_models(
+        m,
+        [
+            {"gfs_seamless": 3.2, "ecmwf_ifs025": 0.0, "gem_seamless": 0.8},
+            {"gfs_seamless": 7.6, "ecmwf_ifs025": 1.6, "gem_seamless": 6.3},
+            {"gfs_seamless": 3.0, "ecmwf_ifs025": 8.0},
+            {"gfs_seamless": 4.0, "ecmwf_ifs025": 4.5},
+        ],
+    )
+    page_ = p.model_copy(update={"mountains": [m]})
+    days = page.snow_timeline(page_).rows[0].days
+    assert [(c.text, c.sub) for c in days] == [
+        ("1″", "0\u20133"),
+        ("5″", "2\u20138"),
+        ("4″", "3\u20138"),
+        ("4″", "mix"),
+    ]
+    html = page.render_report(page_, recorded_narrative())
+    assert "5″<small " in html and ">2\u20138</small>" in html
+    assert "2\u20138″" not in html  # no inch marks on the range
+
+
+def test_drawer_rows_order_and_nws() -> None:
+    p = recorded()
+    m = with_models(
+        p.mountains[0],
+        [
+            {
+                "gfs_seamless": 3.2,
+                "ecmwf_ifs025": 0.0,
+                "gem_seamless": 0.8,
+                "ncep_hrrr_conus": 3.0,
+                "ecmwf_ifs": 0.3,
+            },
+            {"gfs_seamless": 7.6, "ecmwf_ifs025": 1.6, "gem_seamless": 6.3, "ecmwf_ifs": 2.0},
+            {"gfs_seamless": 0.0, "ecmwf_ifs025": 0.0, "gem_seamless": 0.0},
+            {"gfs_seamless": 0.0, "ecmwf_ifs025": 0.0, "gem_seamless": 0.0},
+            {"ncep_nbm_conus": 9.0},  # day 5 is not shown, so NBM has no row
+        ],
+    )
+    windows = dict(m.forecast.windows)
+    windows["1d"] = windows["1d"].model_copy(update={"nws_in": 0.4})
+    windows["3d"] = windows["3d"].model_copy(update={"nws_in": 2.6})
+    m = with_method(m, windows=windows)
+    row = page.snow_timeline(p.model_copy(update={"mountains": [m]})).rows[0]
+    d = row.drawer
+    assert [r.name for r in d.rows] == ["Hazel St", "GFS", "ECMWF", "GEM", "ECMWF 9 km", "HRRR"]
+    assert d.rows[0].ours and not any(r.ours for r in d.rows[1:])
+    assert d.rows[0].cells == [page.cell_text(x.snow_in) for x in m.forecast.days[:4]]
+    assert d.rows[1].cells == ["3″", "8″", "0", "0"]
+    assert d.rows[5].cells == ["3″", "·", "·", "·"]
+    assert (d.nws_1d, d.nws_3d) == ("0", "3″ to Sat")
+    assert d.method == "Hazel St uses the model mean for Killington."
+
+
+def test_drawer_method_line() -> None:
+    m = recorded().mountains[1]
+    assert page.method_line(with_method(m, method="resort_ratio")) == (
+        f"Hazel St uses the resort ratio for {m.name}."
+    )
+    day1 = with_method(m, day1_method="hrrr_ratio")
+    assert page.method_line(day1) == (
+        f"Hazel St uses the model mean for {m.name}, the HRRR ratio for day 1."
+    )
+    closed = m.model_copy(update={"is_open": False})
+    assert page.method_line(closed).endswith(". Closed for the season so far.")
+
+
+def test_drawer_markup_is_aligned_with_the_grid() -> None:
+    """Each drawer row is a subgrid of the main grid: name over columns 1-4, the now
+    rule, then one cell per forecast day (NWS: 1 + 2 + 1); no repeated date header."""
     css = (Path(page.__file__).parent / "static" / "page.css").read_text()
     assert (
-        ".tl{display:grid;grid-template-columns:70px repeat(3,minmax(0,1fr)) 3px"
-        " repeat(4,minmax(0,1fr));gap:3px;"
+        ".grid{display:grid;grid-template-columns:minmax(88px,1.4fr) repeat(3,1fr) 10px"
+        " repeat(4,1fr);"
     ) in css
-    assert "min-width:0;min-height:36px;" in css
+    assert ".drawer{grid-column:1/-1;display:grid;grid-template-columns:subgrid;" in css
+    assert ".dr{grid-column:1/-1;display:grid;grid-template-columns:subgrid;" in css
+    assert ".dr .dn{grid-column:1/5;" in css and ".dr .span2{grid-column:span 2;" in css
     p = recorded()
     html = page.render_report(p, recorded_narrative())
-    grid = html[
-        html.index('<div class="tl"') : html.index("</figure>", html.index('<div class="tl"'))
-    ]
-    assert "width" not in grid and "nowrap" not in grid
-    cells = grid.count('role="cell"')
-    assert cells == 7 * len(p.mountains) and grid.count(" title=") == cells
-    assert f'style="grid-row:2 / span {len(p.mountains)}"' in grid
-    # Removed: the stacked chart, the type grid, and the by-day details.
-    assert 'class="types"' not in html and "stacked by day" not in html
-    assert "<h2>By day</h2>" not in html and "<details" not in html
+    drawers = re.findall(
+        r'<div class="drawer" id="d-(\w+)" hidden>(.*?)<p class="meth">', html, re.S
+    )
+    assert len(drawers) == len(p.mountains)
+    for _, body in drawers:
+        assert 'class="hd' not in body
+        rows = re.findall(r'<div class="dr[^"]*">(.*?)</div>', body)
+        assert rows[0].startswith('<span class="dn">Hazel St</span><span class="nowl"></span>')
+        for r in rows[:-1]:
+            assert r.count("<b>") + r.count("<span>") == 4 and r.count('class="nowl"') == 1
+        assert rows[-1] == (
+            '<span class="dn">NWS</span><span class="nowl"></span><span>'
+            + rows[-1].split("<span>")[1].split("</span>")[0]
+            + '</span><span class="span2">'
+            + rows[-1].split('class="span2">')[1].split("</span>")[0]
+            + "</span><span>·</span>"
+        )
 
 
-def test_section_labels_lead_straight_into_grid_and_table() -> None:
-    html = page.render_report(recorded(), recorded_narrative())
-    timeline = html[
-        html.index("Snow · reported and forecast</div>") : html.index('<div class="tl"')
+def test_mountain_button_opens_its_drawer() -> None:
+    p = recorded()
+    html = page.render_report(p, recorded_narrative())
+    for m in p.mountains:
+        assert (
+            f'<button class="nm" type="button" aria-expanded="false" aria-controls="d-{m.key}">'
+            f'{m.name}<i class="chev" aria-hidden="true">\u203a</i></button>'
+        ) in html
+        assert f'<div class="drawer" id="d-{m.key}" hidden>' in html
+    assert 'b.setAttribute("aria-expanded"' in html and "mouseover" not in html
+
+
+def test_page_order_and_no_forecast_table() -> None:
+    html = page.render_report(sample(), sample_narrative())
+    marks = [
+        '<div class="brand">Hazel St</div><h1>',
+        '<div class="grid">',
+        "Best bet",
+        "<h2>The storm</h2>",
+        "<h2>Mountain by mountain</h2>",
+        "<h2>Cautions</h2>",
+        "<footer>",
     ]
-    table = html[html.index("Forecast · what falls next</div>") : html.index('<table id="fct">')]
-    for part in (timeline, table):
-        assert "<h2>" not in part and 'class="lead"' not in part
+    positions = [html.index(m) for m in marks]
+    assert positions == sorted(positions)
+    assert 'id="fct"' not in html and "<table" not in html
+    assert "Resort ratio: each model" not in html and "Model mean: Open-Meteo" not in html
+    assert 'class="band"' not in html and 'class="part"' not in html
+
+
+def test_footer_is_one_line() -> None:
+    p = recorded().model_copy(
+        update={"edition": "1440", "issued": datetime(2026, 11, 26, 22, 43, tzinfo=UTC)}
+    )
+    assert page.edition_label(p) == "Thu 26 Nov 2026 · 2:40 PM"
+    html = page.render_report(p, recorded_narrative())
+    assert (
+        '<footer>Thu 26 Nov 2026 · 2:40 PM · <a href="/archive">Archive</a> ·'
+        ' <a href="/api/report/2026-11-26.json">JSON</a></footer>'
+    ) in html
+    assert html.count("<footer>") == 1 and "Verification" not in html
+
+
+def test_old_payload_without_model_values_renders() -> None:
+    """Payloads stored before J35 have no `by_model` per day: no ranges, a two-row drawer."""
+    p = recorded()
+    p = p.model_copy(update={"mountains": [with_models(m, []) for m in p.mountains]})
+    t = page.snow_timeline(p)
+    assert all(c.sub in ("", "rain", "ice", "mix") for r in t.rows for c in r.days)
+    assert all([x.name for x in r.drawer.rows] == ["Hazel St"] for r in t.rows)
+    assert "Hazel St uses the" in page.render_report(p, recorded_narrative())

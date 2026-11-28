@@ -259,7 +259,7 @@ series'; the two points share a latitude and longitude):
 | 5 | otherwise | `mix` |
 
 - `precip_type` is the summit's (stored in `forecast_day.precip_type`; the
-  page's "What falls" grid), `base_precip_type` the base's.
+  page's snow grid), `base_precip_type` the base's.
 - `freezing_rain_at` lists each elevation that has a freezing-rain hour (rule
   4) on a day that is not `dry` there, so a `rain` day can still carry
   freezing rain at the summit. NWS ice counts at both elevations.
@@ -295,7 +295,9 @@ so the ranking and the narrative agree.
     "days": [
       { "date": "2026-11-26", "snow_in": 4, "hi_f": 26, "lo_f": 14,
         "gust_mph": 32, "freezing_level_ft": 1800, "precip_in": 0.4,
-        "precip_type": "snow", "tags": ["nw_upslope"] }
+        "precip_type": "snow", "tags": ["nw_upslope"],
+        "by_model": { "gfs_seamless": 3.2, "ecmwf_ifs025": 4.1, "gem_seamless": 5.8,
+                      "ecmwf_ifs": 4.4, "ncep_hrrr_conus": 3.9 } }
     ],
     "storm_type": "clipper"
   },
@@ -310,6 +312,12 @@ so the ranking and the narrative agree.
   "powder_score": 71
 }
 ```
+
+`days[].by_model` (J35) is each model's summit snowfall for the day as
+Open-Meteo reports it, before any ratio: the global models and the finer
+models, each only where its run covers at least 23 hours of the day. It feeds
+the page's model drawer and the in-cell model range; the mean, the windows,
+and the digest do not read it. Payloads stored before J35 have `{}`.
 
 Run-level fields: `issued`, `discussions` (`{ "BTV": "...", "ALY": "...",
 "GYX": "...", "WPC": "..." }`, Key Messages + Discussion only).

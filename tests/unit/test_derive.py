@@ -97,6 +97,27 @@ def test_daily_buckets_sum_to_windows() -> None:
     assert k.windows["5d"].base_snow_in == 1.2
 
 
+def test_day_by_model_lists_global_and_finer_models_with_a_full_day() -> None:
+    """Each model's summit snow per day (J35): finer models too, only where a run covers
+    at least 23 hours of the day; the mean and the windows still use the global models."""
+    rows: list[HourlyRow] = []
+    for i, m in enumerate(MODELS):  # 0.05, 0.10, 0.15 in/h
+        rows += hourly(m, snowfall_in=0.05 * (i + 1))
+    rows += hourly("ncep_hrrr_conus", snowfall_in=0.2)[:30]  # day 1 and 6 h of day 2
+    rows += hourly("ecmwf_ifs", snowfall_in=0.25)
+    k = run(rows).mountain("killington")
+    assert k.days[0].by_model == {
+        "gfs_seamless": 1.2,
+        "ecmwf_ifs025": 2.4,
+        "gem_seamless": 3.6,
+        "ecmwf_ifs": 6.0,
+        "ncep_hrrr_conus": 4.8,
+    }
+    assert list(k.days[1].by_model) == ["gfs_seamless", "ecmwf_ifs025", "gem_seamless", "ecmwf_ifs"]
+    assert k.days[0].snow_in == 2.4
+    assert "ecmwf_ifs" not in k.windows["1d"].by_model
+
+
 def test_daily_buckets_sum_to_windows_on_recorded_day() -> None:
     forecast = recorded_forecast()
     for m in forecast.mountains:

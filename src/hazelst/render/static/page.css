@@ -1,61 +1,58 @@
-/* Hazel St Forecast page styles (report-page.md, mockup C). Fonts: Fraunces and Inter, SIL OFL 1.1, self-hosted. */
+/* Hazel St Forecast page styles (report-page.md, J35). Fonts: Fraunces and Inter, SIL OFL 1.1, self-hosted. */
 @font-face{font-family:Inter;font-style:normal;font-weight:400;font-display:swap;src:url(/static/fonts/inter-latin-400-normal.woff2) format("woff2")}
-@font-face{font-family:Inter;font-style:normal;font-weight:500;font-display:swap;src:url(/static/fonts/inter-latin-500-normal.woff2) format("woff2")}
 @font-face{font-family:Inter;font-style:normal;font-weight:600;font-display:swap;src:url(/static/fonts/inter-latin-600-normal.woff2) format("woff2")}
 @font-face{font-family:Inter;font-style:normal;font-weight:700;font-display:swap;src:url(/static/fonts/inter-latin-700-normal.woff2) format("woff2")}
-@font-face{font-family:Fraunces;font-style:normal;font-weight:500;font-display:swap;src:url(/static/fonts/fraunces-latin-500-normal.woff2) format("woff2")}
 @font-face{font-family:Fraunces;font-style:normal;font-weight:600;font-display:swap;src:url(/static/fonts/fraunces-latin-600-normal.woff2) format("woff2")}
-:root{--ink:#132534;--deep:#0f3a5a;--sea:#1a5c88;--green:#12806a;--paper:#f5f9fb;--card:#fff;--line:#dce7ee;--line-2:#eef4f8;--mist:#5b7183;--warn:#b45309;--warn-bg:#fdf3e4;
-  --band:linear-gradient(152deg,#0f3a5a 0%,#164f77 46%,#12806a 100%)}
+:root{--ink:#132534;--mute:#64788a;--faint:#b8c4ce;--line:#e3e9ee;--bg:#f4f6f8;--card:#fff;--accent:#1a5c88;--tint:#f0f6fb}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:15.5px/1.6 Inter,-apple-system,sans-serif}
-.band{background:var(--band);color:#fff;padding:18px 16px 26px}
-.band .k{font:600 13px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;opacity:.85}
-.band h1{font:500 18px/1.35 Fraunces,Georgia,serif;margin:10px 0 6px}
-.band .when{font-size:12px;opacity:.7}
-main{max-width:42rem;margin:0 auto;padding:0 16px 32px}
-.call{background:var(--card);border-radius:16px;margin-top:-14px;padding:14px 16px;box-shadow:0 14px 34px -22px rgba(15,58,90,.55);border-left:4px solid var(--green)}
-.call small{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);font-weight:700}
-.call b{display:block;font:600 18px/1.3 Fraunces,Georgia,serif;color:var(--deep);margin:2px 0}
-.call span{font-size:14px;color:var(--mist)}
-h2{font:600 19px/1.3 Fraunces,Georgia,serif;color:var(--deep);margin:26px 0 8px}
-p{margin:0 0 12px}
-p b{color:var(--sea)}
-.part{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mist);font-weight:700;margin:34px 0 -18px;padding-top:14px;border-top:1px solid var(--line)}
-.lead{font-size:13px;color:var(--mist);margin:-4px 0 10px}
-figure{margin:0 0 12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-#fct{background:var(--card);border-radius:12px;overflow:hidden;border:1px solid var(--line);font-size:14px}
-#fct th,#fct td{padding:8px 10px;text-align:right}
-#fct th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mist);background:var(--line-2);font-weight:600;line-height:1.25}
-#fct th:first-child,#fct td:first-child{text-align:left}
-#fct tr+tr td{border-top:1px solid var(--line-2)}
-#fct td b{color:var(--deep)}
-#fct td small{color:var(--mist);font-size:11px;display:block;line-height:1.1}
-.foot{font-size:12px;color:var(--mist);border-top:1px solid var(--line);margin-top:26px;padding-top:12px}
-#fct td.name{white-space:nowrap}
-#fct td.name small{white-space:normal}
-.archive{list-style:none;margin:18px 0 0;padding:0}
-.archive li{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:8px}
-.archive a{font-weight:600;color:var(--deep);text-decoration:none}
-.archive span{display:block;font-size:14px}
-.archive small{color:var(--mist);font-size:12px;margin-right:8px}
-.foot a{color:var(--sea)}
-.foot p{margin:0 0 6px}
-.fct-note{margin:8px 0 0}
-/* Snow timeline: 3 resort-reported days | now rule | 4 forecast days (palette D, report-page.md). */
-.tl-fig{padding:8px 6px}
-.part+.tl-fig,.part+#fct{margin-top:26px}
-.tl{display:grid;grid-template-columns:70px repeat(3,minmax(0,1fr)) 3px repeat(4,minmax(0,1fr));gap:3px;font-variant-numeric:tabular-nums}
-.tl-row{display:contents}
-.tl-nowh{position:relative}
-.tl-nowh span{position:absolute;left:50%;bottom:0;transform:translateX(-50%) rotate(180deg);writing-mode:vertical-rl;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1;color:var(--sea)}
-.tl-now{grid-column:5;background:var(--sea);border-radius:2px}
-.tl-h{font-size:10px;color:var(--ink);text-align:center;line-height:1.15;font-weight:600}
-.tl-h-past{color:var(--mist)}
-.tl-n{display:flex;flex-direction:column;justify-content:center;font:600 12.5px/1.15 Fraunces,Georgia,serif;color:var(--deep);min-width:0;overflow-wrap:anywhere}
-.tl .c{min-width:0;min-height:36px;border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;line-height:1.1;padding:2px 0;overflow:hidden}
-.tl .c b{font-size:14px;font-weight:700}
-.tl .c .w{font-size:10px;font-weight:700}
-.tl .c.fut{border-style:dashed;border-color:#a9cbe4}
-.tl .c.nr{color:#b9c8d3;background:repeating-linear-gradient(135deg,#f5f9fb 0 3px,#eaf1f5 3px 5px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 Inter,-apple-system,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+header{padding:20px 16px 14px;max-width:44rem;margin:0 auto}
+.brand{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font:600 22px/1.25 Fraunces,Georgia,serif;margin:6px 0 0;letter-spacing:-.01em}
+main{max-width:44rem;margin:0 auto;padding:0 10px 24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 8px 8px}
+/* Snow grid: name | 3 resort-reported days | now rule | 4 forecast days; drawers use subgrid. */
+.grid{display:grid;grid-template-columns:minmax(88px,1.4fr) repeat(3,1fr) 10px repeat(4,1fr);column-gap:3px;row-gap:4px;align-items:stretch;font-variant-numeric:tabular-nums}
+.hd{font-size:12px;line-height:1.15;text-align:center;color:var(--mute);padding:2px 0 6px;font-weight:600}
+.hd.past{color:var(--faint)}
+.hd.fut{background:var(--tint);border-radius:8px 8px 0 0}
+.nm{all:unset;box-sizing:border-box;width:100%;cursor:pointer;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:space-between;padding-left:4px;min-height:44px;line-height:1.15}
+.nm:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:6px}
+.nm .chev{font-style:normal;color:var(--faint);font-size:18px;transition:transform .15s;margin-right:2px}
+.nm.open .chev{transform:rotate(90deg);color:var(--accent)}
+.c{display:flex;align-items:center;justify-content:center;min-height:44px}
+.grid > .c.f{background:var(--tint)}
+.s{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;border-radius:8px;font-weight:700;font-size:15px;line-height:1.05}
+.s small{font-size:11px;font-weight:600;opacity:.85;margin-top:2px}
+.z{color:var(--faint);font-weight:600}
+.w{font-size:12px;font-weight:600}
+.nowh,.nowl{display:flex;justify-content:center}
+.nowl::before,.nowh::before{content:"";width:2px;background:var(--accent);border-radius:1px}
+.drawer{grid-column:1/-1;display:grid;grid-template-columns:subgrid;background:#fafbfc;border:1px solid var(--line);border-radius:10px;padding:6px 0 4px;margin:0 0 6px;row-gap:0}
+.drawer[hidden]{display:none}
+.dr{grid-column:1/-1;display:grid;grid-template-columns:subgrid;align-items:center;font-size:13px;font-variant-numeric:tabular-nums;min-height:28px}
+.dr+.dr{border-top:1px solid var(--line)}
+.dr .dn{grid-column:1/5;padding-left:10px;color:var(--mute);font-weight:500;white-space:nowrap}
+.dr > span:not(.dn):not(.nowl), .dr > b{text-align:center}
+.dr.ours .dn,.dr.ours b{color:var(--ink);font-weight:700}
+.dr .span2{grid-column:span 2;color:var(--mute)}
+.dr .nowl{align-self:stretch}
+.meth{grid-column:1/-1;font-size:12px;color:var(--mute);margin:6px 0 0;padding:4px 10px 0}
+/* Written report (narrative.md): best bet, then the sections. */
+.report{margin-top:12px;padding:14px 16px 4px}
+.call{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:4px}
+.call small{display:block;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.call b{display:block;font-size:15px;font-weight:700;margin:4px 0 2px}
+.call span{font-size:13px;color:var(--mute)}
+.report h2{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:14px 0 6px}
+.report p{margin:0 0 10px}
+.report p b{font-weight:700}
+footer{font-size:12px;color:var(--mute);text-align:center;padding:16px 0 0}
+footer a{color:var(--accent);text-decoration:none}
+/* Archive */
+.archive{list-style:none;margin:0;padding:0}
+.archive li{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:8px}
+.archive a{font-weight:700;color:var(--accent);text-decoration:none}
+.archive span{display:block;font-size:15px}
+.archive small{color:var(--mute);font-size:12px}
+.empty{color:var(--mute)}

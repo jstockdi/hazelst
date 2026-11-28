@@ -1,39 +1,64 @@
 # Report Page — Hazel St Forecast
 
-Selected design: `mockups/c-brief.html`. One page per day at
-`/d/<date>`; `/` shows today; `/archive` lists days newest first.
+Selected design: J35 overhaul (option "ab": spread in the cell, aligned model
+drawer), replacing mockup C. One page per day at `/d/<date>`; `/` shows
+today; `/archive` lists days newest first.
 
 ## Order, top to bottom
 
 | # | Section | Contents | Source |
 |---|---------|----------|--------|
-| 0 | **Band** | Kicker "HAZEL ST FORECAST"; headline (Fraunces 18px, one to three lines); no date or issue line (the date and edition are the last footer line) | Front matter |
-| 1 | **The report** | Best-bet card (mountain + day + one-line why) → The storm → Mountain by mountain → Cautions | Narrative markdown in `report` |
-| 2 | **Snow timeline** | Label "Snow · reported and forecast", then the grid; no heading or explanatory line. One grid, one row per mountain, one shared date header: name only (70 px; no total, "closed", or other line beneath) │ the **3 days before the report date**, resort-reported only (decisions row 24) │ a 3 px **now rule** │ **4 forecast days** from 6 AM on the report date. Past cells: the resort's number, "0" for a reported zero, a hatched "–" for no report; the past columns always show. Forecast cells (dashed outline): the day's headline forecast (`forecast.days[].snow_in`, so day 1 includes a chosen finer-model `day1_method`); below 0.5″ the precip-type word (rain / ice / mix) if wet, else "·"; otherwise the amount with the type word beneath for rain / ice / mix. Amounts: whole inches from 1″ up, tenths below (".6″"), rounded half up to tenths first (0.97 → 1″). Rows sort by forecast snow over the 4 days, ties in roster order. The now rule is a plain rule; its header cell reads "NOW", set vertically. Each cell has a `title` for desktop hover: past = the resort's exact value and source; forecast = snow, type, liquid, high °F, gusts, lift-hold wind, and the day-1 method. No legend or other explanatory text around the grid beyond the column headers | `accumulation.days` (past), `forecast.days` (future) in JSON |
-| 3 | **Forecast** | Label "Forecast · what falls next", then the table (no heading or lead line): Next 24 h / Next 3 days / Next 5 days — headline, model range (hidden when zero-width), NWS value (1d, 3d); under each mountain's name the method behind its numbers ("model mean" or "resort ratio", and "day 1: …" for a finer-model day 1); where it is "resort ratio", "Mean N″" under each value; a note under the table explains both. The method per mountain is the one `method_gate` chose (forecast-method.md, "Method choice"); "Corrected N″" shows under a value only where `method_gate` chose `corrected`. The timeline and the table use the same method per mountain (`forecast.method`), so the days still sum to the windows | `forecast` in JSON |
-| 4 | **Footer** | Sources used (forecast; the resort-reported sources behind the timeline's past days; the context sources, as "Not resort-reported, in the JSON only: …"); the newest verification: `HIT` / `MISS` / no-report counts for the model mean's next-24 h forecast, per edition. At 7 AM that is the day before yesterday, since yesterday is scored at 9 PM tonight. Last line, just above the Archive · JSON links: the report date and edition, "Fri 27 Nov 2026 · 2:40 PM" (the issue time only when the report has no edition); no issue time and no "numbers only" | Fixed text + `verification`, `date`, `edition` |
+| 0 | **Header** | Small "HAZEL ST" wordmark (accent); the headline in Fraunces 22px; no date or issue line | Front matter |
+| 1 | **Snow grid** | One white card, no heading. Columns: name │ the **3 days before the report date**, resort-reported only (decisions row 24) │ a **now rule** │ **4 forecast days** from 6 AM on the report date, on a tinted background. One shared date header; one 44 px row per mountain; rows sort by forecast snow over the 4 days, ties in roster order. Cells below | `accumulation.days` (past), `forecast.days` (future) |
+| 2 | **Model drawer** | Tap a mountain name (a button with a chevron) to open a full-width row under it; closed by default, one tap per drawer, no hover. Rows: **Hazel St** (bold, the headline values), GFS, ECMWF, GEM, then each finer model with a value on a shown day, then **NWS** (the 1-day value under day 1; the 3-day value across days 2–3 as "3″ to Sun"). The drawer uses CSS subgrid, so each value sits under its day column and there is no second date header; the model name spans the name and past columns. One line under it: "Hazel St uses the <method> for <mountain>." (plus the day-1 method when a finer model is chosen; "Closed for the season so far." before opening day) | `forecast.days[].by_model`, `windows.1d/3d.nws_in`, `forecast.method`, `day1_method` |
+| 3 | **The report** | A second card after the grid: best bet (mountain + day + why) → The storm → Mountain by mountain → Cautions, with only those section names as headings | Narrative markdown in `report` |
+| 4 | **Footer** | One centered line: "Fri 27 Nov 2026 · 2:40 PM · Archive · JSON" (the issue time only when the report has no edition) | `date`, `edition` |
+
+There is no forecast table and no method note; windows, ranges, NWS,
+sources, and verification stay in the JSON.
+
+## Grid cells
+
+- **Forecast, ≥ 0.5″:** a filled rounded cell in palette D with the amount.
+  Under it, small: the global models' range ("2–8", no inch marks) when they
+  disagree, else the precip word for rain / ice / mix.
+- **Disagree:** over the models in `used_models` that have a value for the
+  day, max − min ≥ max(1.5″, half the day's amount). The range is whole
+  inches, rounded half up.
+- **Forecast, < 0.5″:** the precip word (rain / ice / mix) in its ink colour,
+  else a faint "0".
+- **Past:** the resort's number (filled at ≥ 0.5″), a faint "0" for a
+  reported amount under 0.5″, blank for no report. The past columns always
+  show.
+- **Amounts:** whole inches from 1″, tenths below (".6″"), rounded half up to
+  tenths first (0.97 → 1″). Drawer values use the same rule, "0" below 0.5″,
+  "·" for no value.
+- Each grid cell keeps a `title` for desktop hover: past = the resort's
+  exact value and source; forecast = snow, type, liquid, high °F, gusts,
+  lift-hold wind, and the day-1 method.
 
 ## Rules
 
-- The headline stays at 18px; no mountain list in the band.
-- Reported snow shows only in the snow timeline, left of the now rule. There is
-  no separate accumulation section or chart; the season total, base depth, and
-  each day's context stay in the JSON (`accumulation`).
-- Mountains sort by 4-day forecast in section 2 and by 5-day forecast in
-  section 3.
-- Every forecast number shows its range in the table.
-- Timeline cells are at least 36 px tall; only the name column (70 px) and the
-  now rule (3 px) have fixed widths, so the grid fits 360 px with no
-  horizontal scroll. Names may wrap to two lines in the timeline.
-- Closed mountains (e.g. Pico before opening day) stay listed; the forecast
-  table says "closed" (the timeline shows names only).
+- Theme: page `#f4f6f8`; white cards with a 1px `#e3e9ee` border, radius 14,
+  no shadows, no gradient band. Tokens on `:root`: ink `#132534`, mute
+  `#64788a`, faint `#b8c4ce`, line `#e3e9ee`, accent `#1a5c88`, forecast
+  tint `#f0f6fb`.
+- Type: Fraunces for the headline only; Inter elsewhere, in three sizes
+  (15 / 13 / 12 px; the in-cell range is 11 px).
+- Grid columns: `minmax(88px,1.4fr) repeat(3,1fr) 10px repeat(4,1fr)`; the
+  grid fits 360 px with no horizontal scroll. Names may wrap to two lines.
 - Snow amounts, both sides of the now rule (palette D, yellow-green-blue),
-  binned on the amount as shown: under 0.5″ white; under 1″ `#f3f8c9`;
+  binned on the amount as shown: under 0.5″ not filled; under 1″ `#f3f8c9`;
   1–3″ `#c7e9b4`; 3–6″ `#7fcdbb`; 6–12″ `#2c7fb8` (white text); 12″+
   `#253494` (white text).
-- Precip-type words: rain `#12806a`, ice `#7c3aed`, mix `#a21caf`; on the two
-  dark bins the word is white. Mountain names never wrap in tables.
-- Reference implementation: `prototype/render.py` + `prototype/page.css`.
+- Precip words on unfilled cells: rain `#0f6b57`, ice and mix `#6d28d9`; on a
+  filled cell the word takes the cell's text colour.
+- The model list is data-driven: the drawer shows every model in the day's
+  `by_model`, in `MODEL_NAMES` order (global, then finer); the spread uses
+  `used_models`.
+- Closed mountains stay listed; the drawer line says so.
+- Payloads stored before J35 have no `by_model`: no in-cell range, and the
+  drawer shows Hazel St and NWS only.
 
 ## Every page has the written report
 
@@ -45,29 +70,23 @@ until the failure is fixed. Rows stored before J33 with
 `report.status = numbers_only` stay in the database for history and are never
 shown.
 
-The band headline is a ski forecaster's text alert, at most 12 words: the
+The header headline is a ski forecaster's text alert, at most 12 words: the
 amount, the resorts by name, the day; then the one catch that changes plans
 ("4–5″ for Killington, Pico and Sugarbush Saturday; rain Monday"; "No new snow
 through Tuesday at any of the eight"). `report-check` holds it to that length,
 to naming a resort (or "all eight"), and to forecast days.
 
-The footer's date line reads "Thu 26 Nov 2026 · 7:00 AM" even when the
+The footer reads "Thu 26 Nov 2026 · 7:00 AM · Archive · JSON" even when the
 edition publishes late (ECMWF 06Z gate); the issue time stays in the JSON.
 
-When no resort reported in the last 3 days, the timeline still shows its 3
-past days, with "–" in every past cell.
+When no resort reported in the last 3 days, the grid still shows its 3 past
+days, blank.
 
-Implementation: `render/` (Jinja templates, `page.css`,
+Implementation: `render/` (Jinja templates, `page.css`, the drawer toggle inline in `report.html`,
 fonts under `render/static/fonts` with their OFL licenses); golden pages in
 `tests/golden/`.
 
-## Visual system
-
-Same as the sailing report: Fraunces (display) + Inter (body); navy
-`#0f3a5a`, sea blue `#1a5c88`, kelp green `#12806a`, paper `#f5f9fb`. The snow
-timeline uses palette D (Rules); its now rule is sea blue.
-
 ## Mobile
 
-Designed at 360–430 px. Max content width 42rem on larger screens. No
-horizontal scroll.
+Designed at 360–430 px, checked at 728 px. Max content width 44rem on larger
+screens. No horizontal scroll.

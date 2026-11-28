@@ -8,12 +8,95 @@
 <link rel="stylesheet" href="/static/page.css">
 </head>
 <body>
-<div class="band">
-  <div class="k">Hazel St Forecast</div>
-  <h1>Ski the cold, quiet Thanksgiving morning — a coastal storm turns it to ice, then rain, Thursday night.</h1>
-</div>
+<header><div class="brand">Hazel St</div><h1>Ski the cold, quiet Thanksgiving morning — a coastal storm turns it to ice, then rain, Thursday night.</h1></header>
 <main>
-  <div class="call"><small>Best bet</small><b>Sunday River, Thu 26</b><span>Dry until afternoon, summit gusts near 20 mph while southern Vermont and Loon gust past 40.</span></div>
+  <section class="card" aria-label="Snow by mountain and day">
+    <div class="grid">
+      <div></div>
+      <div class="hd past">Sun<br>22</div>
+      <div class="hd past">Mon<br>23</div>
+      <div class="hd past">Tue<br>24</div>
+      <div class="hd nowh"></div>
+      <div class="hd fut">Wed<br>25</div>
+      <div class="hd fut">Thu<br>26</div>
+      <div class="hd fut">Fri<br>27</div>
+      <div class="hd fut">Sat<br>28</div>
+      <button class="nm" type="button" aria-expanded="false" aria-controls="d-sugarloaf">Sugarloaf<i class="chev" aria-hidden="true">›</i></button><div class="c" title="Sun 22 · no resort report"></div><div class="c" title="Mon 23 · no resort report"></div><div class="c" title="Tue 24 · no resort report"></div><div class="nowl"></div><div class="c f" title="Wed 25 · 0″ snow · 0.00″ liquid · high 26°F · gusts 12 mph"><span class="z">0</span></div><div class="c f" title="Thu 26 · 0.7″ snow · ice · 0.41″ liquid · high 29°F · gusts 21 mph"><span class="s" style="background:#f3f8c9;color:#132534">.7″<small style="color:#132534">0–2</small></span></div><div class="c f" title="Fri 27 · 0″ snow · ice · 0.51″ liquid · high 28°F · gusts 25 mph"><span class="w" style="color:#6d28d9">ice</span></div><div class="c f" title="Sat 28 · 0.4″ snow · 0.06″ liquid · high 28°F · gusts 23 mph"><span class="z">0</span></div>
+      <div class="drawer" id="d-sugarloaf" hidden>
+        <div class="dr ours"><span class="dn">Hazel St</span><span class="nowl"></span><b>0</b><b>.7″</b><b>0</b><b>0</b></div>
+        <div class="dr"><span class="dn">GFS</span><span class="nowl"></span><span>0</span><span>2″</span><span>0</span><span>.5″</span></div>
+        <div class="dr"><span class="dn">ECMWF</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">GEM</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>.6″</span></div>
+        <div class="dr"><span class="dn">NWS</span><span class="nowl"></span><span>·</span><span class="span2">·</span><span>·</span></div>
+        <p class="meth">Hazel St uses the model mean for Sugarloaf.</p>
+      </div>
+      <button class="nm" type="button" aria-expanded="false" aria-controls="d-killington">Killington<i class="chev" aria-hidden="true">›</i></button><div class="c" title="Sun 22 · no resort report"></div><div class="c" title="Mon 23 · no resort report"></div><div class="c" title="Tue 24 · no resort report"></div><div class="nowl"></div><div class="c f" title="Wed 25 · 0″ snow · 0.00″ liquid · high 29°F · gusts 11 mph"><span class="z">0</span></div><div class="c f" title="Thu 26 · 0.1″ snow · ice · 0.70″ liquid · high 26°F · gusts 43 mph"><span class="w" style="color:#6d28d9">ice</span></div><div class="c f" title="Fri 27 · 0″ snow · ice · 0.51″ liquid · high 32°F · gusts 29 mph"><span class="w" style="color:#6d28d9">ice</span></div><div class="c f" title="Sat 28 · 0.8″ snow · mix · 0.25″ liquid · high 28°F · gusts 23 mph"><span class="s" style="background:#f3f8c9;color:#132534">.8″<small style="color:#132534">0–2</small></span></div>
+      <div class="drawer" id="d-killington" hidden>
+        <div class="dr ours"><span class="dn">Hazel St</span><span class="nowl"></span><b>0</b><b>0</b><b>0</b><b>.8″</b></div>
+        <div class="dr"><span class="dn">GFS</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">ECMWF</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>.8″</span></div>
+        <div class="dr"><span class="dn">GEM</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>2″</span></div>
+        <div class="dr"><span class="dn">NWS</span><span class="nowl"></span><span>·</span><span class="span2">·</span><span>·</span></div>
+        <p class="meth">Hazel St uses the model mean for Killington.</p>
+      </div>
+      <button class="nm" type="button" aria-expanded="false" aria-controls="d-stratton">Stratton<i class="chev" aria-hidden="true">›</i></button><div class="c" title="Sun 22 · no resort report"></div><div class="c" title="Mon 23 · no resort report"></div><div class="c" title="Tue 24 · no resort report"></div><div class="nowl"></div><div class="c f" title="Wed 25 · 0″ snow · 0.00″ liquid · high 30°F · gusts 15 mph"><span class="z">0</span></div><div class="c f" title="Thu 26 · 0″ snow · ice · 0.77″ liquid · high 28°F · gusts 41 mph"><span class="w" style="color:#6d28d9">ice</span></div><div class="c f" title="Fri 27 · 0.1″ snow · rain · 0.31″ liquid · high 35°F · gusts 35 mph"><span class="w" style="color:#0f6b57">rain</span></div><div class="c f" title="Sat 28 · 0.8″ snow · mix · 0.20″ liquid · high 30°F · gusts 30 mph"><span class="s" style="background:#f3f8c9;color:#132534">.8″<small style="color:#132534">0–2</small></span></div>
+      <div class="drawer" id="d-stratton" hidden>
+        <div class="dr ours"><span class="dn">Hazel St</span><span class="nowl"></span><b>0</b><b>0</b><b>0</b><b>.8″</b></div>
+        <div class="dr"><span class="dn">GFS</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">ECMWF</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>2″</span></div>
+        <div class="dr"><span class="dn">GEM</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>.8″</span></div>
+        <div class="dr"><span class="dn">NWS</span><span class="nowl"></span><span>·</span><span class="span2">·</span><span>·</span></div>
+        <p class="meth">Hazel St uses the model mean for Stratton.</p>
+      </div>
+      <button class="nm" type="button" aria-expanded="false" aria-controls="d-loon">Loon<i class="chev" aria-hidden="true">›</i></button><div class="c" title="Sun 22 · no resort report"></div><div class="c" title="Mon 23 · no resort report"></div><div class="c" title="Tue 24 · no resort report"></div><div class="nowl"></div><div class="c f" title="Wed 25 · 0″ snow · 0.00″ liquid · high 32°F · gusts 10 mph"><span class="z">0</span></div><div class="c f" title="Thu 26 · 0″ snow · ice · 0.53″ liquid · high 33°F · gusts 44 mph"><span class="w" style="color:#6d28d9">ice</span></div><div class="c f" title="Fri 27 · 0.1″ snow · rain · 0.36″ liquid · high 36°F · gusts 33 mph"><span class="w" style="color:#0f6b57">rain</span></div><div class="c f" title="Sat 28 · 0.7″ snow · 0.13″ liquid · high 33°F · gusts 21 mph"><span class="s" style="background:#f3f8c9;color:#132534">.7″<small style="color:#132534">0–2</small></span></div>
+      <div class="drawer" id="d-loon" hidden>
+        <div class="dr ours"><span class="dn">Hazel St</span><span class="nowl"></span><b>0</b><b>0</b><b>0</b><b>.7″</b></div>
+        <div class="dr"><span class="dn">GFS</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">ECMWF</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">GEM</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>2″</span></div>
+        <div class="dr"><span class="dn">NWS</span><span class="nowl"></span><span>·</span><span class="span2">·</span><span>·</span></div>
+        <p class="meth">Hazel St uses the model mean for Loon.</p>
+      </div>
+      <button class="nm" type="button" aria-expanded="false" aria-controls="d-sunday_river">Sunday River<i class="chev" aria-hidden="true">›</i></button><div class="c" title="Sun 22 · no resort report"></div><div class="c" title="Mon 23 · no resort report"></div><div class="c" title="Tue 24 · no resort report"></div><div class="nowl"></div><div class="c f" title="Wed 25 · 0″ snow · 0.00″ liquid · high 32°F · gusts 10 mph"><span class="z">0</span></div><div class="c f" title="Thu 26 · 0.6″ snow · ice · 0.60″ liquid · high 31°F · gusts 21 mph"><span class="s" style="background:#f3f8c9;color:#132534">.6″<small style="color:#132534">0–2</small></span></div><div class="c f" title="Fri 27 · 0″ snow · ice · 0.34″ liquid · high 32°F · gusts 28 mph"><span class="w" style="color:#6d28d9">ice</span></div><div class="c f" title="Sat 28 · 0″ snow · 0.04″ liquid · high 32°F · gusts 22 mph"><span class="z">0</span></div>
+      <div class="drawer" id="d-sunday_river" hidden>
+        <div class="dr ours"><span class="dn">Hazel St</span><span class="nowl"></span><b>0</b><b>.6″</b><b>0</b><b>0</b></div>
+        <div class="dr"><span class="dn">GFS</span><span class="nowl"></span><span>0</span><span>2″</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">ECMWF</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">GEM</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">NWS</span><span class="nowl"></span><span>·</span><span class="span2">·</span><span>·</span></div>
+        <p class="meth">Hazel St uses the model mean for Sunday River.</p>
+      </div>
+      <button class="nm" type="button" aria-expanded="false" aria-controls="d-sugarbush">Sugarbush<i class="chev" aria-hidden="true">›</i></button><div class="c" title="Sun 22 · no resort report"></div><div class="c" title="Mon 23 · no resort report"></div><div class="c" title="Tue 24 · no resort report"></div><div class="nowl"></div><div class="c f" title="Wed 25 · 0″ snow · 0.00″ liquid · high 27°F · gusts 10 mph"><span class="z">0</span></div><div class="c f" title="Thu 26 · 0″ snow · ice · 0.54″ liquid · high 29°F · gusts 37 mph"><span class="w" style="color:#6d28d9">ice</span></div><div class="c f" title="Fri 27 · 0″ snow · ice · 0.34″ liquid · high 34°F · gusts 25 mph"><span class="w" style="color:#6d28d9">ice</span></div><div class="c f" title="Sat 28 · 0.4″ snow · mix · 0.21″ liquid · high 29°F · gusts 14 mph"><span class="w" style="color:#6d28d9">mix</span></div>
+      <div class="drawer" id="d-sugarbush" hidden>
+        <div class="dr ours"><span class="dn">Hazel St</span><span class="nowl"></span><b>0</b><b>0</b><b>0</b><b>0</b></div>
+        <div class="dr"><span class="dn">GFS</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">ECMWF</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">GEM</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>.9″</span></div>
+        <div class="dr"><span class="dn">NWS</span><span class="nowl"></span><span>·</span><span class="span2">·</span><span>·</span></div>
+        <p class="meth">Hazel St uses the model mean for Sugarbush.</p>
+      </div>
+      <button class="nm" type="button" aria-expanded="false" aria-controls="d-cranmore">Cranmore<i class="chev" aria-hidden="true">›</i></button><div class="c" title="Sun 22 · no resort report"></div><div class="c" title="Mon 23 · no resort report"></div><div class="c" title="Tue 24 · no resort report"></div><div class="nowl"></div><div class="c f" title="Wed 25 · 0″ snow · 0.00″ liquid · high 34°F · gusts 10 mph"><span class="z">0</span></div><div class="c f" title="Thu 26 · 0.3″ snow · ice · 0.66″ liquid · high 34°F · gusts 27 mph"><span class="w" style="color:#6d28d9">ice</span></div><div class="c f" title="Fri 27 · 0″ snow · rain · 0.28″ liquid · high 35°F · gusts 21 mph"><span class="w" style="color:#0f6b57">rain</span></div><div class="c f" title="Sat 28 · 0″ snow · 0.02″ liquid · high 40°F · gusts 19 mph"><span class="z">0</span></div>
+      <div class="drawer" id="d-cranmore" hidden>
+        <div class="dr ours"><span class="dn">Hazel St</span><span class="nowl"></span><b>0</b><b>0</b><b>0</b><b>0</b></div>
+        <div class="dr"><span class="dn">GFS</span><span class="nowl"></span><span>0</span><span>.8″</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">ECMWF</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">GEM</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">NWS</span><span class="nowl"></span><span>·</span><span class="span2">·</span><span>·</span></div>
+        <p class="meth">Hazel St uses the model mean for Cranmore.</p>
+      </div>
+      <button class="nm" type="button" aria-expanded="false" aria-controls="d-pico">Pico<i class="chev" aria-hidden="true">›</i></button><div class="c" title="Sun 22 · no resort report"></div><div class="c" title="Mon 23 · no resort report"></div><div class="c" title="Tue 24 · no resort report"></div><div class="nowl"></div><div class="c f" title="Wed 25 · 0″ snow · 0.00″ liquid · high 29°F · gusts 10 mph"><span class="z">0</span></div><div class="c f" title="Thu 26 · 0″ snow · ice · 0.66″ liquid · high 27°F · gusts 42 mph"><span class="w" style="color:#6d28d9">ice</span></div><div class="c f" title="Fri 27 · 0″ snow · ice · 0.51″ liquid · high 33°F · gusts 30 mph"><span class="w" style="color:#6d28d9">ice</span></div><div class="c f" title="Sat 28 · 0.2″ snow · mix · 0.20″ liquid · high 29°F · gusts 22 mph"><span class="w" style="color:#6d28d9">mix</span></div>
+      <div class="drawer" id="d-pico" hidden>
+        <div class="dr ours"><span class="dn">Hazel St</span><span class="nowl"></span><b>0</b><b>0</b><b>0</b><b>0</b></div>
+        <div class="dr"><span class="dn">GFS</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">ECMWF</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">GEM</span><span class="nowl"></span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+        <div class="dr"><span class="dn">NWS</span><span class="nowl"></span><span>·</span><span class="span2">·</span><span>·</span></div>
+        <p class="meth">Hazel St uses the model mean for Pico.</p>
+      </div>
+    </div>
+  </section>
+  <article class="card report">
+    <div class="call"><small>Best bet</small><b>Sunday River, Thu 26</b><span>Dry until afternoon, summit gusts near 20 mph while southern Vermont and Loon gust past 40.</span></div>
 <h2>The storm</h2>
 <p>High pressure keeps today and Thanksgiving morning dry and cold — lows in the teens, the coldest of the season so far (NWS Gray). A coastal low forms off Florida tonight, runs up the coast, and reaches the Gulf of Maine by early Friday. It is a warm storm for skiing: warm air arrives aloft first, so cold air trapped in the mountains turns the onset to <b>freezing rain Thursday night</b> (8 PM – 4 AM per NWS Burlington). Friday, rain reaches the summits at Sugarbush, Stratton, and Loon, while Killington, Pico, Sunday River, and Sugarloaf stay icy up top.</p>
 <p>Models agree it brings about an inch of liquid and almost no snow: the 3-day summit snow is 0–0.3″ everywhere. A little snow comes back on the back side Saturday (up to about 1″ at Killington and Stratton). NWS Burlington expects seasonably mild weather next week, with showers Sunday night into Monday.</p>
@@ -28,45 +111,18 @@
 <p><b>Sugarloaf.</b> Coldest summit (26–28 °F), so it holds on to ice longer than rain — glaze Thursday night into Friday. About ½″ Saturday.</p>
 <h2>Cautions</h2>
 <p><b>Wind.</b> Gusts above 40 mph Thursday afternoon and evening in western New England (NWS Albany) — lift holds likely at Loon and possible at Killington, Pico, and Stratton. <b>Ice.</b> Freezing rain Thursday night across the higher elevations and northern areas; up to 0.1″ of ice. Treat Thanksgiving-night mountain roads as icy.</p>
-
-  <div class="part">Snow · reported and forecast</div>
-  <figure class="tl-fig">
-    <div class="tl" role="table" aria-label="Snow by mountain and day">
-      <div class="tl-now" style="grid-row:2 / span 8"></div>
-      <div role="row" class="tl-row"><div role="columnheader"></div><div role="columnheader" class="tl-h tl-h-past">Sun<br>22</div><div role="columnheader" class="tl-h tl-h-past">Mon<br>23</div><div role="columnheader" class="tl-h tl-h-past">Tue<br>24</div><div role="columnheader" class="tl-nowh"><span>Now</span></div><div role="columnheader" class="tl-h">Wed<br>25</div><div role="columnheader" class="tl-h">Thu<br>26</div><div role="columnheader" class="tl-h">Fri<br>27</div><div role="columnheader" class="tl-h">Sat<br>28</div></div>
-      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">Sugarloaf</div><div role="cell" class="c nr" title="Sun 22 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Mon 23 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Tue 24 · no resort report"><b>–</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Wed 25 · 0″ snow · 0.00″ liquid · high 26°F · gusts 12 mph"><b>·</b></div><div role="cell" class="c fut" style="background:#f3f8c9;color:#132534" title="Thu 26 · 0.7″ snow · ice · 0.41″ liquid · high 29°F · gusts 21 mph"><b>.7″</b><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Fri 27 · 0″ snow · ice · 0.51″ liquid · high 28°F · gusts 25 mph"><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Sat 28 · 0.4″ snow · 0.06″ liquid · high 28°F · gusts 23 mph"><b>·</b></div></div>
-      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">Killington</div><div role="cell" class="c nr" title="Sun 22 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Mon 23 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Tue 24 · no resort report"><b>–</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Wed 25 · 0″ snow · 0.00″ liquid · high 29°F · gusts 11 mph"><b>·</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Thu 26 · 0.1″ snow · ice · 0.70″ liquid · high 26°F · gusts 43 mph"><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Fri 27 · 0″ snow · ice · 0.51″ liquid · high 32°F · gusts 29 mph"><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#f3f8c9;color:#132534" title="Sat 28 · 0.8″ snow · mix · 0.25″ liquid · high 28°F · gusts 23 mph"><b>.8″</b><span class="w" style="color:#a21caf">mix</span></div></div>
-      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">Stratton</div><div role="cell" class="c nr" title="Sun 22 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Mon 23 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Tue 24 · no resort report"><b>–</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Wed 25 · 0″ snow · 0.00″ liquid · high 30°F · gusts 15 mph"><b>·</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Thu 26 · 0″ snow · ice · 0.77″ liquid · high 28°F · gusts 41 mph"><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Fri 27 · 0.1″ snow · rain · 0.31″ liquid · high 35°F · gusts 35 mph"><span class="w" style="color:#12806a">rain</span></div><div role="cell" class="c fut" style="background:#f3f8c9;color:#132534" title="Sat 28 · 0.8″ snow · mix · 0.20″ liquid · high 30°F · gusts 30 mph"><b>.8″</b><span class="w" style="color:#a21caf">mix</span></div></div>
-      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">Loon</div><div role="cell" class="c nr" title="Sun 22 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Mon 23 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Tue 24 · no resort report"><b>–</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Wed 25 · 0″ snow · 0.00″ liquid · high 32°F · gusts 10 mph"><b>·</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Thu 26 · 0″ snow · ice · 0.53″ liquid · high 33°F · gusts 44 mph"><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Fri 27 · 0.1″ snow · rain · 0.36″ liquid · high 36°F · gusts 33 mph"><span class="w" style="color:#12806a">rain</span></div><div role="cell" class="c fut" style="background:#f3f8c9;color:#132534" title="Sat 28 · 0.7″ snow · 0.13″ liquid · high 33°F · gusts 21 mph"><b>.7″</b></div></div>
-      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">Sunday River</div><div role="cell" class="c nr" title="Sun 22 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Mon 23 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Tue 24 · no resort report"><b>–</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Wed 25 · 0″ snow · 0.00″ liquid · high 32°F · gusts 10 mph"><b>·</b></div><div role="cell" class="c fut" style="background:#f3f8c9;color:#132534" title="Thu 26 · 0.6″ snow · ice · 0.60″ liquid · high 31°F · gusts 21 mph"><b>.6″</b><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Fri 27 · 0″ snow · ice · 0.34″ liquid · high 32°F · gusts 28 mph"><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Sat 28 · 0″ snow · 0.04″ liquid · high 32°F · gusts 22 mph"><b>·</b></div></div>
-      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">Sugarbush</div><div role="cell" class="c nr" title="Sun 22 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Mon 23 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Tue 24 · no resort report"><b>–</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Wed 25 · 0″ snow · 0.00″ liquid · high 27°F · gusts 10 mph"><b>·</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Thu 26 · 0″ snow · ice · 0.54″ liquid · high 29°F · gusts 37 mph"><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Fri 27 · 0″ snow · ice · 0.34″ liquid · high 34°F · gusts 25 mph"><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Sat 28 · 0.4″ snow · mix · 0.21″ liquid · high 29°F · gusts 14 mph"><span class="w" style="color:#a21caf">mix</span></div></div>
-      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">Cranmore</div><div role="cell" class="c nr" title="Sun 22 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Mon 23 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Tue 24 · no resort report"><b>–</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Wed 25 · 0″ snow · 0.00″ liquid · high 34°F · gusts 10 mph"><b>·</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Thu 26 · 0.3″ snow · ice · 0.66″ liquid · high 34°F · gusts 27 mph"><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Fri 27 · 0″ snow · rain · 0.28″ liquid · high 35°F · gusts 21 mph"><span class="w" style="color:#12806a">rain</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Sat 28 · 0″ snow · 0.02″ liquid · high 40°F · gusts 19 mph"><b>·</b></div></div>
-      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">Pico</div><div role="cell" class="c nr" title="Sun 22 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Mon 23 · no resort report"><b>–</b></div><div role="cell" class="c nr" title="Tue 24 · no resort report"><b>–</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Wed 25 · 0″ snow · 0.00″ liquid · high 29°F · gusts 10 mph"><b>·</b></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Thu 26 · 0″ snow · ice · 0.66″ liquid · high 27°F · gusts 42 mph"><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Fri 27 · 0″ snow · ice · 0.51″ liquid · high 33°F · gusts 30 mph"><span class="w" style="color:#7c3aed">ice</span></div><div role="cell" class="c fut" style="background:#ffffff;color:#8a9cab" title="Sat 28 · 0.2″ snow · mix · 0.20″ liquid · high 29°F · gusts 22 mph"><span class="w" style="color:#a21caf">mix</span></div></div>
-    </div>
-  </figure>
-
-  <div class="part">Forecast · what falls next</div>
-  <table id="fct">
-    <thead><tr><th>Mountain</th><th>Next<br>24 h</th><th>Next<br>3 days</th><th>Next<br>5 days</th></tr></thead>
-    <tbody>
-      <tr><td class="name">Sugarloaf<small>model mean</small></td><td><b>0″</b></td><td><b>0.8″</b><small>0–2.2</small></td><td><b>1.2″</b><small>0.2–2.7</small></td></tr>
-      <tr><td class="name">Killington<small>model mean</small></td><td><b>0″</b></td><td><b>0.1″</b><small>0–0.2</small></td><td><b>0.9″</b><small>0.2–1.8</small></td></tr>
-      <tr><td class="name">Stratton<small>model mean</small></td><td><b>0″</b></td><td><b>0.1″</b><small>0–0.2</small></td><td><b>0.9″</b><small>0.1–1.9</small></td></tr>
-      <tr><td class="name">Loon<small>model mean</small></td><td><b>0″</b></td><td><b>0.1″</b><small>0–0.3</small></td><td><b>0.8″</b><small>0–2</small></td></tr>
-      <tr><td class="name">Sunday River<small>model mean</small></td><td><b>0″</b></td><td><b>0.6″</b><small>0–1.9</small></td><td><b>0.6″</b><small>0–1.9</small></td></tr>
-      <tr><td class="name">Sugarbush<small>model mean</small></td><td><b>0″</b></td><td><b>0″</b></td><td><b>0.4″</b><small>0–0.9</small></td></tr>
-      <tr><td class="name">Cranmore<small>model mean</small></td><td><b>0″</b></td><td><b>0.3″</b><small>0–0.8</small></td><td><b>0.3″</b><small>0–0.8</small></td></tr>
-      <tr><td class="name">Pico<small>model mean</small></td><td><b>0″</b></td><td><b>0.1″</b><small>0–0.1</small></td><td><b>0.2″</b><small>0.1–0.3</small></td></tr>
-    </tbody>
-  </table>
-  <p class="lead fct-note">Model mean: Open-Meteo snowfall (7:1), mean of the models. Resort ratio: each model's snow water times the ratio fitted to that resort's reports, shown where its average 1-day error beat the mean's by at least 0.05″ on the last complete season (fitted on earlier seasons), or on this season's verified snow days once a mountain has 20. Corrected, where shown, passed the same test.</p>
-
-  <div class="foot">
-    <p>Forecast: Open-Meteo (GFS 06Z, ECMWF 06Z, GEM 00Z) at summit and base elevation; NWS gridpoints and alerts; NWS forecast discussions (Burlington, Albany, Gray).</p>
-    <p>Verification: none yet.</p>
-    <p>Wed 25 Nov 2026 · 10:44 AM</p>
-    <p><a href="/archive">Archive</a> · <a href="/api/report/2026-11-25.json">JSON</a></p>
-  </div>
+  </article>
+  <footer>Wed 25 Nov 2026 · 10:44 AM · <a href="/archive">Archive</a> · <a href="/api/report/2026-11-25.json">JSON</a></footer>
 </main>
+<script>
+document.querySelectorAll(".nm").forEach(function (b) {
+  b.addEventListener("click", function () {
+    var d = document.getElementById(b.getAttribute("aria-controls"));
+    d.hidden = !d.hidden;
+    b.classList.toggle("open", !d.hidden);
+    b.setAttribute("aria-expanded", String(!d.hidden));
+  });
+});
+</script>
 </body>
 </html>
