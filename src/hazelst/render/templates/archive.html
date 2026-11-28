@@ -1,11 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Hazel St Forecast · Archive{% endblock %}
 {% block body %}
-<div class="band">
-  <div class="k">Hazel St Forecast</div>
-  <h1>Archive</h1>
-  <div class="when">Every report, newest first.</div>
-</div>
+<header><div class="brand">Hazel St</div><h1>Archive</h1></header>
 <main>
 {% if entries %}
   <ul class="archive">
@@ -16,6 +12,6 @@
 {% else %}
   <div class="empty">No reports yet.</div>
 {% endif %}
-  <div class="foot"><p><a href="/">Today</a></p></div>
+  <footer><a href="/">Today</a></footer>
 </main>
 {% endblock %}

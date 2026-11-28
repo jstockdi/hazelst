@@ -1,10 +1,7 @@
 {% extends "base.html" %}
 {% block body %}
-<div class="band">
-  <div class="k">Hazel St Forecast</div>
-  <h1>{{ message }}</h1>
-</div>
+<header><div class="brand">Hazel St</div><h1>{{ message }}</h1></header>
 <main>
-  <div class="foot"><p><a href="/">Today</a> · <a href="/archive">Archive</a></p></div>
+  <footer><a href="/">Today</a> · <a href="/archive">Archive</a></footer>
 </main>
 {% endblock %}

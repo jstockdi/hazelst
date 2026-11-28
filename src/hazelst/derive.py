@@ -50,6 +50,7 @@ STALE_AFTER_H = 18.0
 FREEZING_LEVEL_MODEL = "gfs_seamless"
 DIRECTION_MODEL = "gfs_seamless"
 MM_PER_IN = 25.4
+DAY_MIN_HOURS = 23  # a model's day counts when its run covers a full day (23 for spring DST)
 
 
 @dataclass(frozen=True)
@@ -202,6 +203,8 @@ def derive_mountain(
     s = _Series(rows, hours)
     all_models = [m for m in open_meteo.MODELS if m in s.models()]
     snow = {m: s.get(m, "summit", "snowfall_in") for m in all_models}
+    day_models = [m for m in (*open_meteo.MODELS, *open_meteo.FINE_MODELS) if m in s.models()]
+    day_snow = {m: s.get(m, "summit", "snowfall_in") for m in day_models}
     snow_mean = s.mean(models, "summit", "snowfall_in")
     base_snow_mean = s.mean(models, "base", "snowfall_in")
     precip = s.mean(models, "summit", "precip_in")
@@ -283,6 +286,11 @@ def derive_mountain(
         gusts = [v for v in gust[a:z] if v is not None]
         levels = [v for v in freezing[a:z] if v is not None]
         local = (anchor + timedelta(days=d)).date()
+        by_model = {
+            m: round(_total(v[a:z]), 1)
+            for m, v in day_snow.items()
+            if sum(x is not None for x in v[a:z]) >= DAY_MIN_HOURS
+        }
         days.append(
             ForecastDay(
                 date=local,
@@ -297,6 +305,7 @@ def derive_mountain(
                 tags=day_tags,
                 base_precip_type=kinds.base_precip_type,
                 freezing_rain_at=list(kinds.freezing_rain_at),
+                by_model=by_model,
             )
         )
     return MountainForecast(

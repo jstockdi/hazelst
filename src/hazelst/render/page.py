@@ -1,11 +1,11 @@
-"""HTML pages from the report payload and narrative (report-page.md, mockup C). Pure."""
+"""HTML pages from the report payload and narrative (report-page.md, J35). Pure."""
 
 from __future__ import annotations
 
 import html
 import math
 import re
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -17,6 +17,7 @@ from markupsafe import Markup
 from hazelst.config import TIMEZONE
 from hazelst.models import (
     BestBet,
+    ForecastDay,
     MountainReport,
     Narrative,
     PrecipType,
@@ -25,8 +26,18 @@ from hazelst.models import (
 )
 from hazelst.render import charts
 
-MODEL_NAMES = {"gfs_seamless": "GFS", "ecmwf_ifs025": "ECMWF", "gem_seamless": "GEM"}
-OFFICE_NAMES = {"BTV": "Burlington", "ALY": "Albany", "GYX": "Gray"}
+# Drawer rows in this order (global, then finer); a model missing here shows last,
+# under its Open-Meteo key.
+MODEL_NAMES = {
+    "gfs_seamless": "GFS",
+    "ecmwf_ifs025": "ECMWF",
+    "gem_seamless": "GEM",
+    "ecmwf_ifs": "ECMWF 9 km",
+    "ncep_hrrr_conus": "HRRR",
+    "gem_hrdps_continental": "HRDPS",
+    "ncep_nbm_conus": "NBM",
+    "ecmwf_aifs025_single": "AIFS",
+}
 EDITIONS = {"0700": "7:00 AM", "0815": "8:15 AM", "1440": "2:40 PM"}
 ACCUMULATION_MIN_IN = 0.5
 
@@ -106,47 +117,9 @@ def edition_label(payload: ReportPayload) -> str:
     return f"{d:%a} {d.day} {d:%b %Y} · {edition}"
 
 
-def run_label(model: str, issued: datetime | None) -> str:
-    name = MODEL_NAMES.get(model, model)
-    return name if issued is None else f"{name} {issued.astimezone(ZoneInfo('UTC')):%HZ}"
-
-
-def sorted_by_5d(mountains: Sequence[MountainReport]) -> list[MountainReport]:
-    return sorted(mountains, key=lambda m: -m.forecast.windows["5d"].snow_in)
-
-
-ACCUMULATION_SOURCE_NAMES = {
-    "resort": "resort reports",
-    "resort_llm": "resort report pages read by Claude",
-    "snocountry": "SnoCountry (resort-reported history)",
-}
-CONTEXT_SOURCE_NAMES = {
-    "pns": "NWS snowfall reports",
-    "lsr": "NWS local storm reports",
-    "ghcn": "GHCN-Daily stations",
-    "nohrsc": "NOHRSC snowfall analysis",
-}
 RESORT_LABELS = {"resort": "resort", "resort_llm": "resort page", "snocountry": "SnoCountry"}
 NO_REPORT = "no report"
 RESULT_WORDS = (("HIT", "HIT"), ("MISS", "MISS"), ("NO_OBS", NO_REPORT))
-
-
-def accumulation_sources(payload: ReportPayload) -> list[str]:
-    """Names of the resort-reported sources behind the accumulation section."""
-    used = {s for m in payload.mountains if m.accumulation for s in m.accumulation.sources}
-    return [name for key, name in ACCUMULATION_SOURCE_NAMES.items() if key in used]
-
-
-def context_sources(payload: ReportPayload) -> list[str]:
-    """Names of the non-resort sources shown beside the accumulation."""
-    used = {
-        c.source
-        for m in payload.mountains
-        if m.accumulation
-        for d in m.accumulation.days
-        for c in d.context
-    }
-    return [name for key, name in CONTEXT_SOURCE_NAMES.items() if key in used]
 
 
 def verification_counts(summary: VerificationSummary) -> str:
@@ -158,23 +131,13 @@ def verification_counts(summary: VerificationSummary) -> str:
     return "; ".join(parts)
 
 
-def verification_line(payload: ReportPayload) -> str:
-    summary = payload.verification
-    if summary is None:
-        return "Verification: none yet."
-    day = f"{summary.for_date:%a} {summary.for_date.day} {summary.for_date:%b}"
-    return (
-        f"Verification, {day} (next 24 h, model mean, within 2″ or 30% is a HIT):"
-        f" {verification_counts(summary)}."
-    )
-
-
 # --- snow timeline ---------------------------------------------------------------------
 
 TIMELINE_PAST_DAYS = 3  # resort-reported days left of the now rule
 TIMELINE_DAYS = 4  # forecast days right of it, from 6 AM on the report date
 # Palette D, one scale for reported and forecast cells: (upper bound in inches,
-# background, text color). Bins take the amount as shown.
+# background, text color). Bins take the amount as shown; below 0.5″ a cell is
+# not filled.
 SNOW_BINS: tuple[tuple[float, str, str], ...] = (
     (ACCUMULATION_MIN_IN, "#ffffff", "#8a9cab"),
     (1, "#f3f8c9", "#132534"),
@@ -183,9 +146,11 @@ SNOW_BINS: tuple[tuple[float, str, str], ...] = (
     (12, "#2c7fb8", "#ffffff"),
     (math.inf, "#253494", "#ffffff"),
 )
-# Precip-type words on forecast cells; on the two dark bins the word takes the text color.
-WET_COLORS: dict[PrecipType, str] = {"rain": "#12806a", "ice": "#7c3aed", "mix": "#a21caf"}
-WHITE_TEXT = "#ffffff"
+# Precip-type words on unfilled forecast cells; on a filled cell the word takes its text color.
+WET_COLORS: dict[PrecipType, str] = {"rain": "#0f6b57", "ice": "#6d28d9", "mix": "#6d28d9"}
+# The global models disagree on a day when max - min >= max(1.5″, half the day's amount).
+SPREAD_MIN_IN = 1.5
+SPREAD_SHARE = 0.5
 
 
 def _half_up(value: float, places: int = 0) -> float:
@@ -209,6 +174,17 @@ def snow_text(value: float) -> str:
     return f".{round(shown * 10)}″" if shown > 0 else "0″"
 
 
+def cell_text(value: float | None) -> str:
+    """A drawer value: "·" for no value, "0" below 0.5″, else the amount as shown."""
+    if value is None:
+        return "·"
+    return snow_text(value) if filled(value) else "0"
+
+
+def filled(value: float) -> bool:
+    return shown_snow(value) >= ACCUMULATION_MIN_IN
+
+
 def snow_bin(value: float) -> tuple[str, str]:
     """(background, text color) for an amount, binned on the amount as shown."""
     shown = shown_snow(value)
@@ -218,22 +194,50 @@ def snow_bin(value: float) -> tuple[str, str]:
     raise AssertionError("the last bin is unbounded")
 
 
+def model_spread(day: ForecastDay, models: Iterable[str]) -> tuple[float, float] | None:
+    """(min, max) of `models`' snow for the day when they disagree, else None.
+
+    Disagree: at least two values and max - min >= max(1.5″, half the day's amount)."""
+    values = [day.by_model[m] for m in models if m in day.by_model]
+    if len(values) < 2:
+        return None
+    lo, hi = min(values), max(values)
+    return (lo, hi) if hi - lo >= max(SPREAD_MIN_IN, SPREAD_SHARE * day.snow_in) else None
+
+
 @dataclass(frozen=True)
 class TimelineCell:
-    kind: str  # "past" | "fut" | "nr" (no resort report)
-    text: str  # "3″", ".6″", "0", "·", an en dash (no report), or "" for a type word only
-    word: str  # "rain" | "ice" | "mix" | ""
-    background: str
+    kind: str  # "past" | "fut"
+    text: str  # amount ("3″", ".6″"), "0" (faint), or "" (no report, or a type word only)
+    sub: str  # under a filled amount: the model range ("2-8", en dash) or the type word; else ""
+    word: str  # an unfilled forecast cell's type word: "rain" | "ice" | "mix" | ""
+    background: str  # "" when not filled
     color: str
-    word_color: str
     title: str
 
 
 @dataclass(frozen=True)
+class DrawerRow:
+    name: str
+    cells: list[str]  # one per forecast day
+    ours: bool = False
+
+
+@dataclass(frozen=True)
+class Drawer:
+    rows: list[DrawerRow]  # Hazel St, then each model with a value on a shown day
+    nws_1d: str
+    nws_3d: str  # "3″ to Sun", or "·"
+    method: str  # "Hazel St uses the model mean for Killington."
+
+
+@dataclass(frozen=True)
 class TimelineRow:
+    key: str
     name: str
     past: list[TimelineCell]
     days: list[TimelineCell]
+    drawer: Drawer
 
 
 @dataclass(frozen=True)
@@ -250,15 +254,16 @@ def _day_parts(day: date) -> tuple[str, str]:
 def _past_cell(day: date, snow_in: float | None, source: str | None) -> TimelineCell:
     label = f"{day:%a} {day.day}"
     if snow_in is None:
-        return TimelineCell("nr", "\u2013", "", "", "", "", f"{label} · no resort report")
+        return TimelineCell("past", "", "", "", "", "", f"{label} · no resort report")
     via = RESORT_LABELS.get(source or "", source or "")
     title = f"{label} · resort reported {charts.num(snow_in)}″" + (f" ({via})" if via else "")
+    if not filled(snow_in):
+        return TimelineCell("past", "0", "", "", "", "", title)
     background, color = snow_bin(snow_in)
-    text = snow_text(snow_in) if shown_snow(snow_in) > 0 else "0"
-    return TimelineCell("past", text, "", background, color, color, title)
+    return TimelineCell("past", snow_text(snow_in), "", "", background, color, title)
 
 
-def _forecast_cell(m: MountainReport, index: int) -> TimelineCell:
+def _forecast_cell(m: MountainReport, index: int, models: Sequence[str]) -> TimelineCell:
     day = m.forecast.days[index]
     wet = day.precip_type in WET_COLORS
     parts = [day.label, f"{charts.num(round(day.snow_in, 1))}″ snow"]
@@ -274,19 +279,55 @@ def _forecast_cell(m: MountainReport, index: int) -> TimelineCell:
     if index == 0 and m.forecast.day1_method:
         parts.append(f"day 1: {METHOD_LABELS.get(m.forecast.day1_method, m.forecast.day1_method)}")
     title = " · ".join(parts)
-    background, color = snow_bin(day.snow_in)
-    word = day.precip_type if wet else ""
-    word_color = color if color == WHITE_TEXT else WET_COLORS.get(day.precip_type, color)
-    if shown_snow(day.snow_in) < ACCUMULATION_MIN_IN:
+    if not filled(day.snow_in):
         if wet:
-            return TimelineCell("fut", "", word, background, color, word_color, title)
-        return TimelineCell("fut", "·", "", background, color, color, title)
-    return TimelineCell("fut", snow_text(day.snow_in), word, background, color, word_color, title)
+            return TimelineCell(
+                "fut", "", "", day.precip_type, "", WET_COLORS[day.precip_type], title
+            )
+        return TimelineCell("fut", "0", "", "", "", "", title)
+    background, color = snow_bin(day.snow_in)
+    spread = model_spread(day, models)
+    if spread is not None:
+        sub = f"{_half_up(spread[0]):.0f}\u2013{_half_up(spread[1]):.0f}"
+    else:
+        sub = day.precip_type if wet else ""
+    return TimelineCell("fut", snow_text(day.snow_in), sub, "", background, color, title)
 
 
 def _past(m: MountainReport, days: Sequence[date]) -> list[tuple[float | None, str | None]]:
     by_date = {d.date: d for d in m.accumulation.days} if m.accumulation else {}
     return [(by_date[d].snow_in, by_date[d].source) if d in by_date else (None, None) for d in days]
+
+
+def method_line(m: MountainReport) -> str:
+    """ "Hazel St uses the model mean for Killington." (and day 1's finer-model method)."""
+    f = m.forecast
+    line = f"Hazel St uses the {METHOD_LABELS.get(f.method, f.method)} for {m.name}"
+    if f.day1_method:
+        line += f", the {METHOD_LABELS.get(f.day1_method, f.day1_method)} for day 1"
+    return line + ("." if m.is_open else ". Closed for the season so far.")
+
+
+def drawer(m: MountainReport, day_labels: Sequence[str]) -> Drawer:
+    """The model drawer: Hazel St, each model with a value on a shown day, NWS."""
+    days = m.forecast.days[:TIMELINE_DAYS]
+    order = list(MODEL_NAMES)
+    found = {k for d in days for k in d.by_model}
+    models = sorted(found, key=lambda k: (order.index(k) if k in order else len(order), k))
+    rows = [DrawerRow("Hazel St", [cell_text(d.snow_in) for d in days], ours=True)]
+    rows += [
+        DrawerRow(MODEL_NAMES.get(k, k), [cell_text(d.by_model.get(k)) for d in days])
+        for k in models
+    ]
+    nws_1d = m.forecast.windows["1d"].nws_in if "1d" in m.forecast.windows else None
+    nws_3d = m.forecast.windows["3d"].nws_in if "3d" in m.forecast.windows else None
+    through = day_labels[2].split(" ")[0] if len(day_labels) > 2 else ""
+    return Drawer(
+        rows=rows,
+        nws_1d=cell_text(nws_1d),
+        nws_3d="·" if nws_3d is None else f"{cell_text(nws_3d)} to {through}",
+        method=method_line(m),
+    )
 
 
 def snow_timeline(payload: ReportPayload) -> Timeline:
@@ -300,12 +341,17 @@ def snow_timeline(payload: ReportPayload) -> Timeline:
     )
     rows = [
         TimelineRow(
+            key=m.key,
             name=m.name,
             past=[
                 _past_cell(d, v, s)
                 for d, (v, s) in zip(past_dates, _past(m, past_dates), strict=True)
             ],
-            days=[_forecast_cell(m, i) for i in range(min(TIMELINE_DAYS, len(m.forecast.days)))],
+            days=[
+                _forecast_cell(m, i, payload.used_models)
+                for i in range(min(TIMELINE_DAYS, len(m.forecast.days)))
+            ],
+            drawer=drawer(m, payload.days),
         )
         for m in ordered
     ]
@@ -321,21 +367,13 @@ def snow_timeline(payload: ReportPayload) -> Timeline:
 
 def render_report(payload: ReportPayload, narrative: Narrative) -> str:
     """The report page: every page carries a checked narrative (J33)."""
-    rows = sorted_by_5d(payload.mountains)
     context: dict[str, Any] = {
         "p": payload,
         "narrative": narrative,
         "headline": narrative.headline,
         "body": md_to_html(narrative.body_md),
         "edition": edition_label(payload),
-        "rows": rows,
         "timeline": snow_timeline(payload),
-        "accumulation_sources": accumulation_sources(payload),
-        "context_sources": context_sources(payload),
-        "verification": verification_line(payload),
-        "runs": [(run_label(r.model, r.issued_at), r.stale) for r in payload.models],
-        "offices": [f"{OFFICE_NAMES.get(o, o)}" for o in payload.discussions],
-        "method_labels": METHOD_LABELS,
     }
     return _env.get_template("report.html").render(**context)
 

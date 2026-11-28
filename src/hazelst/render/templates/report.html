@@ -1,58 +1,45 @@
 {% extends "base.html" %}
 {% block title %}Hazel St Forecast · {{ p.date.isoformat() }}{% endblock %}
 {% block body %}
-<div class="band">
-  <div class="k">Hazel St Forecast</div>
-  <h1>{{ headline }}</h1>
-</div>
+<header><div class="brand">Hazel St</div><h1>{{ headline }}</h1></header>
 <main>
-{% if narrative.best_bet %}
-  <div class="call"><small>Best bet</small><b>{{ narrative.best_bet.mountain }}, {{ narrative.best_bet.day }}</b><span>{{ narrative.best_bet.why }}</span></div>
-{% endif %}
-{{ body }}
-
-  <div class="part">Snow · reported and forecast</div>
 {% set t = timeline %}
-  <figure class="tl-fig">
-    <div class="tl" role="table" aria-label="Snow by mountain and day">
-      <div class="tl-now" style="grid-row:2 / span {{ t.rows | length }}"></div>
-      <div role="row" class="tl-row"><div role="columnheader"></div>{% for a, b in t.past_days %}<div role="columnheader" class="tl-h tl-h-past">{{ a }}<br>{{ b }}</div>{% endfor %}<div role="columnheader" class="tl-nowh"><span>Now</span></div>{% for a, b in t.days %}<div role="columnheader" class="tl-h">{{ a }}<br>{{ b }}</div>{% endfor %}</div>
+  <section class="card" aria-label="Snow by mountain and day">
+    <div class="grid">
+      <div></div>
+{% for a, b in t.past_days %}      <div class="hd past">{{ a }}<br>{{ b }}</div>
+{% endfor %}      <div class="hd nowh"></div>
+{% for a, b in t.days %}      <div class="hd fut">{{ a }}<br>{{ b }}</div>
+{% endfor %}
 {% for r in t.rows %}
-      <div role="row" class="tl-row"><div role="rowheader" class="tl-n">{{ r.name }}</div>
-{%- for c in r.past + r.days %}<div role="cell" class="c {{ c.kind }}"{% if c.background %} style="background:{{ c.background }};color:{{ c.color }}"{% endif %} title="{{ c.title }}">{% if c.text %}<b>{{ c.text }}</b>{% endif %}{% if c.word %}<span class="w" style="color:{{ c.word_color }}">{{ c.word }}</span>{% endif %}</div>{% endfor %}</div>
+      <button class="nm" type="button" aria-expanded="false" aria-controls="d-{{ r.key }}">{{ r.name }}<i class="chev" aria-hidden="true">›</i></button>
+{%- for c in r.past %}<div class="c" title="{{ c.title }}">{% if c.background %}<span class="s" style="background:{{ c.background }};color:{{ c.color }}">{{ c.text }}</span>{% elif c.text %}<span class="z">{{ c.text }}</span>{% endif %}</div>{% endfor %}<div class="nowl"></div>
+{%- for c in r.days %}<div class="c f" title="{{ c.title }}">{% if c.background %}<span class="s" style="background:{{ c.background }};color:{{ c.color }}">{{ c.text }}{% if c.sub %}<small style="color:{{ c.color }}">{{ c.sub }}</small>{% endif %}</span>{% elif c.word %}<span class="w" style="color:{{ c.color }}">{{ c.word }}</span>{% else %}<span class="z">{{ c.text }}</span>{% endif %}</div>{% endfor %}
+
+      <div class="drawer" id="d-{{ r.key }}" hidden>
+{% for d in r.drawer.rows %}        <div class="dr{{ ' ours' if d.ours }}"><span class="dn">{{ d.name }}</span><span class="nowl"></span>{% for v in d.cells %}{% if d.ours %}<b>{{ v }}</b>{% else %}<span>{{ v }}</span>{% endif %}{% endfor %}</div>
+{% endfor %}        <div class="dr"><span class="dn">NWS</span><span class="nowl"></span><span>{{ r.drawer.nws_1d }}</span><span class="span2">{{ r.drawer.nws_3d }}</span><span>·</span></div>
+        <p class="meth">{{ r.drawer.method }}</p>
+      </div>
 {% endfor %}
     </div>
-  </figure>
-
-  <div class="part">Forecast · what falls next</div>
-  <table id="fct">
-    <thead><tr><th>Mountain</th><th>Next<br>24 h</th><th>Next<br>3 days</th><th>Next<br>5 days</th></tr></thead>
-    <tbody>
-{% for m in rows %}
-      <tr><td class="name">{{ m.name }}<small>{{ method_labels.get(m.forecast.method, m.forecast.method) }}</small>{% if m.forecast.day1_method %}<small>day 1: {{ method_labels.get(m.forecast.day1_method, m.forecast.day1_method) }}</small>{% endif %}{% if not m.is_open %}<small>closed</small>{% endif %}</td>
-{%- for key in ("1d", "3d", "5d") %}{% set w = m.forecast.windows[key] %}<td><b>{{ w.snow_in | num }}″</b>{% if w.range[1] > w.range[0] %}<small>{{ w.range[0] | num }}–{{ w.range[1] | num }}</small>{% endif %}{% if w.nws_in is not none %}<small>NWS {{ w.nws_in | num }}</small>{% endif %}{% if w.raw_mean_in is not none %}<small>Mean {{ w.raw_mean_in | num }}″</small>{% endif %}{% if w.corrected_in is not none %}<small>Corrected {{ w.corrected_in | num }}″</small>{% endif %}</td>{% endfor %}</tr>
-{% endfor %}
-    </tbody>
-  </table>
-  <p class="lead fct-note">Model mean: Open-Meteo snowfall (7:1), mean of the models. Resort ratio: each model's snow water times the ratio fitted to that resort's reports, shown where its average 1-day error beat the mean's by at least 0.05″ on the last complete season (fitted on earlier seasons), or on this season's verified snow days once a mountain has 20. Corrected, where shown, passed the same test.</p>
-
-  <div class="foot">
-    <p>Forecast: Open-Meteo ({% for label, stale in runs %}{{ label }}{% if stale %} (stale, not in the average){% endif %}{{ ", " if not loop.last }}{% endfor %}) at summit and base elevation; NWS gridpoints and alerts{% if offices %}; NWS forecast discussions ({{ offices | join(", ") }}){% endif %}.</p>
-{% for note in p.notes %}
-    <p>{{ note }}</p>
-{% endfor %}
-{% if p.sources_unavailable %}
-    <p>Source unavailable: {{ p.sources_unavailable | join(", ") }}.</p>
+  </section>
+  <article class="card report">
+{% if narrative.best_bet %}
+    <div class="call"><small>Best bet</small><b>{{ narrative.best_bet.mountain }}, {{ narrative.best_bet.day }}</b><span>{{ narrative.best_bet.why }}</span></div>
 {% endif %}
-{% if accumulation_sources %}
-    <p>Accumulation: {{ accumulation_sources | join(", ") }}.</p>
-{% endif %}
-{% if context_sources %}
-    <p>Not resort-reported, in the JSON only: {{ context_sources | join(", ") }}.</p>
-{% endif %}
-    <p>{{ verification }}</p>
-    <p>{{ edition }}</p>
-    <p><a href="/archive">Archive</a> · <a href="/api/report/{{ p.date.isoformat() }}.json">JSON</a></p>
-  </div>
+{{ body }}
+  </article>
+  <footer>{{ edition }} · <a href="/archive">Archive</a> · <a href="/api/report/{{ p.date.isoformat() }}.json">JSON</a></footer>
 </main>
+<script>
+document.querySelectorAll(".nm").forEach(function (b) {
+  b.addEventListener("click", function () {
+    var d = document.getElementById(b.getAttribute("aria-controls"));
+    d.hidden = !d.hidden;
+    b.classList.toggle("open", !d.hidden);
+    b.setAttribute("aria-expanded", String(!d.hidden));
+  });
+});
+</script>
 {% endblock %}

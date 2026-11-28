@@ -64,6 +64,10 @@ class ForecastDay(_Model):
     # None / empty on payloads stored before J33.
     base_precip_type: PrecipType | None = None
     freezing_rain_at: list[Elevation] = []
+    # Each model's summit snowfall for the day as Open-Meteo reports it (global
+    # and finer models, before any ratio), where the run covers >= 23 hours of
+    # the day; the page's model drawer (J35). Empty on payloads stored before J35.
+    by_model: dict[str, float] = {}
 
 
 ForecastMethod = Literal["raw_mean", "resort_ratio"]

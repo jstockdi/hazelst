@@ -410,21 +410,17 @@ def _with_accumulation(snow_day: sqlite3.Connection, for_date: date):  # type: i
     )
 
 
-def test_footer_names_sources_and_verification(snow_day: sqlite3.Connection) -> None:
+def test_sources_and_verification_stay_in_the_json(snow_day: sqlite3.Connection) -> None:
+    """The footer is one line (J35); sources and verification are in the payload only."""
     with db.transaction(snow_day):
         verify.store(snow_day, verify.verify_date(snow_day, MOUNTAINS, DAY))
     payload = _with_accumulation(snow_day, date(2026, 2, 7)).model_copy(
         update={"verification": verify.latest_summary(snow_day, date(2026, 2, 7))}
     )
     html = page.render_report(payload, recorded_narrative())
-    assert "Accumulation · snow that has fallen" not in html and "<svg" not in html
-    assert "Accumulation: resort reports, resort report pages read by Claude." in html
-    assert (
-        "Not resort-reported, in the JSON only: NWS snowfall reports, NWS local storm reports,"
-        " NOHRSC snowfall analysis." in html
-    )
-    assert "Verification, Fri 6 Feb (next 24 h, model mean" in html
-    assert "Verification: none yet." not in html
+    assert "Accumulation" not in html and "Verification" not in html and "<svg" not in html
+    assert "NWS snowfall reports" not in html
+    assert payload.verification is not None and payload.verification.for_date == date(2026, 2, 6)
 
 
 def test_timeline_past_is_resort_reported_only(snow_day: sqlite3.Connection) -> None:
@@ -434,11 +430,11 @@ def test_timeline_past_is_resort_reported_only(snow_day: sqlite3.Connection) -> 
     rows = {r.name: r for r in page.snow_timeline(payload).rows}
     # Cranmore has NOHRSC and PNS context on Fri 6 but no resort number: no report.
     feb6 = rows["Cranmore"].past[-1]
-    assert (feb6.kind, feb6.text, feb6.title) == ("nr", "\u2013", "Fri 6 · no resort report")
+    assert (feb6.kind, feb6.text, feb6.title) == ("past", "", "Fri 6 · no resort report")
     killington = rows["Killington"].past
     assert killington[-1].text == "3\u2033"
     assert killington[-1].title == "Fri 6 · resort reported 3\u2033 (resort)"
-    assert [c.kind for c in killington[:2]] == ["nr", "nr"]
+    assert [c.text for c in killington[:2]] == ["", ""]
     html = page.render_report(payload, recorded_narrative())
     assert "NOHRSC 1" not in html  # context stays in the JSON
 
@@ -450,7 +446,7 @@ def test_timeline_without_resort_reports(snow_day: sqlite3.Connection) -> None:
         update={"date": date(2026, 2, 7)}
     )
     killington = next(r for r in page.snow_timeline(payload).rows if r.name == "Killington")
-    assert killington.past[-1].kind == "nr"
+    assert killington.past[-1].text == "" and not killington.past[-1].background
     assert "no resort report" in page.render_report(payload, recorded_narrative())
 
 

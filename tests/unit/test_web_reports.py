@@ -69,7 +69,7 @@ def test_rows_from_before_j33_without_prose_are_not_shown(db_path: Path) -> None
     conn.close()
     c = client(db_path)
     html = c.get("/d/2026-11-26").text
-    assert recorded_narrative().headline in html and "<p>Thu 26 Nov 2026 · 7:00 AM</p>" in html
+    assert recorded_narrative().headline in html and "<footer>Thu 26 Nov 2026 · 7:00 AM · " in html
     assert c.get("/d/2026-11-24").status_code == 404
     assert 'href="/d/2026-11-24"' not in c.get("/archive").text
 
@@ -112,7 +112,7 @@ def test_new_version_replaces_cached_page(db_path: Path) -> None:
     insert(conn, payload, version=2, narrative=sample_narrative())
     conn.close()
     html = c.get("/d/2026-11-26").text
-    assert sample_narrative().headline in html and "<p>Thu 26 Nov 2026 · 8:15 AM</p>" in html
+    assert sample_narrative().headline in html and "<footer>Thu 26 Nov 2026 · 8:15 AM · " in html
 
 
 def test_static_fonts_and_css(db_path: Path) -> None:
