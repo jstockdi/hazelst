@@ -204,8 +204,8 @@ the other sources beside each day (decisions row 24).
   stores. Context is never summed into the resort value.
 - Season total and base depth come from the newest non-stale resort report of
   the last 3 days; without one they are `null` (no NOHRSC fallback).
-  `sources` lists every resort-reported source used; the footer names them,
-  and names the context sources separately.
+  `sources` lists every resort-reported source used; the JSON carries them
+  and the context sources (the page footer is one line, J35).
 - A mountain with neither a resort value nor any context has no accumulation;
   the chart shows only mountains with a resort value, and the section shows
   its empty state when no mountain has 0.5″ or more of resort-reported snow

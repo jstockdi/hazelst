@@ -223,7 +223,7 @@ class ReportPayload(_Model):
     discussions: dict[str, str] = {}  # office -> summary text
     storm_words: dict[str, list[str]] = {}
     sources_unavailable: list[str] = []
-    notes: list[str] = []  # footer notes, e.g. an edition published without ECMWF 06Z
+    notes: list[str] = []  # edition notes, e.g. published without ECMWF 06Z (JSON only, J35)
     verification: VerificationSummary | None = None  # the newest verified date before this one
     mountains: list[MountainReport]
 
