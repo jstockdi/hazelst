@@ -47,8 +47,8 @@ NWS_WINDOWS: frozenset[str] = frozenset({"1d", "3d"})  # NWS snow / ice grids en
 DAYS = 5
 ANCHOR_HOUR = 6
 STALE_AFTER_H = 18.0
-FREEZING_LEVEL_MODEL = "gfs_seamless"
-DIRECTION_MODEL = "gfs_seamless"
+FREEZING_LEVEL_MODEL = "gfs_global"
+DIRECTION_MODEL = "gfs_global"
 MM_PER_IN = 25.4
 DAY_MIN_HOURS = 23  # a model's day counts when its run covers a full day (23 for spring DST)
 

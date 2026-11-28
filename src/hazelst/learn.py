@@ -9,6 +9,8 @@ A sample is one model's summit snow forecast for one mountain-day (6 AM to
   day 1. Rows before their run (`lead_h` < 0, the API's past days) and models
   without a run time are skipped. Several fetches of the same model at the
   same lead day (the three daily ingests) are averaged into one sample.
+  Only the configured models count (`open_meteo.KNOWN_MODELS`); rows of
+  retired model ids stay stored and are not read.
 - Lead days are pooled into the report's window segments: `1d` (day 1),
   `2-3d` (days 2 and 3), `4-5d` (days 4 and 5), so the corrected method can
   rebuild the 1d / 3d / 5d windows from them.
@@ -42,6 +44,7 @@ from zoneinfo import ZoneInfo
 
 from hazelst import verify
 from hazelst.config import TIMEZONE, Mountain
+from hazelst.sources import open_meteo
 
 SNOW_DAY_IN = 0.5
 ALL_TAGS = ""
@@ -103,17 +106,18 @@ def model_forecasts(
 ) -> dict[tuple[str, str, int, date], float]:
     """(mountain, model, lead day, day) -> mean summit snow over the fetches covering the day."""
     conn.create_function("hazelst_local_day", 1, _local_day_fn(tz), deterministic=True)
+    known, known_params = open_meteo.known_models_sql()
     sql = (
         "SELECT mountain, model, day, min_lead, total FROM ("
         " SELECT mountain, model, hazelst_local_day(valid_at) AS day,"
         "  min(lead_h) AS min_lead, sum(snowfall_in) AS total, count(*) AS hours"
         " FROM forecast_hourly"
         " WHERE elevation = 'summit' AND lead_h IS NOT NULL AND lead_h >= 0"
-        "  AND lead_h < ? AND snowfall_in IS NOT NULL"
+        f"  AND lead_h < ? AND snowfall_in IS NOT NULL AND {known}"
         " GROUP BY fetch_id, mountain, model, day)"
         " WHERE hours >= ?"
     )
-    params: list[object] = [24 * (MAX_LEAD_DAY + 1), MIN_HOURS]
+    params: list[object] = [24 * (MAX_LEAD_DAY + 1), *known_params, MIN_HOURS]
     sums: dict[tuple[str, str, int, date], list[float]] = defaultdict(list)
     for mountain, model, day, min_lead, total in conn.execute(sql, params):
         lead_day = int(min_lead) // 24 + 1

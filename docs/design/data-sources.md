@@ -9,7 +9,7 @@ All sources below are free and keyless (NWS requires a `User-Agent` header).
 
 | Source | Endpoint | Fields used | Feeds |
 |--------|----------|-------------|-------|
-| **Open-Meteo Forecast** | `api.open-meteo.com/v1/forecast` — one call per elevation for all mountains (comma-separated `latitude`/`longitude`/`elevation` in meters; response is a list); `precipitation_unit=inch`, `past_days=7` | Hourly `snowfall`, `precipitation`, `temperature_2m`, `wind_speed_10m`, `wind_gusts_10m`, `freezing_level_height`; pressure-level `wind_direction_850hPa`, `wind_speed_850hPa`, `temperature_850hPa`, `relative_humidity_850hPa`. `elevation=` set to summit, then base. Models: GFS/HRRR, ECMWF IFS, GEM; a second call per elevation for the finer models (J29: ECMWF IFS 9 km, HRRR, HRDPS, NBM, AIFS; `snowfall`, `precipitation`, `temperature_2m`) | 1d/3d/5d snow, ranges, temps, gusts, mixing, upslope tag; day-1 candidates (finer models) |
+| **Open-Meteo Forecast** | `api.open-meteo.com/v1/forecast` — one call per elevation for all mountains (comma-separated `latitude`/`longitude`/`elevation` in meters; response is a list); `precipitation_unit=inch`, `past_days=7` | Hourly `snowfall`, `precipitation`, `temperature_2m`, `wind_speed_10m`, `wind_gusts_10m`, `freezing_level_height`; pressure-level `wind_direction_850hPa`, `wind_speed_850hPa`, `temperature_850hPa`, `relative_humidity_850hPa`. `elevation=` set to summit, then base. Models: GFS global, ECMWF IFS 0.25°, GEM global (J34: the pure global models, not the `*_seamless` blends); a second call per elevation for the finer models (J29: ECMWF IFS 9 km, HRRR, HRDPS, NBM, AIFS; `snowfall`, `precipitation`, `temperature_2m`) | 1d/3d/5d snow, ranges, temps, gusts, mixing, upslope tag; day-1 candidates (finer models) |
 | **NWS gridpoint** | `api.weather.gov/gridpoints/{office}/{x},{y}` (grid from `/points/{lat},{lon}`, cached) | `snowfallAmount`, `iceAccumulation` (mm, ISO-8601 intervals, ~3 days), `windGust` | Cross-check of 1d/3d totals; ice |
 | **NWS alerts** | `api.weather.gov/alerts/active?point={lat},{lon}` | Event, headline, onset/expires | Cautions section |
 | **NWS Area Forecast Discussion** | `api.weather.gov/products/types/AFD/locations/{BTV,ALY,GYX}` | Key Messages + Discussion text | Narrative: storm type, timing, mixing, confidence |
@@ -19,7 +19,8 @@ All sources below are free and keyless (NWS requires a `User-Agent` header).
 
 - Request: `timezone=GMT` (stored times are UTC; a local-time response uses one
   offset for the whole series, which is wrong across a DST change),
-  `models=gfs_seamless,ecmwf_ifs025,gem_seamless`, `past_days=7`,
+  `models=gfs_global,ecmwf_ifs025,gem_global` (J34; before it
+  `gfs_seamless,ecmwf_ifs025,gem_seamless`, see "Seamless overlap (J34)"), `past_days=7`,
   `forecast_days=7`, `temperature_unit=fahrenheit`, `wind_speed_unit=mph`,
   `precipitation_unit=inch`. The same hourly variables are requested at summit
   and base. The raw response keeps every hour; `forecast_hourly` stores hours
@@ -34,9 +35,9 @@ All sources below are free and keyless (NWS requires a `User-Agent` header).
 
   | Model | meta.json id |
   |-------|--------------|
-  | `gfs_seamless` | `ncep_gfs013` (GFS run; HRRR blends into the first hours) |
+  | `gfs_global` | `ncep_gfs013` |
   | `ecmwf_ifs025` | `ecmwf_ifs025` |
-  | `gem_seamless` | `cmc_gem_gdps_15km` |
+  | `gem_global` | `cmc_gem_gdps_15km` |
   | `ecmwf_ifs` (J29) | `ecmwf_ifs` |
   | `ncep_hrrr_conus` (J29) | `ncep_hrrr_conus` |
   | `gem_hrdps_continental` (J29) | `cmc_gem_hrdps` |
@@ -62,7 +63,66 @@ All sources below are free and keyless (NWS requires a `User-Agent` header).
   `run=`), each response carrying its run time; `tests/fixtures/open_meteo/2026-11-25`
   holds GFS 06Z, ECMWF 06Z, and GEM 00Z, the runs behind the sample run.
   `gfs_seamless` from that API blends its own-cycle HRRR, not the latest HRRR
-  the live API served that morning.
+  the live API served that morning. These fixtures were relabeled
+  `gfs_global` / `gem_global` in J34 (`tests/fixtures/open_meteo/README.md`).
+
+### Seamless overlap (J34, measured 2026-11-27)
+
+Open-Meteo's `*_seamless` ids blend models. The docs say the GEM API
+combines "global and regional weather models … into a seamless prediction"
+(HRDPS 2 days, RDPS 3.5 days, GEM Global 10 days) and the GFS API combines
+GFS with high-resolution North American forecasts, without naming a
+cut-over hour (open-meteo.com/en/docs/gem-api and gfs-api, read
+2026-11-27). The data shows where: `gfs_seamless` serves HRRR for as long
+as an HRRR run lasts, then GFS; `gem_seamless` serves HRDPS, then GEM
+Regional, then GEM Global. The docs list no pure-global ids;
+`gfs_global` and `gem_global` are confirmed by the API itself (below). Until J34 the global set was
+`gfs_seamless,ecmwf_ifs025,gem_seamless`, so HRRR and HRDPS were inside the
+model mean, `resort_ratio`, and their `snow_ratio` fits, and J29 added them
+again as finer candidates. Measured by hourly `snowfall` and
+`temperature_2m` equality:
+
+| Where | Series | Identical | Notes |
+|-------|--------|-----------|-------|
+| Live `forecast_hourly` (fetches 3585 / 3587 and 3619 / 3621, 2026-11-27) | `gfs_seamless` vs `ncep_hrrr_conus`; `gem_seamless` vs `gem_hrdps_continental` | 88 of 91 common hours (53 of 56) at every mountain, through 2026-11-29T15Z (lead up to 51 h from the GFS run); the last three hours of the HRRR / HRDPS call differ | Killington summit day snow: 2.98″ / 7.63″ (Fri 27 / Sat 28) in both GFS series, 0.85″ / 6.34″ in both GEM series |
+| Live Forecast API, Killington, 2026-11-27 | `gfs_seamless` vs `gfs_global`; `gem_seamless` vs `gem_global` | from 2026-11-29T19Z (after HRRR) and 2026-12-01T06Z (after HRDPS and GEM Regional) to the end | Day 1 of the seamless ids is never the global model |
+| Previous Runs `previous_day1` (stored as the backfilled global models) | `gfs_seamless` vs `ncep_hrrr_conus`; `gem_seamless` vs `gem_hrdps_continental` | GFS = HRRR in 7,830 of 7,830 hours at each mountain (every hour with both, 2024-12-06..2026-04-30; none earlier); GEM = HRDPS in 11,064 of 11,073 at each mountain (2024-01-20..2026-04-30, Nov–Apr). Against the pure global ids: 0.6–1.2 % (GFS) and 0.5–1.4 % (GEM) of hours equal, all zero-snow hours | Hourly `snowfall_previous_day1` and `temperature_2m_previous_day1`, all eight summits, each Nov–Apr month. The backfilled "global" day 1 was HRRR + HRDPS at lead 24–48 h; the stored rows agree (2026-01, frank copy: 744 of 744 hours at every mountain) |
+| Previous Runs, leads 2–5 (January 2026) | `gem_seamless` vs `gem_regional` / `gem_global`; `gfs_seamless` vs `gfs_global` | `gfs_seamless` = `gfs_global` at leads 2–5 (5,952 of 5,952 hours, all mountains); `gem_seamless` = `gem_regional` at lead 2 and `gem_global` at leads 3–5 (5,952 of 5,952 each) | |
+| Historical Forecast | `gfs_seamless` vs `ncep_hrrr_conus`; `gem_seamless` vs `gem_hrdps_continental` | same totals in every probe window (Killington, Nov 2023 to Dec 2025) | `gfs_global` has no Historical Forecast data before 2024-12 |
+
+`ecmwf_ifs025` and `ecmwf_ifs` (9 km) are the same IFS run on different
+grids: 1–8 of 96 live hours are identical, so they are correlated but not one
+series.
+
+**Model ids per API** (snowfall at Killington summit, the 10th–12th of each
+month 2023-11..2026-04, checked 2026-11-27):
+
+| Model id | Forecast | Previous Runs `snowfall_previous_day1` | Historical Forecast `snowfall` |
+|----------|----------|----------------------------------------|--------------------------------|
+| `gfs_global` | yes (all ten variables; freezing level) | from 2024-12-06 | from 2024-12 |
+| `gem_global` | yes (no freezing level) | from 2024-01-20 | from 2023-11 |
+| `ecmwf_ifs025` | yes | never | from 2025-11-20 |
+| `ncep_hrrr_conus` | yes (J29) | from 2024-12-06 | from 2023-11 |
+| `gem_hrdps_continental` | yes (J29) | from 2024-01-20 | from 2023-11 |
+| `ncep_nbm_conus` | yes (J29) | from 2024-12-06 | from 2024-10-08 |
+| `ecmwf_ifs` | yes (J29) | from 2025-10 | from 2023-11 |
+| `ecmwf_aifs025_single` | yes (J29) | never | from 2025-02-20 |
+
+`gfs025` returns no data on either archive; `gfs013` equals `gfs_global`.
+Previous Runs serves the unsuffixed 850 hPa variables and
+`temperature_2m_previous_day1` for `gfs_global` and `gem_global` over the
+whole backfill.
+
+**Model set (decisions row 35).** The global set is `gfs_global`,
+`ecmwf_ifs025`, `gem_global` live and in the backfill (Previous Runs at the
+matching lead, as before). HRRR, HRDPS, and NBM are backfilled from Previous
+Runs `previous_day1`, the same lead as the global models, instead of the
+Historical Forecast's short-lead series; ECMWF 9 km and AIFS keep the
+Historical Forecast (no lead archive before 2025-10). GEM at lead day 2
+was GEM Regional (10 km) under `gem_seamless`; it is GEM Global now, so
+every window uses one GEM. Stored rows of
+`gfs_seamless` and `gem_seamless` stay (row 9) but no reader counts them
+(`open_meteo.KNOWN_MODELS`).
 
 ### NWS request details (verified 2026-11-26)
 
@@ -657,7 +717,7 @@ inches. Checked at Killington summit for 2025-11-01 to 2026-04-30:
 
 | API | Model | Available | Gaps |
 |-----|-------|-----------|------|
-| Previous Runs `previous-runs-api.open-meteo.com/v1/forecast` | `gfs_seamless`, `gem_seamless` | `snowfall_previous_day{1..7}`, `precipitation_previous_day{N}`, `temperature_2m_previous_day{N}`, full season | GEM `precipitation_previous_day5`: 39 of 4,344 hours null |
+| Previous Runs `previous-runs-api.open-meteo.com/v1/forecast` | `gfs_seamless`, `gem_seamless` (`gfs_global`, `gem_global` since J34) | `snowfall_previous_day{1..7}`, `precipitation_previous_day{N}`, `temperature_2m_previous_day{N}`, full season | GEM `precipitation_previous_day5`: 39 of 4,344 hours null |
 | Previous Runs | `ecmwf_ifs025` | `precipitation_previous_day{N}`, `temperature_2m_previous_day{N}` | `snowfall_previous_day{N}` null for the whole season; `precipitation_previous_day5`: 129 hours null |
 | Historical Forecast `historical-forecast-api.open-meteo.com/v1/forecast` | all three | `snowfall`, `precipitation`, `temperature_2m`, 10 m wind and gusts, 850 hPa wind, temperature, humidity | ECMWF `snowfall` null before 2025-11-20T08:00 local; `freezing_level_height` null for ECMWF and GEM |
 | Historical Forecast (J29) | `ecmwf_ifs`, `ncep_hrrr_conus`, `gem_hrdps_continental`, `ncep_nbm_conus`, `ecmwf_aifs025_single` | `snowfall`, `precipitation`, `temperature_2m`, all eight mountains, January 2026 complete (768 hours each) | Each model only from its first archived day ("Finer models (J29)"); checked at Killington: NBM and AIFS empty on 2024-01-10, all five present on 2025-03-01 and 2026-04-20 |
@@ -668,8 +728,10 @@ J22 backfills `skill` from Previous Runs at the matching lead
 (`previous_day1` for 1d, and so on). ECMWF snowfall at lead is not available,
 so the Fallbacks rule applies ("backfill the models and dates it has"): J22
 backfills GFS and GEM, and ECMWF `skill` rows start from live verification.
-J29 backfills the finer models from the Historical Forecast API instead,
-for day 1 only, and accepts its short lead (decisions row 30).
+J29 backfilled the finer models from the Historical Forecast API instead,
+for day 1 only, and accepted its short lead (decisions row 30); since J34,
+HRRR, HRDPS, and NBM come from Previous Runs `previous_day1` and only ECMWF
+9 km and AIFS keep the Historical Forecast (decisions row 35).
 
 ### Finer models (J29)
 
@@ -695,19 +757,18 @@ and `cmc_gem_hrdps`.
   `snowfall_in / 7` is snow water. For NBM that quotient is a scaled native
   snowfall; its `snow_ratio` is fitted on the same quantity, so it is a scale
   factor on NBM's own snow (forecast-method.md, "Finer models for day 1").
-- **Backfill.** The Historical Forecast API stitches the first hours of
-  successive runs into one hourly series, so a day's values are short-lead
-  output (minutes to hours after each run), not a forecast issued the
-  morning before. They stand in for the finer models' day-1 forecast
-  (decisions row 30), which makes the backfilled finer models look better
-  than a live day-1 forecast: the global models' backfill is Previous Runs
-  `previous_day1` (lead 24–48 h). Live finer-model days, scored by
+- **Backfill (J34).** HRRR, HRDPS, and NBM are backfilled from Previous Runs
+  `previous_day1`, the same lead (24–48 h) as the global models: HRDPS from
+  2024-01-20, HRRR and NBM from 2024-12-06 ("Seamless overlap (J34)"). J29
+  judged that too short from probes on 2024-01-10 (before the archive's
+  2024-01-20 start) and 2025-03-01, and used the Historical Forecast for all
+  five; HRRR and NBM have one winter before the held-out season, as GFS
+  already had. ECMWF 9 km (`previous_day1` only from
+  2025-10) and AIFS (none) keep the Historical Forecast, which stitches the
+  first hours of successive runs, so their day is short-lead output, not a
+  forecast issued the morning before (decisions row 30); the backtest
+  favors those two by lead time. Live finer-model days, scored by
   `forecast-verify`, carry the true lead.
-- Previous Runs serves `snowfall_previous_day1` for some finer models from
-  2025 on (checked at Killington: none on 2024-01-10; HRRR, HRDPS, and NBM on
-  2025-03-01; ECMWF 9 km on 2026-01-25; AIFS has `precipitation_previous_day1`
-  but no snowfall). Too short for a fit through 2025-04-30, so it is not used
-  (decisions row 30).
 - **Rate limit.** Open-Meteo's free tier allows 600 calls a minute, 5,000 an
   hour, and 10,000 a day; a request over 10 variables or two weeks of data
   per location counts as several calls. A backfill request is one model ×
@@ -723,8 +784,8 @@ D..D into the live tables (all steps, or the listed ones), one `season-backfill`
 
 | Step | Request | Writes |
 |------|---------|--------|
-| `historical_forecast` | Historical Forecast (J29), one request per finer model: all eight mountains (summit elevation), `snowfall,precipitation,temperature_2m`, `timezone=GMT`, UTC dates D..end + 1 clipped to the model's first archived day; requests 10 s apart; an HTTP 429 stops the step and the command (`rate_limited`), and a rerun resumes from the stored requests | `forecast_hourly` at summit, `issued_at` NULL, nominal `lead_h` 0 (lead day 1 only) |
-| `previous_runs` | Previous Runs, one request per lead day N = 1–5: all eight mountains (summit elevation), `gfs_seamless,gem_seamless`, `snowfall_previous_dayN`, `precipitation_previous_dayN`, `temperature_2m_previous_dayN`, `timezone=GMT`, UTC dates D..end + 1; lead day 1 also requests the unsuffixed `temperature_850hPa`, `relative_humidity_850hPa`, `wind_speed_850hPa`, `wind_direction_850hPa` with `wind_speed_unit=mph` (J27) | `forecast_hourly` at summit, `issued_at` NULL (a stitched series has no single run), nominal `lead_h` = 24 × (N − 1) so `skill-learn` places the day at lead day N. A new fetch replaces the rows of earlier Previous Runs fetches for the same lead day and hours, so re-running after the query changed does not store a day twice |
+| `historical_forecast` | Historical Forecast (J29), one request per model for ECMWF 9 km and AIFS (J34; HRRR, HRDPS, and NBM before it): all eight mountains (summit elevation), `snowfall,precipitation,temperature_2m`, `timezone=GMT`, UTC dates D..end + 1 clipped to the model's first archived day; requests 10 s apart; an HTTP 429 stops the step and the command (`rate_limited`), and a rerun resumes from the stored requests | `forecast_hourly` at summit, `issued_at` NULL, nominal `lead_h` 0 (lead day 1 only) |
+| `previous_runs` | Previous Runs, one request per lead day N = 1–5 for `gfs_global,gem_global` (J34; `gfs_seamless,gem_seamless` before it), plus one lead-day-1 request for `ncep_hrrr_conus,gem_hrdps_continental,ncep_nbm_conus` (J34): all eight mountains (summit elevation), `snowfall_previous_dayN`, `precipitation_previous_dayN`, `temperature_2m_previous_dayN`, `timezone=GMT`, UTC dates D..end + 1; the global lead-day-1 request also asks for the unsuffixed `temperature_850hPa`, `relative_humidity_850hPa`, `wind_speed_850hPa`, `wind_direction_850hPa` with `wind_speed_unit=mph` (J27); requests 25 s apart (a month is about 170 of Open-Meteo's fractional calls, so a three-season run stays near 4,000 an hour), an HTTP 429 stops the step | `forecast_hourly` at summit, `issued_at` NULL (a stitched series has no single run), nominal `lead_h` = 24 × (N − 1) so `skill-learn` places the day at lead day N. A new fetch replaces the rows of earlier fetches for the same models, lead, mountains, and dates (Previous Runs after a query change; Historical Forecast for HRRR, HRDPS, and NBM), so no day is stored twice or at two leads |
 | `lsr` | IEM LSR GeoJSON from midnight before D to midnight after the morning of end + 1 | `snow_report` |
 | `pns` | IEM AFOS listing per office per day (D..end + 1), then each new product's text | `discussion` (`PNS`), `snow_report` |
 | `nohrsc` | The 24 h grid ending 12Z on each obs_date (D + 1..end + 1) | `observation` (`nohrsc`) |
@@ -740,7 +801,8 @@ query) is not sent again (for SnoCountry, either URL); PNS products are fetched 
 PNS listing is stored only when all its products were fetched, so a failed
 product is retried; NOHRSC dates with stored rows are skipped. Previous
 **GFS lead-day-1 snowfall before 2024-12-06 (J28).** Previous Runs
-`gfs_seamless` `snowfall_previous_day1` is empty before 2024-12-06: on frank
+`gfs_seamless` `snowfall_previous_day1` is empty before 2024-12-06 (it is
+HRRR's series, J34; `gfs_global` starts the same day): on frank
 (checked 2026-11-27) the first lead-day-1 GFS summit hour with snowfall is
 2024-12-06T18:00Z, while GEM's is 2024-01-20T00:00Z, the backfill start. So
 backfilled lead-day-1 days 2024-01-20..2024-12-05 carry GEM only, and the
@@ -756,7 +818,8 @@ pressure-level variables: `temperature_850hPa_previous_day1` is rejected
 ("Cannot initialize … from invalid String value", checked 2026-11-26 for
 `gfs_seamless` and `gem_seamless`). The unsuffixed `temperature_850hPa`,
 `relative_humidity_850hPa`, `wind_speed_850hPa`, and `wind_direction_850hPa`
-are served for both models over 2024-01-20..2026-04-30; each hour comes from
+are served for both models over 2024-01-20..2026-04-30 (and for
+`gfs_global` and `gem_global`, checked 2026-11-27); each hour comes from
 the newest run before it (lead under 24 h, the API's day 0). The backfill
 stores them on the lead-day-1 rows, and `nw_upslope` for a backfilled day is
 tagged from that short-lead series (decisions row 27). The Fallbacks row

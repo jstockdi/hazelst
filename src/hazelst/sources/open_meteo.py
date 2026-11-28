@@ -1,7 +1,11 @@
 """Open-Meteo forecast: summit and base hourly series for every mountain.
 
 Two model sets: the three global models (`MODELS`), which feed every window,
-and the finer models (`FINE_MODELS`, J29), which compete for day 1 only. One
+and the finer models (`FINE_MODELS`, J29), which compete for day 1 only. The
+global set is the pure global models (J34): Open-Meteo's `gfs_seamless` is
+HRRR for HRRR's whole run and `gem_seamless` is HRDPS for HRDPS's, so the
+seamless ids would count HRRR and HRDPS in the model mean and again as finer
+candidates. One
 call per elevation and set covers all mountains (comma-separated coordinates;
 the response is a list in the same order). Each ingest also fetches each
 model's `meta.json` so `forecast_hourly.issued_at` is the model run time, not
@@ -29,7 +33,7 @@ FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 SINGLE_RUN_URL = "https://single-runs-api.open-meteo.com/v1/forecast"
 META_URL = "https://api.open-meteo.com/data/{meta_id}/static/meta.json"
 
-MODELS: tuple[str, ...] = ("gfs_seamless", "ecmwf_ifs025", "gem_seamless")
+MODELS: tuple[str, ...] = ("gfs_global", "ecmwf_ifs025", "gem_global")
 # Finer models (J29, decisions row 30): collected every run, candidates for day 1 only.
 FINE_MODELS: tuple[str, ...] = (
     "ecmwf_ifs",  # ECMWF IFS HRES 9 km
@@ -38,12 +42,14 @@ FINE_MODELS: tuple[str, ...] = (
     "ncep_nbm_conus",  # NCEP NBM CONUS (native snowfall)
     "ecmwf_aifs025_single",  # ECMWF AIFS 0.25 degree
 )
-# meta.json id that carries each model's run time. gfs_seamless blends HRRR
-# into the first hours; its run time is the GFS run.
+# Every model a reader of `forecast_hourly` counts. Rows of the ids the global set
+# used before J34 (`gfs_seamless`, `gem_seamless`) stay stored but are not read.
+KNOWN_MODELS: tuple[str, ...] = (*MODELS, *FINE_MODELS)
+# meta.json id that carries each model's run time.
 META_IDS: dict[str, str] = {
-    "gfs_seamless": "ncep_gfs013",
+    "gfs_global": "ncep_gfs013",
     "ecmwf_ifs025": "ecmwf_ifs025",
-    "gem_seamless": "cmc_gem_gdps_15km",
+    "gem_global": "cmc_gem_gdps_15km",
     "ecmwf_ifs": "ecmwf_ifs",
     "ncep_hrrr_conus": "ncep_hrrr_conus",
     "gem_hrdps_continental": "cmc_gem_hrdps",
@@ -81,6 +87,11 @@ FORECAST_DAYS = 7
 
 def is_fine(model: str) -> bool:
     return model in FINE_MODELS
+
+
+def known_models_sql() -> tuple[str, list[str]]:
+    """(`model IN (?, ...)`, its parameters): the filter readers put on `forecast_hourly`."""
+    return f"model IN ({', '.join('?' for _ in KNOWN_MODELS)})", list(KNOWN_MODELS)
 
 
 class NormalizeError(ValueError):

@@ -259,13 +259,13 @@ def insert_hourly(
 
 def test_backfill_forecasts_score_days_without_reports(conn: sqlite3.Connection) -> None:
     with db.transaction(conn):
-        insert_hourly(conn, "loon", "gfs_seamless", DAY, 0.25)  # 6 in
-        insert_hourly(conn, "loon", "gem_seamless", DAY, 0.125)  # 3 in
+        insert_hourly(conn, "loon", "gfs_global", DAY, 0.25)  # 6 in
+        insert_hourly(conn, "loon", "gem_global", DAY, 0.125)  # 3 in
         insert_resort(conn, "loon", "2026-02-07", "2026-02-07T12:00:00+00:00", 5.0)
     found = verify.backfill_forecasts(conn, DAY, DAY)
     (loon,) = found[DAY]
     assert (loon.edition, loon.mountain) == ("backfill", "loon")
-    assert loon.methods == {"gfs_seamless": 6.0, "gem_seamless": 3.0, "raw_mean": 4.5}
+    assert loon.methods == {"gfs_global": 6.0, "gem_global": 3.0, "raw_mean": 4.5}
     rows = verify.verify_date(conn, MOUNTAINS, DAY, forecasts=found[DAY])
     mean = next(r for r in rows if r.method == "raw_mean")
     assert (mean.edition, mean.observed_in, mean.observed_source, mean.result) == (
@@ -339,7 +339,7 @@ def test_summary_by_elevation_bands_and_earliest_edition(conn: sqlite3.Connectio
         insert_verification(conn, "2026-02-03", "backfill", "loon", 1.0, 3.0, [(0.1, None)])
         insert_verification(conn, "2026-02-04", "0700", "loon", 0.2, 0.0, [(0.0, 900)])  # dry
         insert_verification(conn, "2026-02-01", "0700", "pico", 3.0, 6.0)  # MISS
-        insert_verification(conn, "2026-02-01", "0700", "pico", 1.0, 6.0, method="gfs_seamless")
+        insert_verification(conn, "2026-02-01", "0700", "pico", 1.0, 6.0, method="gfs_global")
     cells = verify.summary_cells(conn, by="elevation")
     got = {(c.mountain, c.group): (c.n, c.bias_ratio, c.mae_in, c.hit_rate) for c in cells}
     assert got == {
@@ -405,9 +405,13 @@ def test_forecast_verify_range_scores_backfilled_days(tmp_path: Path) -> None:
     before = DAY - timedelta(days=1)  # no report: scored from forecast_hourly
     with db.transaction(c):
         insert_editions(c, DAY)
-        insert_hourly(c, "loon", "gfs_seamless", before, 0.25)
-        insert_hourly(c, "loon", "gfs_seamless", DAY, 0.5)  # DAY has editions: ignored
+        insert_hourly(c, "loon", "gfs_global", before, 0.25)
+        insert_hourly(c, "loon", "gfs_global", DAY, 0.5)  # DAY has editions: ignored
         insert_resort(c, "loon", before.isoformat(), "2026-02-06T12:00:00+00:00", 5.0)
+        # A backfill row of a model id retired since (J34): the rescore drops it.
+        insert_verification(
+            c, before.isoformat(), "backfill", "loon", 3.0, 5.0, method="gfs_seamless"
+        )
     out = jobs.run_job(cfg, "forecast-verify", DAY, options={"start": before, "end": DAY})
     assert out["rescored"]["days"] == 2
     assert out["rescored"]["backfill_days"] == 1
@@ -415,7 +419,7 @@ def test_forecast_verify_range_scores_backfilled_days(tmp_path: Path) -> None:
         "SELECT for_date, edition, count(*) FROM verification GROUP BY 1, 2 ORDER BY 1, 2"
     ).fetchall()
     assert [tuple(r) for r in editions] == [
-        (before.isoformat(), "backfill", 2),  # gfs_seamless and raw_mean
+        (before.isoformat(), "backfill", 2),  # gfs_global and raw_mean
         (DAY.isoformat(), "0700", 24),
         (DAY.isoformat(), "0815", 24),
         (DAY.isoformat(), "1440", 24),

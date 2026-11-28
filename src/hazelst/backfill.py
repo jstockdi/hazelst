@@ -2,13 +2,15 @@
 
 For report days `start`..`end` (local dates):
 
-- `previous_runs`: Open-Meteo Previous Runs, GFS and GEM at summit, lead days
-  1-5 (one request per lead day; lead day 1 adds the 850 hPa variables) ->
-  `fetch`, `forecast_hourly` (`issued_at` NULL, `lead_h` = 24 x (N - 1)). A
-  new fetch for a lead day replaces the rows of earlier fetches for the same
-  hours (a re-run after the query changed).
-- `historical_forecast`: Open-Meteo Historical Forecast, the finer models at
-  summit (one request per model, from each model's first archived day) ->
+- `previous_runs`: Open-Meteo Previous Runs at summit: GFS and GEM global,
+  lead days 1-5 (one request per lead day; lead day 1 adds the 850 hPa
+  variables), and HRRR, HRDPS, and NBM at lead day 1 (J34) -> `fetch`,
+  `forecast_hourly` (`issued_at` NULL, `lead_h` = 24 x (N - 1)). A new fetch
+  replaces the rows of earlier fetches for the same models, lead, and dates
+  (a re-run after the query changed, or a finer model's Historical Forecast
+  series). Requests are sent `previous_runs.REQUEST_INTERVAL_S` apart.
+- `historical_forecast`: Open-Meteo Historical Forecast, ECMWF IFS 9 km and
+  AIFS at summit (one request per model, from each model's first archived day) ->
   `fetch`, `forecast_hourly` (`issued_at` NULL, nominal `lead_h` 0: the
   stitched short-lead series stands in for day 1, decisions row 30).
   Requests are sent `REQUEST_INTERVAL_S` apart, and an HTTP 429 stops the
@@ -192,29 +194,43 @@ class Backfill:
     # --- steps ---------------------------------------------------------------------
 
     def previous_runs(self, start: date, end: date) -> Counts:
-        """Lead days 1-5 for report days `start`..`end` (UTC dates through end + 1)."""
+        """Each Previous Runs request (`previous_runs.requests`) for report days
+        `start`..`end` (UTC dates through end + 1)."""
         counts = Counts()
         mountains = self.cfg.mountains
+        keys = [m.key for m in mountains]
         last = end + timedelta(days=1)
-        for lead in previous_runs.LEAD_DAYS:
-            query = previous_runs.params(mountains, lead, start, last)
+        for models, lead in previous_runs.requests():
+            query = previous_runs.params(mountains, lead, start, last, models)
+            if not self._seen(previous_runs.SOURCE, previous_runs.URL, query):
+                pace(previous_runs.REQUEST_INTERVAL_S)
             fetched = self._get(
                 counts,
                 previous_runs.SOURCE,
                 previous_runs.URL,
                 query,
-                partial(previous_runs.fetch, self.client, mountains, lead, start, last),
+                partial(previous_runs.fetch, self.client, mountains, lead, start, last, models),
             )
+            if counts.rate_limited:
+                break
             if fetched is None:
                 continue
             try:
                 rows = previous_runs.normalize(fetched)
             except (open_meteo.NormalizeError, KeyError, ValueError) as exc:
-                counts.errors.append(f"previous_runs lead {lead}: {exc}")
+                counts.errors.append(f"previous_runs {','.join(models)} lead {lead}: {exc}")
                 continue
             with db.transaction(self.conn):
                 fetch_id = base.store_fetch(self.conn, self.run_id, fetched)
-                dropped = previous_runs.drop_superseded(self.conn, fetch_id, rows)
+                dropped = previous_runs.drop_superseded(
+                    self.conn,
+                    fetch_id,
+                    models=models,
+                    lead_day=lead,
+                    mountains=keys,
+                    start=start,
+                    end=last,
+                )
                 counts.add("forecast_hourly", open_meteo.store(self.conn, fetch_id, rows))
                 if dropped:
                     counts.add("superseded", dropped)
@@ -222,11 +238,11 @@ class Backfill:
         return counts
 
     def historical_forecast(self, start: date, end: date) -> Counts:
-        """The finer models for report days `start`..`end` (UTC dates through end + 1)."""
+        """ECMWF IFS 9 km and AIFS for report days `start`..`end` (UTC dates through end + 1)."""
         counts = Counts()
         mountains = self.cfg.mountains
         last = end + timedelta(days=1)
-        for model in open_meteo.FINE_MODELS:
+        for model in historical_forecast.MODELS:
             span = historical_forecast.window(model, start, last)
             if span is None:
                 continue

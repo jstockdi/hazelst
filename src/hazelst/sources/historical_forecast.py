@@ -1,10 +1,13 @@
-"""Open-Meteo Historical Forecast: the finer models' past summit series, for `season-backfill`.
+"""Open-Meteo Historical Forecast: past summit series of the finer models with no lead
+archive, for `season-backfill`.
 
 The Historical Forecast API stitches the first hours of successive runs into
 one hourly series (data-sources.md, "Open-Meteo historical models"), so a
 day's values are short-lead output. They stand in for the day-1 forecast of
-the finer models only (decisions row 30); the global models keep Previous
-Runs at the matching lead (decisions row 17).
+ECMWF IFS 9 km and AIFS only (`MODELS`; decisions rows 30 and 35): Previous
+Runs has no `snowfall_previous_day1` for them before 2025-10. HRRR, HRDPS,
+and NBM come from Previous Runs at lead day 1, and the global models keep
+Previous Runs at the matching lead (decisions row 17).
 
 One request per model and range covers every mountain (comma-separated
 coordinates, a list in the same order). A model is requested only for dates
@@ -39,12 +42,11 @@ SOURCE = "open_meteo_historical_forecast"
 URL = "https://historical-forecast-api.open-meteo.com/v1/forecast"
 ELEVATION = "summit"
 LEAD_H = 0  # nominal: a stitched short-lead series stands in for lead day 1
+# The finer models backfilled here (J34); the others come from Previous Runs at lead day 1.
+MODELS: tuple[str, ...] = ("ecmwf_ifs", "ecmwf_aifs025_single")
 # First archived day per model (Open-Meteo Historical Forecast docs, checked 2026-11-27).
 FIRST_DAY: dict[str, date] = {
     "ecmwf_ifs": date(2017, 1, 1),
-    "ncep_hrrr_conus": date(2018, 1, 1),
-    "gem_hrdps_continental": date(2023, 3, 3),
-    "ncep_nbm_conus": date(2024, 10, 8),
     "ecmwf_aifs025_single": date(2025, 2, 20),
 }
 # Open-Meteo variable -> forecast_hourly column.
@@ -71,7 +73,7 @@ COLUMNS: tuple[str, ...] = (
 # under the 600-a-minute and 5,000-an-hour limits.
 REQUEST_INTERVAL_S = 10.0
 
-assert set(FIRST_DAY) == set(FINE_MODELS)
+assert set(FIRST_DAY) == set(MODELS) <= set(FINE_MODELS)
 
 
 def window(model: str, start: date, end: date) -> tuple[date, date] | None:
@@ -114,7 +116,7 @@ def normalize(fetched: Fetched) -> list[HourlyRow]:
     locations: list[dict[str, Any]] = data if isinstance(data, list) else [data]
     keys = [str(k) for k in fetched.meta.get("mountains", [])]
     model = str(fetched.meta.get("model", ""))
-    if model not in FINE_MODELS:
+    if model not in FINE_MODELS:  # earlier fetches also hold HRRR, HRDPS, and NBM
         raise NormalizeError(f"unknown model {model!r}")
     if len(locations) != len(keys):
         raise NormalizeError(f"{len(locations)} locations for {len(keys)} mountains")

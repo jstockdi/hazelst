@@ -33,7 +33,7 @@ from tests.unit.test_obs_sources import (
 DAY = date(2026, 2, 6)  # the report date being verified
 OBS = date(2026, 2, 7)  # obs_date: the 24 h ending the morning after
 EDITIONS = ("0700", "0815", "1440")
-MODELS = ("gfs_seamless", "ecmwf_ifs025", "gem_seamless")
+MODELS = ("gfs_global", "ecmwf_ifs025", "gem_global")
 # The 1d model-mean forecast per mountain, and each edition's change to it.
 FORECAST = {
     "killington": 4.0,
@@ -125,7 +125,7 @@ def insert_editions(conn: sqlite3.Connection, day: date) -> None:
             )
         for mountain, mean in FORECAST.items():
             value = max(mean + EDITION_SHIFT[edition], 0.0)
-            by_model = {"gfs_seamless": value - 1, "ecmwf_ifs025": value, "gem_seamless": None}
+            by_model = {"gfs_global": value - 1, "ecmwf_ifs025": value, "gem_global": None}
             conn.execute(
                 "INSERT INTO forecast_window (run_id, mountain, window, method, snow_in, lo_in,"
                 " hi_in, by_model) VALUES (?, ?, '1d', 'raw_mean', ?, 0, 0, ?)",
@@ -304,7 +304,7 @@ def test_verification_rows_for_each_edition(snow_day: sqlite3.Connection) -> Non
     # 3 editions x 8 mountains x (raw_mean + GFS + ECMWF; GEM is null).
     assert len(rows) == 3 * 8 * 3
     assert {r.edition for r in rows} == set(EDITIONS)
-    assert {r.method for r in rows} == {"raw_mean", "gfs_seamless", "ecmwf_ifs025"}
+    assert {r.method for r in rows} == {"raw_mean", "gfs_global", "ecmwf_ifs025"}
     assert {r.window for r in rows} == {"1d"}
     mean = {(r.edition, r.mountain): r for r in rows if r.method == "raw_mean"}
     k = mean[("0700", "killington")]

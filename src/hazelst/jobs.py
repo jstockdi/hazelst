@@ -847,7 +847,9 @@ def forecast_verify(ctx: JobContext) -> None:
 
 def rescore_range(ctx: JobContext, start: date, end: date) -> None:
     """Re-score each date `start`..`end`: its stored report editions, or, for a day with
-    none (a season backfill), the `backfill` edition built from `forecast_hourly`."""
+    none (a season backfill), the `backfill` edition built from `forecast_hourly`, which
+    replaces the day's earlier `backfill` rows (a method or model no longer scored, such
+    as a retired model id, leaves no stale row)."""
     extra = ratio.backfill_values(ctx.conn, ctx.cfg.mountains, start, end, ctx.cfg.timezone)
     backfilled = verify.backfill_forecasts(ctx.conn, start, end, ctx.cfg.timezone, extra)
     days = rows_total = backfill_days = 0
@@ -856,13 +858,16 @@ def rescore_range(ctx: JobContext, start: date, end: date) -> None:
     day = start
     while day <= end:
         rows = verify.verify_date(ctx.conn, ctx.cfg.mountains, day, ctx.cfg.timezone)
-        if not rows and day in backfilled:
+        backfill = not rows and day in backfilled
+        if backfill:
             rows = verify.verify_date(
                 ctx.conn, ctx.cfg.mountains, day, ctx.cfg.timezone, forecasts=backfilled[day]
             )
             backfill_days += 1 if rows else 0
         if rows:
             with db.transaction(ctx.conn):
+                if backfill:  # the day's backfill edition is rewritten whole
+                    verify.drop_backfill(ctx.conn, day)
                 rows_total += verify.store(ctx.conn, rows)
             days += 1
             for r in rows:

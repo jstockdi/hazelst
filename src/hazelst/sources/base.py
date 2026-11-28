@@ -78,12 +78,15 @@ def get(
     headers: Mapping[str, str] | None = None,
     retries: int = 2,
     backoff_s: float = 2.0,
+    timeout_s: float | None = None,
 ) -> Fetched:
     """GET with retries on timeouts, connection errors, 429, and 5xx.
 
     Any other status is returned as is (the caller decides whether a 404 is
-    an error); raises `SourceError` once the retries are spent.
+    an error); raises `SourceError` once the retries are spent. `timeout_s`
+    overrides the client's timeout for this request.
     """
+    timeout = httpx.USE_CLIENT_DEFAULT if timeout_s is None else httpx.Timeout(timeout_s)
     query = dict(params or {})
     last_error = "no attempt"
     for attempt in range(retries + 1):
@@ -92,7 +95,7 @@ def get(
         started = time.monotonic()
         fetched_at = utc_now()
         try:
-            response = client.get(url, params=query, headers=dict(headers or {}))
+            response = client.get(url, params=query, headers=dict(headers or {}), timeout=timeout)
         except httpx.TransportError as exc:
             last_error = f"{type(exc).__name__}: {exc}"
             continue

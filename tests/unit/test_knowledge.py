@@ -58,9 +58,9 @@ def seed_week(c: config.Config) -> None:
     conn.executemany(
         "INSERT INTO skill VALUES (?, ?, '1d', ?, ?, ?, ?, ?, '2026-11-30T07:00:00+00:00')",
         [
-            ("sugarbush", "gfs_seamless", "", 9, 0.62, 2.1, 0.33),
-            ("sugarbush", "gfs_seamless", "nw_upslope", 4, 0.55, 3.0, 0.25),
-            ("loon", "gfs_seamless", "", 2, 1.1, 0.5, 1.0),  # n < 3: not evidence
+            ("sugarbush", "gfs_global", "", 9, 0.62, 2.1, 0.33),
+            ("sugarbush", "gfs_global", "nw_upslope", 4, 0.55, 3.0, 0.25),
+            ("loon", "gfs_global", "", 2, 1.1, 0.5, 1.0),  # n < 3: not evidence
         ],
     )
     verification = [
@@ -87,7 +87,7 @@ def seed_week(c: config.Config) -> None:
 
 
 KEY_MISS = "verification:2026-11-24:0700:sugarbush:1d:raw_mean"
-KEY_SKILL = "skill:sugarbush:gfs_seamless:1d:nw_upslope"
+KEY_SKILL = "skill:sugarbush:gfs_global:1d:nw_upslope"
 
 
 def proposals() -> KnowledgeProposals:
@@ -193,7 +193,7 @@ def test_review_stores_valid_proposals_as_proposed(
 
     sent = KnowledgeInput.model_validate_json(backend.requests[0].prompt)
     assert [c.key for c in sent.skill_changes] == [
-        "skill:sugarbush:gfs_seamless:1d:all",
+        "skill:sugarbush:gfs_global:1d:all",
         KEY_SKILL,
     ]
     assert all(c.previous is None for c in sent.skill_changes)
@@ -224,7 +224,7 @@ def test_review_reports_how_skill_moved_since_the_last_call(
     summary = jobs.run_job(cfg, "knowledge-review", date(2026, 12, 7))
     assert summary["proposed"] == {"knowledge": [], "config_change": []}
     sent = KnowledgeInput.model_validate_json(backend.requests[1].prompt)
-    assert sent.skill_changes[0].key == "skill:sugarbush:gfs_seamless:1d:all"
+    assert sent.skill_changes[0].key == "skill:sugarbush:gfs_global:1d:all"
     cell = sent.skill_changes[0]
     assert (cell.n, cell.bias_ratio) == (12, 0.7)
     assert cell.previous is not None

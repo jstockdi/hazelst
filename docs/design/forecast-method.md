@@ -16,7 +16,10 @@ Daily buckets (6 AM → 6 AM) feed the forecast chart.
 ## Snow amount
 
 - Sum Open-Meteo hourly `snowfall` at **summit elevation**, per model
-  (GFS, ECMWF, GEM).
+  (GFS global `gfs_global`, ECMWF IFS 0.25° `ecmwf_ifs025`, GEM global
+  `gem_global`). These are the pure global models (J34, decisions row 35):
+  the `*_seamless` ids serve HRRR and HRDPS for day 1, which would count
+  those models in the mean and again as finer day-1 candidates.
 - **Headline value** = **mean** of the three models. The mean is additive, so
   the daily buckets in the chart sum exactly to the window totals in the table
   (a median does not). **Range** = min–max of the per-model window totals.
@@ -137,10 +140,12 @@ ECMWF IFS HRES 9 km (`ecmwf_ifs`), HRRR CONUS 3 km (`ncep_hrrr_conus`), HRDPS
 Continental 2.5 km (`gem_hrdps_continental`), NBM CONUS (`ncep_nbm_conus`,
 native snowfall), and AIFS (`ecmwf_aifs025_single`).
 
-- **Collected** every `ingest-forecast` run at summit and base, and
-  backfilled from the Historical Forecast API (summit). They never enter the
-  model mean, its range, the tags, or `resort_ratio`; those stay on the three
-  global models.
+- **Collected** every `ingest-forecast` run at summit and base. Backfilled
+  at summit: HRRR, HRDPS, and NBM from Previous Runs `previous_day1`, the
+  global models' lead (J34); ECMWF 9 km and AIFS from the Historical
+  Forecast API. They never enter the model mean, its range, the tags, or
+  `resort_ratio`; those stay on the three global models, which since J34
+  contain no finer model (data-sources.md, "Seamless overlap (J34)").
 - **Ratios**: each finer model gets its own `snow_ratio` cells, fitted as
   `resort_ratio`'s (same bands, upslope split, fallbacks). Snow water is
   `snowfall_in / 7` for every model; for NBM, whose `snowfall` is native
@@ -171,10 +176,11 @@ native snowfall), and AIFS (`ecmwf_aifs025_single`).
 - **Backtest**: `ratio backtest` prints every candidate beside the global
   methods on the same days, the fit days per finer model and mountain, and
   the thin candidates. A test day without a candidate's value scores the raw
-  mean for it; the fallback count is printed. The backfilled finer-model
-  series is the Historical Forecast's stitched short-lead output, while the
-  global models' backfill is Previous Runs `previous_day1` (lead 24–48 h), so
-  the backtest favors the finer models by lead time (decisions row 30).
+  mean for it; the fallback count is printed. HRRR, HRDPS, and NBM are scored
+  at the global models' lead (Previous Runs `previous_day1`, 24–48 h); ECMWF
+  9 km and AIFS are the Historical Forecast's stitched short-lead output, so
+  the backtest favors `ifs9_ratio` and `aifs_ratio` by lead time (decisions
+  rows 30 and 35).
 
 ## Corrected value (learned)
 
@@ -237,7 +243,7 @@ Implementation: `derive.py` (windows, days, NWS proration, stale models),
 rebuilt from the same model runs (GFS 06Z, ECMWF 06Z, GEM 00Z) through the
 Single Runs API, derive reproduces the sample's precip type and tags on 39 of
 40 mountain-days and the ECMWF window totals exactly. The differences come
-from the inputs, not the method: `gfs_seamless` from the Single Runs API
+from the inputs, not the method: `gfs_seamless` (the global id before J34) from the Single Runs API
 blends the 06Z HRRR rather than the later HRRR the live API served at 10:44
 AM, which moves GFS snow totals in the first two days and turns Sugarbush on
 Fri 27 from rain to ice; GEM totals match to 0.1″ in 19 of 24 windows. NWS
@@ -288,7 +294,7 @@ so the ranking and the narrative agree.
     "method": "raw_mean",
     "windows": {
       "1d": { "snow_in": 4, "range": [3, 6], "confidence": "high", "nws_in": 5, "nws_disagrees": false,
-              "by_model": { "gfs_seamless": 3, "ecmwf_ifs025": 4, "gem_seamless": 6 } },
+              "by_model": { "gfs_global": 3, "ecmwf_ifs025": 4, "gem_global": 6 } },
       "3d": { "snow_in": 10, "range": [7, 14], "confidence": "medium", "nws_in": 9 },
       "5d": { "snow_in": 13, "range": [8, 19], "confidence": "low", "nws_in": null }
     },
