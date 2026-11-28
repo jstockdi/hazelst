@@ -230,7 +230,8 @@ How `report_check.py` reads the prose (so a draft can be written to pass):
   mountains, resorts, peaks, bases) is every `VT` mountain, likewise Maine
   (`ME`) and New Hampshire (`NH`); "all eight" is every mountain; "the rest"
   is every mountain not yet named in that sentence ("the rest of the week" is
-  not a group). Members are precip-checked one by one, and a snow amount said
+  not a group). "Dry through Monday" must hold on each day up to
+  Monday. Members are precip-checked one by one, and a snow amount said
   of a group must fit every member. The headline's "names a resort" rule
   counts names only, not groups.
 - Elevation: each precip word is read at the elevation word nearest to it in

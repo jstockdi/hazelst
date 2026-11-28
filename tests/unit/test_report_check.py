@@ -609,3 +609,25 @@ def test_snow_line_height_matches_the_freezing_level_or_a_discussion() -> None:
     assert (
         check(with_storm("Freezing rain Thursday on Cranmore's 2,000-ft summit."), digest()) == []
     )
+
+
+# --- strictness: escapes found by mutating real drafts before shipping (J37) ---------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Vermont's summits get snow Sunday.",
+        "Sugarbush is dry Sunday; the rest of the mountains get snow Sunday.",
+        "Stratton stays dry through Friday.",
+        "Behind Friday's cold front, Saturday brings freezing rain to Killington.",
+        "Killington is freezing rain Saturday, and nothing accumulates through Saturday.",
+    ],
+)
+def test_false_claims_do_not_escape(text: str) -> None:
+    assert "precip_type" in rules(check(with_storm(text), digest()))
+
+
+def test_whole_day_and_partial_day_dry_spells() -> None:
+    assert check(with_storm("Cranmore stays dry Saturday through Sunday."), digest()) == []
+    assert check(draft(stratton="Dry through Thursday midday."), digest()) == []

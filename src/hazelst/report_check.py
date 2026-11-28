@@ -157,9 +157,12 @@ GROUP_NOUN = (
     r"(?=(?:\s+four|\s+two)?\s+(?:summits?|mountains?|resorts?|peaks?|bases?|ski areas?)\b)"
 )
 ALL_MOUNTAINS = r"\ball eight\b"
-REST = r"\bthe rest\b(?!\s+of\b)"
+REST = r"\bthe rest\b(?!\s+of\b(?!\s+(?:them|the\s+(?:mountains|resorts|summits|eight))\b))"
+# "through Monday", whole days only ("through Thursday midday" is part of a day).
 THROUGH_DAY = re.compile(
-    r"\b(?:through|thru|until|till)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b"
+    r"\b(?:through|thru)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b"
+    r"(?!\s+(?:morning|midday|noon|afternoon|evening))",
+    re.I,
 )
 # A phrase about the days the section has not named ("dry otherwise").
 OTHERWISE = re.compile(r"\botherwise\b", re.I)
@@ -169,6 +172,8 @@ CLAUSE_SPLIT = re.compile(r"([;—]|:(?!\d)|\s–\s|\bwhile\b|\bbut\b|\bthen\b|\
 MIX_BEFORE_WITH = re.compile(r"\bmix(?:es|ed|ing)?\b(?:\W+\w+){0,3}\W*$", re.I)
 # Words a bare list item may carry besides names and days ("Saturday night", "Pico up top").
 BARE_WORDS = 3
+# A day aside is not a list item ("Behind Friday's cold front", "nothing falls through Tuesday").
+BARE_DAY_WORDS = 1
 DAY_WORD = re.compile(
     r"\b(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day(?:[’']s)?|today|tonight|tomorrow"
     r"|weekend|night|morning|afternoon|evening|the|a|at|on|in|of|to)\b",
@@ -224,7 +229,7 @@ class _Names:
         names = sorted(self.by_name, key=len, reverse=True)
         name_alt = "|".join(map(re.escape, names))
         self.name_re = re.compile(rf"\b(?:{name_alt})\b", re.I)
-        groups = [f"(?P<{code}>\\b{word}{GROUP_NOUN})" for code, word in STATE_GROUPS]
+        groups = [f"(?P<{code}>\\b{word}(?:[’']s)?{GROUP_NOUN})" for code, word in STATE_GROUPS]
         groups += [f"(?P<all>{ALL_MOUNTAINS})", f"(?P<rest>{REST})"]
         self.mountain_re = re.compile(rf"(?P<name>\b(?:{name_alt})\b)|" + "|".join(groups), re.I)
 
@@ -302,7 +307,9 @@ class _Names:
                     add(d)
         # "through Monday": every day from the earliest one named (else the first) to Monday.
         for match in THROUGH_DAY.finditer(lowered):
-            end = next((d for d in days if d.strftime("%A").lower() == match.group(1)), None)
+            end = next(
+                (d for d in days if d.strftime("%A").lower() == match.group(1).lower()), None
+            )
             if end is None:
                 continue
             start = min([d for d in found if d < end], default=days[0])
@@ -343,9 +350,10 @@ def _shares_claim(names: _Names, before: str, rest: str) -> bool:
     )
 
 
-def _bare(text: str) -> bool:
-    """True for a list item that is only a name or day ("Pico", "Saturday night")."""
-    return len(re.findall(r"\w+", DAY_WORD.sub(" ", text))) <= BARE_WORDS
+def _bare(text: str, names_mountain: bool) -> bool:
+    """True for a list item that is only a name or day ("Pico up top", "Saturday night")."""
+    limit = BARE_WORDS if names_mountain else BARE_DAY_WORDS
+    return len(re.findall(r"\w+", DAY_WORD.sub(" ", text))) <= limit
 
 
 def _phrases(names: _Names, clause: str) -> list[str]:
@@ -363,7 +371,7 @@ def _phrases(names: _Names, clause: str) -> list[str]:
         joiner = parts[i - 1] if i else ""
         named, rest = names.mountains_in(piece)
         subject = bool(named) or bool(names.days_in(rest)) or bool(OTHERWISE.search(rest))
-        own = subject and (_claims(rest) or not _bare(rest))
+        own = subject and (_claims(rest) or not _bare(rest, bool(named)))
         if own and phrases and _shares_claim(names, phrases[-1], rest):
             # "only the upper mountain at Sugarbush, Killington and Pico gets wet snow":
             # the claim at the end of a mountain list is about the whole list.
@@ -525,7 +533,8 @@ def precip_claims(text: str) -> list[tuple[int, PrecipType, str]]:
             taken.append((start, end))
             if NEGATION.search(text[:start]):
                 continue
-            if kind == "dry" and DRY_PARTIAL.match(text[end:]):
+            partial = DRY_PARTIAL.match(text[end:])
+            if kind == "dry" and partial and not THROUGH_DAY.search(text, end):
                 continue
             found.append((start, kind, match.group(0)))
     return sorted(found)
@@ -591,9 +600,13 @@ def check_precip_types(draft: ReportDraft, digest: ReportDigest) -> list[CheckEr
         clause_days = clause.days or digest.days
         for offset, kind, word in precip_claims(clause.text):
             elevation = elevation_at(clause.text, offset)
+            # "dry otherwise" and "dry through Monday" are claims about every one of the days.
+            every_day = clause.every_day or (
+                kind == "dry" and THROUGH_DAY.search(clause.text) is not None
+            )
             for mountain in clause.mountains:
                 days = [d for day in clause_days if (d := mountain.day(day))]
-                if clause.every_day:
+                if every_day:
                     days = [d for d in days if not accepts(d, kind, elevation)]
                     if not days:
                         continue
@@ -601,7 +614,7 @@ def check_precip_types(draft: ReportDraft, digest: ReportDigest) -> list[CheckEr
                     continue
                 label = (
                     _day_label(d.date for d in days)
-                    if clause.every_day
+                    if every_day
                     else _day_label(clause.days)
                     if clause.days
                     else "any day"
