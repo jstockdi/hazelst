@@ -192,6 +192,10 @@ Verified by the J01 spike ([spikes/agent_sdk/](../../spikes/agent_sdk/README.md)
   and a day in the window. `null` means no day is worth chasing.
 - A storm type is named only if `storm_type` or a discussion names it.
 - Cautions mention every active alert and every `wind_hold_likely` day.
+- No "X is the day" anywhere (`voice`).
+- A snow-line or freezing-level height is within 700 ft of a
+  `freezing_level_ft` for the phrase's mountains and days, or a height an NWS
+  discussion states (`snow_line`).
 
 How `report_check.py` reads the prose (so a draft can be written to pass):
 

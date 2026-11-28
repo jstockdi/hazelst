@@ -589,3 +589,23 @@ def test_a_claim_at_the_end_of_a_mountain_list_covers_the_list() -> None:
 )
 def test_the_snow_line_is_not_a_precip_claim(text: str) -> None:
     assert precip_words(text) == []
+
+
+def test_snow_line_height_matches_the_freezing_level_or_a_discussion() -> None:
+    # Killington Sat 28 freezing level 3,281 ft; BTV's discussion states 2000 and 2500 ft.
+    assert (
+        check(with_storm("The snow line sits near 3,000 ft at Killington Saturday."), digest())
+        == []
+    )
+    assert check(with_storm("Snow levels drop to 2,500 ft."), digest()) == []
+    (error,) = check(
+        with_storm("The snow line sits near 6,000 ft at Killington Saturday."), digest()
+    )
+    assert str(error) == (
+        "snow_line: storm: snow line '6,000 ft' is not within 700 ft of a freezing level for"
+        " Sat 28 (freezing_level_ft 3,281–3,281 ft) or a height a discussion states"
+    )
+    # A height that is not about the snow line is not checked.
+    assert (
+        check(with_storm("Freezing rain Thursday on Cranmore's 2,000-ft summit."), digest()) == []
+    )

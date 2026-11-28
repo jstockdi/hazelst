@@ -158,5 +158,7 @@ that fails comes back with the errors. To pass:
 - Cautions name every active alert by its exact event name and every
   `wind_hold_likely` day.
 - "is the day" anywhere in the draft fails.
+- A snow-line or freezing-level height is within 700 ft of that day's
+  `freezing_level_ft`, or a height a discussion states.
 
 Follow the rules and regional knowledge below.

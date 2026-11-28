@@ -54,6 +54,7 @@ Rule = Literal[
     "storm_type",
     "cautions",
     "voice",
+    "snow_line",
 ]
 
 SNOW_TOLERANCE_IN = 0.5
@@ -799,6 +800,61 @@ def check_cautions(draft: ReportDraft, digest: ReportDigest) -> list[CheckError]
     return errors
 
 
+# A snow-line height must sit near the digest's freezing level for that phrase.
+SNOW_LINE_TOLERANCE_FT = 700
+LINE_WORDS = re.compile(r"snow[- ]?(?:line|level)|freezing level", re.I)
+HEIGHT = re.compile(r"\b(\d{1,2},\d{3}|\d{3,5})(?:\s*|-)(?:ft|feet|foot)\b", re.I)
+# Heights in discussion text, ranges included ("snow levels fall into the 1500 to 2000 foot range").
+DISCUSSION_HEIGHT = re.compile(
+    r"\b(\d{1,2},?\d{3})(?:\s*(?:-|–|to)\s*(\d{1,2},?\d{3}))?\s*(?:-|\s)?(?:ft|feet|foot)\b",
+    re.I,
+)
+
+
+def discussion_heights(digest: ReportDigest) -> list[float]:
+    """Every height an NWS discussion states, in feet."""
+    heights: list[float] = []
+    for d in digest.discussions:
+        for match in DISCUSSION_HEIGHT.finditer(" ".join(d.text.split())):
+            heights += [float(g.replace(",", "")) for g in match.groups() if g]
+    return heights
+
+
+def check_snow_line(draft: ReportDraft, digest: ReportDigest) -> list[CheckError]:
+    """A snow-line or freezing-level height is within `SNOW_LINE_TOLERANCE_FT` of a
+    `freezing_level_ft` for the phrase's mountains (any, when it names none) and days
+    (any, when it names none), or is a height an NWS discussion states."""
+    errors: list[CheckError] = []
+    stated = discussion_heights(digest)
+    for clause in _sections(draft, digest):
+        if not LINE_WORDS.search(clause.text):
+            continue
+        mountains = clause.mountains or digest.mountains
+        days = clause.days or digest.days
+        levels = [
+            d.freezing_level_ft
+            for m in mountains
+            for day in days
+            if (d := m.day(day)) is not None and d.freezing_level_ft is not None
+        ]
+        for match in HEIGHT.finditer(clause.text):
+            feet = float(match.group(1).replace(",", ""))
+            if feet in stated:
+                continue
+            if not any(abs(feet - level) <= SNOW_LINE_TOLERANCE_FT for level in levels):
+                near = f"{min(levels):,.0f}–{max(levels):,.0f} ft" if levels else "none"
+                errors.append(
+                    CheckError(
+                        "snow_line",
+                        f"{clause.section}: snow line {match.group(0)!r} is not within"
+                        f" {SNOW_LINE_TOLERANCE_FT} ft of a freezing level for"
+                        f" {_day_label(days)} (freezing_level_ft {near}) or a height a"
+                        " discussion states",
+                    )
+                )
+    return errors
+
+
 # Banned in every section (owner, J37): "Today is the day here", "Saturday's the day".
 IS_THE_DAY = re.compile(r"\bis\s+the\s+day\b|\b\w+[’']s\s+the\s+day\b", re.I)
 
@@ -836,6 +892,7 @@ RULES = (
     check_storm_types,
     check_cautions,
     check_voice,
+    check_snow_line,
 )
 
 
