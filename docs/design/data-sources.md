@@ -107,7 +107,7 @@ Resort report adapters are the fragile part: no resort publishes an official
 API. Models see only natural snow, so base depth and open terrain exist only in
 resort reports. Each adapter is isolated, has a fixture-based test, and on
 failure the report falls back to NOHRSC for accumulation and says so in the
-footer. Robots and content signals are in the [resort map](#resort-report-map)
+JSON (`sources_unavailable`). Robots and content signals are in the [resort map](#resort-report-map)
 (checked 2026-11-26). Loon, Sunday River, and Sugarloaf (Boyne) publish
 `Content-Signal: search=yes,ai-train=no,use=reference` with no `ai-input`
 signal — their adapters are code-only and their content is never sent to

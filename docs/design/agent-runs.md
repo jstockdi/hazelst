@@ -46,7 +46,7 @@ assumed; after ~20 verified days the editions can be re-timed from that data.
 
 Each Open-Meteo fetch also records the model's run time from
 `api.open-meteo.com/data/{model}/static/meta.json`; a model whose latest run is
-more than 18 h old is flagged stale in the footer and excluded from the mean. Every job
+more than 18 h old is flagged stale in the JSON (`models[].stale`) and excluded from the mean. Every job
 opens a `run` row, holds the job lock (one job at a time), and is idempotent
 for its date.
 
@@ -73,8 +73,8 @@ job lock, and a failed step does not stop the next one.
   `--edition`, `report-build` publishes 0700 and `report-refresh` the next
   unpublished of 0815 and 1440.
 - **ECMWF gate**: an 0815 edition built on an ECMWF run older than that day's
-  06Z says so in the footer ("ECMWF 06Z was not available by 8:45 AM; this
-  edition uses the 00Z run.").
+  06Z says so in the JSON `notes` ("ECMWF 06Z was not available by 8:45 AM;
+  this edition uses the 00Z run.").
 - **Startup catch-up**: when the container starts, the latest edition due
   today (by its publish time) is run if it has no report: ingest-forecast,
   ingest-obs, then the report job.
@@ -308,7 +308,7 @@ small structured-output call measured $0.005–0.034 per call at that price.
 
 | Failure | Behavior |
 |---------|----------|
-| One source down | That section shows "source unavailable" in the footer; the run continues |
+| One source down | The JSON lists it in `sources_unavailable`; the run continues |
 | Open-Meteo down | Retry 3× over 20 min; then publish yesterday's forecast marked stale |
 | `report-write` / `report-revise` fail, or `report-check` still fails after 3 revisions | The job fails (`run.status = failed`, non-zero exit, the reason and last errors in `run.error` and the log); nothing is published and the previous edition stays. `/health` returns 503 and `hazelst_report_job_failed` is 1 until a report job succeeds; frank alerts on it (`HazelstReportFailed`). The `report-rebuild` slot (7:15, 7:30, … 9:00) retries the newest due edition when its job failed; it skips when agents are disabled or the daily call cap is reached. There is no page without prose: a failure is a bug to fix (decisions row 33) |
 | Container down at 7:00 | `report-build` runs on startup if today has no report |

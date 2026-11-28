@@ -179,8 +179,8 @@ today; if one is added, this is the allowlist.
   docker exec hazelst hazelst forecast-verify --from 2024-01-20 --to 2026-04-30
   docker exec hazelst hazelst run skill-learn
   ```
-- **Failure behavior:** a failed source degrades that section (noted in the page
-  footer). A report job that cannot publish a checked narrative (a failed
+- **Failure behavior:** a failed source degrades that section (listed in the
+  JSON's `sources_unavailable`). A report job that cannot publish a checked narrative (a failed
   Claude call, or `report-check` still failing after three revisions) fails:
   nothing is published, the previous edition stays, `/health` returns 503, and
   `hazelst_report_job_failed` is 1, which fires `HazelstReportFailed`. The
