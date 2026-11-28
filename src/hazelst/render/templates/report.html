@@ -26,6 +26,8 @@
   <article class="card report">
 {% if narrative.best_bet %}
     <div class="call"><small>Best bet</small><b>{{ narrative.best_bet.mountain }}, {{ narrative.best_bet.day }}</b><span>{{ narrative.best_bet.why }}</span></div>
+{% else %}
+    <div class="call"><small>Best bet</small><b>No best bet today</b></div>
 {% endif %}
 {{ body }}
   </article>

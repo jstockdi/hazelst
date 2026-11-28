@@ -110,7 +110,7 @@ without code changes — that is an owner decision, not a default.
 
 | Role | Effort | Input | Output (Pydantic schema) | Guard |
 |------|--------|-------|--------------------------|-------|
-| **`report-write`** | `high` | Digest: windows, days with `precip_type` (summit), `base_precip_type`, `freezing_rain_at`, and the non-precip tags, discussions (Key Messages + Discussion), alerts, accepted `knowledge`, yesterday's verification | `ReportDraft {headline, best_bet{mountain, day, why}, storm, mountains{key: text}, cautions}` | `report-check` |
+| **`report-write`** | `high` | Digest: windows, days with `precip_type` (summit), `base_precip_type`, `freezing_rain_at`, and the non-precip tags, discussions (Key Messages + Discussion), alerts, accepted `knowledge`, yesterday's verification | `ReportDraft {headline, best_bet{mountain, day, why} \| null, storm, mountains{key: text}, cautions}` | `report-check` |
 | **`report-revise`** | `medium` | The draft + digest + the `report-check` errors of that draft | `ReportDraft` | `report-check` again; up to 3 rounds, each sent the exact errors of the draft before it. If the third still fails, the job fails (see Failure behavior) |
 | **`conditions-extract`** | `low` | Text of one resort report page whose adapter failed (never for Loon, Sunday River, Sugarloaf — see data-sources.md) | `ConditionsExtract {new_24h_in, base_in, trails_open, trails_total, lifts_open, confidence}` | Stored with `source=resort_llm` (`reported_at` = fetch time); never overrides an adapter value. Skipped for a non-200 or near-empty page (a bot challenge); at most once per resort per day |
 | **`knowledge-propose`** | `high` | `skill` cells with n ≥ 3 and each cell's values at the previous call, the week's 1d raw-mean MISSes with tags and the discussion the 7:00 report used, current `knowledge`, the threshold paths and values | `KnowledgeProposals {knowledge[], config_changes[]}` with evidence keys | Owner approval required; nothing proposed takes effect on its own. The job drops an item that cites no input key, names an unknown mountain, repeats a current statement, or (config) names a non-threshold path, keeps the value, or breaks the roster |
@@ -188,7 +188,8 @@ Verified by the J01 spike ([spikes/agent_sdk/](../../spikes/agent_sdk/README.md)
   mountain/day matches that day's type at the elevation the phrase names
   (`precip_type` at the summit, `base_precip_type` at the base); freezing rain
   also matches where `freezing_rain_at` has it.
-- Best bet names an open mountain (`season_open` ≤ day) and a day in the window.
+- A best bet, when there is one, names an open mountain (`season_open` ≤ day)
+  and a day in the window. `null` means no day is worth chasing.
 - A storm type is named only if `storm_type` or a discussion names it.
 - Cautions mention every active alert and every `wind_hold_likely` day.
 
@@ -197,17 +198,27 @@ How `report_check.py` reads the prose (so a draft can be written to pass):
 - Text is split into sentences, clauses (`;`, `:`, `—`, " – ", "while",
   "but", "then", "with"), and phrases. Inside a clause, a comma or "and"
   starts a new phrase only when the part after it makes its own claim (a
-  precip word or snow amount) about its own mountain or day; a bare name or
-  day joins its list. So "freezing rain to Killington, Pico, and Sugarloaf,
+  precip word or snow amount) about its own mountain or day, or says
+  "otherwise"; a bare name or day joins its list. So "freezing rain to Killington, Pico, and Sugarloaf,
   with rain at Stratton and Loon" binds freezing rain to the first three and
   rain to the last two, and "rain today, a mix Saturday, and dry Sunday"
   binds each word to its own day.
 - A phrase is about the mountains it names; one that names none is about the
   mountains named last in its sentence, else the entry's own mountain
   (`mountains[key]`, `best_bet.why`). It is about the days it names (weekday
-  names, today / tonight / tomorrow, weekend); one that names no day keeps
-  the previous phrase's days. Phrases about no mountain (regional) are not
-  precip-checked; their snow numbers must match some mountain.
+  names, today / tonight / tomorrow, weekend, "through Monday" = each day up
+  to Monday); one that names no day keeps the previous phrase's days, except
+  an "otherwise" phrase ("dry otherwise"), which is about every day its
+  section has not named and must hold on each of them. Phrases about no
+  mountain (regional) are not precip-checked; their snow numbers must match
+  some mountain.
+- Mountain groups (J37) name their members: "the Vermont summits" (or
+  mountains, resorts, peaks, bases) is every `VT` mountain, likewise Maine
+  (`ME`) and New Hampshire (`NH`); "all eight" is every mountain; "the rest"
+  is every mountain not yet named in that sentence ("the rest of the week" is
+  not a group). Members are precip-checked one by one, and a snow amount said
+  of a group must fit every member. The headline's "names a resort" rule
+  counts names only, not groups.
 - Elevation: each precip word is read at the elevation word nearest to it in
   its phrase: base (base, valley, lower elevations / slopes / mountain) reads
   `base_precip_type`; summit (summit, peak, up top, upper mountain, higher
@@ -218,8 +229,8 @@ How `report_check.py` reads the prose (so a draft can be written to pass):
 - Precip words: ice = freezing rain, freezing drizzle, ice, icy, glaze; snow =
   snow, snow showers, dusting, flurries, powder; mix = mix, wintry mix, sleet;
   rain = rain, drizzle, showers; dry = dry, drying. A `mix` day also accepts
-  snow and rain words. Negated words ("no snow"), partial-day "dry until …",
-  are skipped.
+  snow and rain words. Negated words ("no snow", "little snow" but not "a
+  little snow"), partial-day "dry until …", are skipped.
 - Snow numbers are amounts written with `″`, `"`, or "inches"; amounts
   followed by "of ice" or "of liquid" are not snow. A number passes when it is
   within 0.5″ of a day, multi-day sum, window mean, range end, model value,

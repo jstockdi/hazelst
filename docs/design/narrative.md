@@ -28,6 +28,12 @@ week's weather. The full sample run is in [the sample run](../experiments/2026-1
 
 ## Rules (go into SKILL.md)
 
+- Voice (J37): a ski and snowboard forecaster writing for people choosing
+  where and when to ride. Lead with where and when the best turns are, then
+  the surface (wet, dense, glazed, firm, refrozen), then what spoils it. The
+  storm is 3–4 sentences by day; each mountain is 1–2 sentences starting with
+  its best day ("dry otherwise" for the rest); cautions are one item per day.
+  Never explain the method or the models.
 - Name a storm type only if `storm_type` or a discussion names it. Otherwise
   describe what happens ("snow Thursday, drying Sunday").
 - Precip type words (snow, ice, freezing rain, rain, mix) must match the
@@ -46,13 +52,17 @@ week's weather. The full sample run is in [the sample run](../experiments/2026-1
   (`not_resort_reported`) is never presented as the mountain's snowfall or
   added to it; when cited, it names its source, place, and elevation ("the
   Stowe co-op at 720 ft had 3″").
-- When `nws_disagrees` is set, say which source the report leans on and why.
-- When models spread wide (low confidence), say so in the storm section.
+- When `nws_disagrees` is set, give the NWS number once in plain words
+  ("though NWS Burlington says 1″"); never explain which numbers the report
+  uses.
+- When models spread wide (low confidence), say so plainly in the storm
+  section.
 - Explain mountain-to-mountain differences with tags and `favored_by`
   (e.g. upslope favors Sugarbush and Killington; coastal favors Maine).
 - Cautions: wind holds, mixing, freezing rain, active NWS alerts — and nothing
   else.
-- Credit forecaster input as "NWS Burlington", "NWS Gray", "NWS Albany", "WPC".
+- Credit forecasters only when they disagree or add something, once, as
+  "NWS Burlington", "NWS Gray", "NWS Albany", "WPC".
 
 ## Regional knowledge (seed for SKILL.md)
 
@@ -69,7 +79,9 @@ week's weather. The full sample run is in [the sample run](../experiments/2026-1
 
 Claude returns a `ReportDraft` (agent-runs.md). The page shows, in order: the
 headline (band), Best bet (card), then The storm → Mountain by mountain →
-Cautions. `report.headline` and `report.best_bet` hold the first two;
+Cautions. `report.headline` and `report.best_bet` hold the first two. The best
+bet is optional (J37): when no day is worth chasing, `best_bet` is `null`
+(the column is `NULL`) and the card reads "No best bet today";
 `report.narrative_md` holds the three sections as markdown (`## ` headings,
 paragraphs, `**bold**`). Charts and tables are added by the page templates,
 not written by Claude.
