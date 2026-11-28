@@ -157,8 +157,12 @@ def body_markdown(draft: ReportDraft, digest: ReportDigest) -> str:
 
 
 def page_narrative(draft: ReportDraft, digest: ReportDigest) -> PageNarrative:
-    """The narrative as the page and the `report` row store it."""
+    """The narrative as the page and the `report` row store it (no best bet: `None`)."""
     bet = draft.best_bet
+    if bet is None:
+        return PageNarrative(
+            headline=draft.headline, best_bet=None, body_md=body_markdown(draft, digest)
+        )
     mountain = digest.mountain(bet.mountain)
     return PageNarrative(
         headline=draft.headline,

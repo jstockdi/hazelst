@@ -393,3 +393,241 @@ def test_headline_rules() -> None:
     # Amounts and precip words in the headline go through the same checks as the prose.
     errors = check(with_draft(headline="6″ for Killington Saturday; rain Thursday"), digest())
     assert [e.rule for e in errors] == ["snow_number", "precip_type"]
+
+
+# --- mountain groups, "otherwise", optional best bet (J37) ------------------------------
+# Fixture Sat 28: the four Vermont mountains mix (rain at the base), Loon and Sugarloaf
+# snow, Cranmore and Sunday River dry. Thu 26: ice at every summit.
+
+
+def test_group_names_its_members_for_precip_types() -> None:
+    text = "Saturday: wet snow mixed with rain on the Vermont summits, rain at the bases."
+    assert check(with_storm(text), digest()) == []
+    (error,) = check(with_storm("Saturday brings snow to the Maine mountains."), digest())
+    assert str(error) == (
+        "precip_type: Sunday River Sat 28: storm says 'snow' (snow); precip_type is dry"
+    )
+
+
+def test_all_eight_is_every_mountain() -> None:
+    assert check(with_storm("Freezing rain Thursday at all eight."), digest()) == []
+    errors = check(with_storm("Rain Saturday at all eight."), digest())
+    assert [e.message.split(":")[0] for e in errors] == [
+        "Loon Sat 28",
+        "Cranmore Sat 28",
+        "Sunday River Sat 28",
+        "Sugarloaf Sat 28",
+    ]
+
+
+def test_the_rest_is_every_mountain_not_yet_named_in_the_sentence() -> None:
+    ok = "Saturday: snow at Loon and Sugarloaf, a mix at the Vermont mountains; the rest stay dry."
+    assert check(with_storm(ok), digest()) == []
+    errors = check(with_storm("Saturday: snow at Loon and Sugarloaf; the rest stay dry."), digest())
+    assert [e.message.split(":")[0] for e in errors] == [
+        "Killington Sat 28",
+        "Pico Sat 28",
+        "Sugarbush Sat 28",
+        "Stratton Sat 28",
+    ]
+    # Named in an earlier sentence does not count: "the rest" is then all eight.
+    errors = check(with_storm("Saturday: snow at Loon. The rest stay dry Saturday."), digest())
+    assert "Loon Sat 28" in {e.message.split(":")[0] for e in errors}
+
+
+def test_the_rest_of_the_week_is_not_a_group() -> None:
+    names = report_check._Names(digest())
+    assert names.mountains_in("quiet the rest of the week")[0] == []
+    assert [m.key for m in names.mountains_in("the rest stay dry", names.digest.mountains[:6])[0]]
+
+
+def test_group_snow_amount_must_fit_every_member() -> None:
+    # A list passes when any mountain has the number; a group must fit each member.
+    assert check(with_storm("Saturday: 0.8″ at Stratton and Loon."), digest()) == []
+    (error,) = check(with_storm("Saturday: up to 1″ at the New Hampshire mountains."), digest())
+    assert str(error) == (
+        "snow_number: storm: '1″' is said of a group, but matches no snow value for Cranmore"
+        " (name the mountains it fits)"
+    )
+
+
+def test_group_counts_for_a_wind_hold_caution() -> None:
+    data = load("digest.json")
+    loon = next(m for m in data["mountains"] if m["key"] == "loon")
+    loon["days"][1]["tags"].append("wind_hold_likely")  # Thursday
+    dig = ReportDigest.model_validate(data)
+    caution = "Thursday: freezing rain, and wind holds likely on the New Hampshire mountains."
+    assert check(with_draft(cautions=[caution]), dig) == []
+
+
+def test_headline_group_is_not_a_resort_name() -> None:
+    (error,) = check(
+        with_draft(headline="Freezing rain Thursday on the Vermont mountains"), digest()
+    )
+    assert str(error) == 'headline: names no resort (name them, or say "all eight")'
+
+
+def test_otherwise_covers_every_day_the_entry_has_not_named() -> None:
+    ok = (
+        "Saturday: 0.9″ of wet snow mixed with rain up top;"
+        " freezing rain Thursday and Friday, dry otherwise."
+    )
+    assert check(draft(killington=ok), digest()) == []
+    (error,) = check(draft(loon="Saturday: 0.7″ of snow up top; dry otherwise."), digest())
+    assert str(error) == (
+        "precip_type: Loon Thu 26/Fri 27: mountains.loon says 'dry' (dry); precip_type is ice/rain"
+    )
+
+
+def test_through_a_day_covers_the_days_up_to_it() -> None:
+    assert check(draft(cranmore="Little snow through Sunday."), digest()) == []
+    (error,) = check(draft(cranmore="A little snow Saturday."), digest())
+    assert error.rule == "precip_type"
+    (error,) = check(draft(cranmore="Snow through Thursday."), digest())
+    assert error.message.startswith("Cranmore Wed 25/Thu 26:")
+
+
+def test_best_bet_may_be_null() -> None:
+    assert check(with_draft(best_bet=None), digest()) == []
+    data = load("draft-checked.json")
+    del data["best_bet"]
+    with pytest.raises(ValueError, match="best_bet"):
+        ReportDraft.model_validate(data)
+
+
+# --- phrasing found in the J37 comparison runs --------------------------------------------
+# Each was a false error on a correct draft; each test also keeps the strict direction.
+
+
+def test_elevation_is_read_within_its_list_part() -> None:
+    # "snow up top, rain at the base": the elevation word nearest by offset was "up top".
+    assert check(draft(loon="Saturday: 0.7″ of snow up top, rain at the base."), digest()) == []
+    errors = check(draft(loon="Saturday: rain up top, snow at the base."), digest())
+    assert [e.message.split(" says ")[1].split(";")[0] for e in errors] == [
+        "'rain' (rain) at the summit",
+        "'snow' (snow) at the base",
+    ]
+
+
+def test_with_does_not_split_a_mix_claim() -> None:
+    ok = "Saturday: snow at Loon, and snow mixes with rain at Killington."
+    assert check(with_storm(ok), digest()) == []
+    bad = "Saturday: snow at Loon, and wet snow mixed with rain at Cranmore."
+    words = [e.message.split(" says ")[1].split(" ")[0] for e in check(with_storm(bad), digest())]
+    assert words == ["'snow'", "'mixed'", "'rain'"]  # each about Cranmore (dry), none about Loon
+
+
+def test_a_claimless_part_with_its_own_day_does_not_take_the_claim() -> None:
+    # "..., and Tuesday's gusts could hold the lifts" moved the freezing rain to Tuesday.
+    ok = (
+        "Friday is rain, with freezing rain at the summit and gusts to 40 mph,"
+        " and Sunday's gusts could slow the lifts."
+    )
+    assert check(draft(stratton=ok), digest()) == []
+    bad = "Friday is rain, and Sunday brings freezing rain at the summit."
+    (error,) = check(draft(stratton=bad), digest())
+    assert error.message.startswith("Stratton Sun 29:")
+
+
+def test_a_leading_claim_keeps_the_clause_context() -> None:
+    after_today = (
+        "Saturday: 0.9″ of wet snow mixed with rain up top, rain at the base,"
+        " after freezing rain on the summit Friday."
+    )
+    assert check(draft(killington=after_today), digest()) == []
+    assert check(draft(killington="Snow and rain mixed Saturday."), digest()) == []
+    # After a comma the claim stays with the mountains before it, not the next ones.
+    ok = "Friday glazes Killington up top with freezing rain, Loon gets rain."
+    assert check(with_storm(ok), digest()) == []
+    bad = "Friday glazes Loon up top with freezing rain, Killington gets rain."
+    assert [e.message.split(":")[0] for e in check(with_storm(bad), digest())] == [
+        "Loon Fri 27",
+        "Loon Fri 27",
+        "Killington Fri 27",
+    ]
+
+
+def test_is_the_day_fails_in_every_section() -> None:
+    # Owner rule (J37): no "X is the day" anywhere, not only in the headline.
+    assert rules(check(draft(loon="Today is the day here: snow up top Saturday."), digest())) == [
+        "voice"
+    ]
+    (error,) = check(with_storm("Saturday's the day: snow at Loon."), digest())
+    assert str(error) == (
+        'voice: storm says "Saturday\'s the day"; never write "X is the day",'
+        " say what the day brings"
+    )
+    bet = {"mountain": "loon", "day": "2026-11-28", "why": "Saturday is the day for Loon."}
+    assert rules(check(with_draft(best_bet=bet), digest())) == ["voice"]
+    assert check(draft(loon="Saturday: snow up top, the day's only snow."), digest()) == []
+
+
+# --- storm v2: the setup, the doubt, the surface (J37) -----------------------------------
+# A v2 storm often names no day, so a day-less claim must still be checked.
+
+
+def test_a_claim_with_no_day_must_hold_on_some_forecast_day() -> None:
+    assert check(with_storm("Loon gets snow up top."), digest()) == []
+    (error,) = check(with_storm("Cranmore gets snow."), digest())
+    assert str(error) == (
+        "precip_type: Cranmore any day: storm says 'snow' (snow); precip_type is dry/ice/rain"
+    )
+
+
+def test_a_claim_at_the_end_of_a_mountain_list_covers_the_list() -> None:
+    ok = "Only the upper mountain at Killington, Pico and Sugarbush gets wet snow mixed with rain."
+    assert check(with_storm(ok), digest()) == []
+    # Cranmore, first in the list, used to escape: the claim bound only to the last name.
+    bad = "Only the upper mountain at Cranmore, Killington and Pico gets wet snow mixed with rain."
+    errors = check(with_storm(bad), digest())
+    assert {e.message.split(":")[0] for e in errors} == {"Cranmore any day"}
+    assert [e.message.split(" says ")[1].split(" ")[0] for e in errors] == ["'snow'", "'mixed'"]
+
+
+@pytest.mark.parametrize(
+    "text", ["the snow line sits near 3,000 ft", "a rain-snow line at the summits", "snow levels"]
+)
+def test_the_snow_line_is_not_a_precip_claim(text: str) -> None:
+    assert precip_words(text) == []
+
+
+def test_snow_line_height_matches_the_freezing_level_or_a_discussion() -> None:
+    # Killington Sat 28 freezing level 3,281 ft; BTV's discussion states 2000 and 2500 ft.
+    assert (
+        check(with_storm("The snow line sits near 3,000 ft at Killington Saturday."), digest())
+        == []
+    )
+    assert check(with_storm("Snow levels drop to 2,500 ft."), digest()) == []
+    (error,) = check(
+        with_storm("The snow line sits near 6,000 ft at Killington Saturday."), digest()
+    )
+    assert str(error) == (
+        "snow_line: storm: snow line '6,000 ft' is not within 700 ft of a freezing level for"
+        " Sat 28 (freezing_level_ft 3,281–3,281 ft) or a height a discussion states"
+    )
+    # A height that is not about the snow line is not checked.
+    assert (
+        check(with_storm("Freezing rain Thursday on Cranmore's 2,000-ft summit."), digest()) == []
+    )
+
+
+# --- strictness: escapes found by mutating real drafts before shipping (J37) ---------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Vermont's summits get snow Sunday.",
+        "Sugarbush is dry Sunday; the rest of the mountains get snow Sunday.",
+        "Stratton stays dry through Friday.",
+        "Behind Friday's cold front, Saturday brings freezing rain to Killington.",
+        "Killington is freezing rain Saturday, and nothing accumulates through Saturday.",
+    ],
+)
+def test_false_claims_do_not_escape(text: str) -> None:
+    assert "precip_type" in rules(check(with_storm(text), digest()))
+
+
+def test_whole_day_and_partial_day_dry_spells() -> None:
+    assert check(with_storm("Cranmore stays dry Saturday through Sunday."), digest()) == []
+    assert check(draft(stratton="Dry through Thursday midday."), digest()) == []

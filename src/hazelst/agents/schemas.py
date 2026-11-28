@@ -22,7 +22,9 @@ class _Schema(BaseModel):
 class BestBet(_Schema):
     mountain: str = Field(description="Mountain key from the digest, e.g. 'sugarbush'")
     day: date = Field(description="Day from the digest's forecast days, YYYY-MM-DD")
-    why: str = Field(min_length=1, description="One or two sentences grounded in the digest")
+    why: str = Field(
+        min_length=1, description="Why the day is worth going, in skier terms; at most 2 sentences"
+    )
 
 
 class ReportDraft(_Schema):
@@ -32,16 +34,18 @@ class ReportDraft(_Schema):
         min_length=1,
         description="A text alert, at most 12 words: amount, resorts, day; then the catch",
     )
-    best_bet: BestBet
+    best_bet: BestBet | None = Field(
+        description="The one mountain and day worth chasing; null when no day is worth it"
+    )
     storm: str = Field(
         min_length=1,
-        description="The storm section: what happens, when, how confident, which sources",
+        description="The storm section, 3-4 sentences by day: where the turns are, then what next",
     )
     mountains: dict[str, str] = Field(
-        description="One entry per mountain key in the digest: key -> 1-3 sentences"
+        description="One entry per mountain key in the digest: key -> 1-2 sentences"
     )
     cautions: list[str] = Field(
-        description="One item per wind hold, mixing, freezing rain, or active NWS alert"
+        description="One item per day with hazards (wind holds, mixing, freezing rain, alerts)"
     )
 
 

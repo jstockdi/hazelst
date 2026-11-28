@@ -205,3 +205,8 @@ def test_page_narrative_matches_the_page_renderer() -> None:
     html = md_to_html(md)
     assert "<h2>The storm</h2>" in html and "<b>Killington.</b>" in html
     assert html.count("<p>") == 1 + len(DIGEST.mountains) + len(GOOD.cautions)
+
+
+def test_page_narrative_without_a_best_bet() -> None:
+    page = page_narrative(GOOD.model_copy(update={"best_bet": None}), DIGEST)
+    assert page.best_bet is None and page.body_md == page_narrative(GOOD, DIGEST).body_md

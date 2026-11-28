@@ -1,0 +1,1718 @@
+{
+ "call_id": 9,
+ "run_id": 225,
+ "kind": "report-build",
+ "for_date": "2026-11-28",
+ "role": "report-write",
+ "created_at": "2026-11-28T12:00:00+00:00",
+ "ingest_run": 223,
+ "stored_check_errors": [],
+ "digest": {
+  "date": "2026-11-28",
+  "edition": "0700",
+  "issued": "2026-11-28T12:00:00+00:00",
+  "days": [
+   "2026-11-28",
+   "2026-11-29",
+   "2026-11-30",
+   "2026-12-01",
+   "2026-12-02"
+  ],
+  "mountains": [
+   {
+    "key": "killington",
+    "name": "Killington",
+    "state": "VT",
+    "summit_ft": 4241,
+    "base_ft": 1165,
+    "season_open": null,
+    "favored_by": [],
+    "windows": {
+     "1d": {
+      "snow_in": 1.2,
+      "lo_in": 0.4,
+      "hi_in": 2.2,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.4,
+       "ecmwf_ifs025": 2.2,
+       "gem_global": 1.1
+      },
+      "base_snow_in": 0.0,
+      "nws_in": 0.5,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": true
+     },
+     "3d": {
+      "snow_in": 1.2,
+      "lo_in": 0.4,
+      "hi_in": 2.2,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.4,
+       "ecmwf_ifs025": 2.2,
+       "gem_global": 1.1
+      },
+      "base_snow_in": 0.0,
+      "nws_in": 0.5,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": true
+     },
+     "5d": {
+      "snow_in": 1.2,
+      "lo_in": 0.4,
+      "hi_in": 2.2,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.4,
+       "ecmwf_ifs025": 2.2,
+       "gem_global": 1.1
+      },
+      "base_snow_in": 0.0,
+      "nws_in": null,
+      "nws_ice_in": null,
+      "nws_disagrees": false
+     }
+    },
+    "forecast_method": "resort_ratio",
+    "day1_method": null,
+    "days": [
+     {
+      "date": "2026-11-28",
+      "snow_in": 1.2,
+      "precip_in": 0.33,
+      "precip_type": "mix",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [],
+      "hi_f": 29.0,
+      "lo_f": 26.0,
+      "gust_mph": 26.0,
+      "freezing_level_ft": 3379.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-29",
+      "snow_in": 0.0,
+      "precip_in": 0.06,
+      "precip_type": "ice",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [
+       "summit"
+      ],
+      "hi_f": 34.0,
+      "lo_f": 27.0,
+      "gust_mph": 26.0,
+      "freezing_level_ft": 8530.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-30",
+      "snow_in": 0.0,
+      "precip_in": 0.47,
+      "precip_type": "rain",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [
+       "summit"
+      ],
+      "hi_f": 36.0,
+      "lo_f": 17.0,
+      "gust_mph": 41.0,
+      "freezing_level_ft": 7283.0,
+      "tags": [
+       "nw_upslope",
+       "wind_hold_watch"
+      ]
+     },
+     {
+      "date": "2026-12-01",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 23.0,
+      "lo_f": 16.0,
+      "gust_mph": 24.0,
+      "freezing_level_ft": 1936.0,
+      "tags": []
+     },
+     {
+      "date": "2026-12-02",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 29.0,
+      "lo_f": 18.0,
+      "gust_mph": 10.0,
+      "freezing_level_ft": 5545.0,
+      "tags": []
+     }
+    ],
+    "storm_type": "none",
+    "alerts": [],
+    "accumulation": {
+     "source": "none",
+     "last7_in": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "season_in": null,
+     "base_in": null,
+     "not_resort_reported": [
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "LUDLOW 3.4 S, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1727,
+       "distance_mi": 18.8
+      },
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "BARNARD 2.7 NW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1610,
+       "distance_mi": 12.9
+      },
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "SHREWSBURY 0.8 W, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1463,
+       "distance_mi": 7.3
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "LUDLOW 3.4 S, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1727,
+       "distance_mi": 18.8
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "BARNARD 2.7 NW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1610,
+       "distance_mi": 12.9
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "SHREWSBURY 0.8 W, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1463,
+       "distance_mi": 7.3
+      },
+      {
+       "date": "2026-11-24",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 3291,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-25",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 3291,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-26",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 3291,
+       "distance_mi": null
+      }
+     ]
+    }
+   },
+   {
+    "key": "pico",
+    "name": "Pico",
+    "state": "VT",
+    "summit_ft": 3967,
+    "base_ft": 2000,
+    "season_open": null,
+    "favored_by": [],
+    "windows": {
+     "1d": {
+      "snow_in": 0.7,
+      "lo_in": 0.0,
+      "hi_in": 1.6,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.4,
+       "ecmwf_ifs025": 1.6,
+       "gem_global": 0.0
+      },
+      "base_snow_in": 0.4,
+      "nws_in": 0.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "3d": {
+      "snow_in": 0.7,
+      "lo_in": 0.0,
+      "hi_in": 1.6,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.4,
+       "ecmwf_ifs025": 1.6,
+       "gem_global": 0.0
+      },
+      "base_snow_in": 0.4,
+      "nws_in": 0.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "5d": {
+      "snow_in": 0.7,
+      "lo_in": 0.0,
+      "hi_in": 1.6,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.4,
+       "ecmwf_ifs025": 1.6,
+       "gem_global": 0.0
+      },
+      "base_snow_in": 0.4,
+      "nws_in": null,
+      "nws_ice_in": null,
+      "nws_disagrees": false
+     }
+    },
+    "forecast_method": "resort_ratio",
+    "day1_method": null,
+    "days": [
+     {
+      "date": "2026-11-28",
+      "snow_in": 0.7,
+      "precip_in": 0.37,
+      "precip_type": "mix",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [],
+      "hi_f": 30.0,
+      "lo_f": 26.0,
+      "gust_mph": 24.0,
+      "freezing_level_ft": 3051.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-29",
+      "snow_in": 0.0,
+      "precip_in": 0.05,
+      "precip_type": "ice",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [
+       "summit"
+      ],
+      "hi_f": 34.0,
+      "lo_f": 27.0,
+      "gust_mph": 27.0,
+      "freezing_level_ft": 8399.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-30",
+      "snow_in": 0.0,
+      "precip_in": 0.49,
+      "precip_type": "rain",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [],
+      "hi_f": 36.0,
+      "lo_f": 18.0,
+      "gust_mph": 36.0,
+      "freezing_level_ft": 6988.0,
+      "tags": [
+       "nw_upslope"
+      ]
+     },
+     {
+      "date": "2026-12-01",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 24.0,
+      "lo_f": 17.0,
+      "gust_mph": 21.0,
+      "freezing_level_ft": 1837.0,
+      "tags": []
+     },
+     {
+      "date": "2026-12-02",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 29.0,
+      "lo_f": 19.0,
+      "gust_mph": 9.0,
+      "freezing_level_ft": 4659.0,
+      "tags": []
+     }
+    ],
+    "storm_type": "none",
+    "alerts": [],
+    "accumulation": {
+     "source": "none",
+     "last7_in": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "season_in": null,
+     "base_in": null,
+     "not_resort_reported": [
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "BRAINTREE 2.8 SW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1611,
+       "distance_mi": 19.5
+      },
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "BARNARD 2.7 NW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1610,
+       "distance_mi": 10.9
+      },
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "ROCHESTER 1.7 NNE, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1521,
+       "distance_mi": 16.5
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "BRAINTREE 2.8 SW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1611,
+       "distance_mi": 19.5
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "BARNARD 2.7 NW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1610,
+       "distance_mi": 10.9
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "ROCHESTER 1.7 NNE, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1521,
+       "distance_mi": 16.5
+      },
+      {
+       "date": "2026-11-24",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 1926,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-25",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 1926,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-26",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 1926,
+       "distance_mi": null
+      }
+     ]
+    }
+   },
+   {
+    "key": "sugarbush",
+    "name": "Sugarbush",
+    "state": "VT",
+    "summit_ft": 3975,
+    "base_ft": 1483,
+    "season_open": null,
+    "favored_by": [],
+    "windows": {
+     "1d": {
+      "snow_in": 3.5,
+      "lo_in": 3.5,
+      "hi_in": 3.5,
+      "confidence": "high",
+      "by_model": {
+       "ecmwf_ifs": 3.5
+      },
+      "base_snow_in": 0.5,
+      "nws_in": 1.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": true
+     },
+     "3d": {
+      "snow_in": 3.6,
+      "lo_in": 2.7,
+      "hi_in": 5.3,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.3,
+       "ecmwf_ifs025": 2.8,
+       "gem_global": 0.2
+      },
+      "base_snow_in": 0.6,
+      "nws_in": 1.1,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": true
+     },
+     "5d": {
+      "snow_in": 3.6,
+      "lo_in": 2.7,
+      "hi_in": 5.3,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.3,
+       "ecmwf_ifs025": 2.8,
+       "gem_global": 0.2
+      },
+      "base_snow_in": 0.6,
+      "nws_in": null,
+      "nws_ice_in": null,
+      "nws_disagrees": false
+     }
+    },
+    "forecast_method": "resort_ratio",
+    "day1_method": "ifs9_ratio",
+    "days": [
+     {
+      "date": "2026-11-28",
+      "snow_in": 3.5,
+      "precip_in": 0.38,
+      "precip_type": "mix",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [],
+      "hi_f": 29.0,
+      "lo_f": 26.0,
+      "gust_mph": 18.0,
+      "freezing_level_ft": 2986.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-29",
+      "snow_in": 0.0,
+      "precip_in": 0.04,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 34.0,
+      "lo_f": 27.0,
+      "gust_mph": 29.0,
+      "freezing_level_ft": 7119.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-30",
+      "snow_in": 0.1,
+      "precip_in": 0.47,
+      "precip_type": "rain",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [],
+      "hi_f": 35.0,
+      "lo_f": 18.0,
+      "gust_mph": 35.0,
+      "freezing_level_ft": 6332.0,
+      "tags": [
+       "nw_upslope"
+      ]
+     },
+     {
+      "date": "2026-12-01",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 23.0,
+      "lo_f": 16.0,
+      "gust_mph": 23.0,
+      "freezing_level_ft": 1444.0,
+      "tags": []
+     },
+     {
+      "date": "2026-12-02",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 28.0,
+      "lo_f": 17.0,
+      "gust_mph": 16.0,
+      "freezing_level_ft": 5512.0,
+      "tags": []
+     }
+    ],
+    "storm_type": "none",
+    "alerts": [],
+    "accumulation": {
+     "source": "resort",
+     "last7_in": [
+      null,
+      null,
+      null,
+      0.0,
+      0.0,
+      0.0,
+      null
+     ],
+     "season_in": 7.0,
+     "base_in": 0.0,
+     "not_resort_reported": [
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "WARREN 2.8 E, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1821,
+       "distance_mi": 5.4
+      },
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "BRAINTREE 2.8 SW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1611,
+       "distance_mi": 15.8
+      },
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "WILLIAMSTOWN 3.0 WSW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1565,
+       "distance_mi": 15.0
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "WARREN 2.8 E, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1821,
+       "distance_mi": 5.4
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "BRAINTREE 2.8 SW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1611,
+       "distance_mi": 15.8
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "WILLIAMSTOWN 3.0 WSW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1565,
+       "distance_mi": 15.0
+      },
+      {
+       "date": "2026-11-24",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 1969,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-25",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 1969,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-26",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 1969,
+       "distance_mi": null
+      }
+     ]
+    }
+   },
+   {
+    "key": "stratton",
+    "name": "Stratton",
+    "state": "VT",
+    "summit_ft": 3875,
+    "base_ft": 1872,
+    "season_open": null,
+    "favored_by": [],
+    "windows": {
+     "1d": {
+      "snow_in": 0.8,
+      "lo_in": 0.2,
+      "hi_in": 2.1,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.2,
+       "ecmwf_ifs025": 2.1,
+       "gem_global": 0.2
+      },
+      "base_snow_in": 0.1,
+      "nws_in": 0.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "3d": {
+      "snow_in": 0.9,
+      "lo_in": 0.2,
+      "hi_in": 2.1,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.2,
+       "ecmwf_ifs025": 2.1,
+       "gem_global": 0.4
+      },
+      "base_snow_in": 0.1,
+      "nws_in": 0.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "5d": {
+      "snow_in": 0.9,
+      "lo_in": 0.2,
+      "hi_in": 2.1,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.2,
+       "ecmwf_ifs025": 2.1,
+       "gem_global": 0.4
+      },
+      "base_snow_in": 0.1,
+      "nws_in": null,
+      "nws_ice_in": null,
+      "nws_disagrees": false
+     }
+    },
+    "forecast_method": "resort_ratio",
+    "day1_method": null,
+    "days": [
+     {
+      "date": "2026-11-28",
+      "snow_in": 0.8,
+      "precip_in": 0.22,
+      "precip_type": "mix",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [],
+      "hi_f": 30.0,
+      "lo_f": 27.0,
+      "gust_mph": 32.0,
+      "freezing_level_ft": 3182.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-29",
+      "snow_in": 0.0,
+      "precip_in": 0.02,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 34.0,
+      "lo_f": 27.0,
+      "gust_mph": 31.0,
+      "freezing_level_ft": 9022.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-30",
+      "snow_in": 0.1,
+      "precip_in": 0.61,
+      "precip_type": "rain",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [],
+      "hi_f": 39.0,
+      "lo_f": 19.0,
+      "gust_mph": 44.0,
+      "freezing_level_ft": 7546.0,
+      "tags": [
+       "wind_hold_watch"
+      ]
+     },
+     {
+      "date": "2026-12-01",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 26.0,
+      "lo_f": 18.0,
+      "gust_mph": 28.0,
+      "freezing_level_ft": 2264.0,
+      "tags": []
+     },
+     {
+      "date": "2026-12-02",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 32.0,
+      "lo_f": 20.0,
+      "gust_mph": 9.0,
+      "freezing_level_ft": 5577.0,
+      "tags": []
+     }
+    ],
+    "storm_type": "inland_runner",
+    "alerts": [],
+    "accumulation": {
+     "source": "resort",
+     "last7_in": [
+      null,
+      null,
+      null,
+      0.0,
+      null,
+      0.0,
+      null
+     ],
+     "season_in": 6.0,
+     "base_in": 0.0,
+     "not_resort_reported": [
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "PERU 2.8 N, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1873,
+       "distance_mi": 10.8
+      },
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "LANDGROVE 1.1 NNE, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1809,
+       "distance_mi": 12.9
+      },
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "ANDOVER 2.5 NW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1766,
+       "distance_mi": 15.4
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "LANDGROVE 1.1 NNE, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1809,
+       "distance_mi": 12.9
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "ANDOVER 2.5 NW, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1766,
+       "distance_mi": 15.4
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "LUDLOW 3.4 S, VT",
+       "snow_in": 0.0,
+       "elev_ft": 1727,
+       "distance_mi": 19.4
+      },
+      {
+       "date": "2026-11-24",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 2425,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-25",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 2425,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-26",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 2425,
+       "distance_mi": null
+      }
+     ]
+    }
+   },
+   {
+    "key": "loon",
+    "name": "Loon",
+    "state": "NH",
+    "summit_ft": 3065,
+    "base_ft": 950,
+    "season_open": null,
+    "favored_by": [],
+    "windows": {
+     "1d": {
+      "snow_in": 0.1,
+      "lo_in": 0.1,
+      "hi_in": 0.1,
+      "confidence": "high",
+      "by_model": {
+       "ncep_nbm_conus": 0.1
+      },
+      "base_snow_in": 0.0,
+      "nws_in": 0.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "3d": {
+      "snow_in": 0.5,
+      "lo_in": 0.0,
+      "hi_in": 1.4,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.7,
+       "ecmwf_ifs025": 0.5,
+       "gem_global": 2.0
+      },
+      "base_snow_in": 0.1,
+      "nws_in": 0.1,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "5d": {
+      "snow_in": 0.5,
+      "lo_in": 0.0,
+      "hi_in": 1.4,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.7,
+       "ecmwf_ifs025": 0.5,
+       "gem_global": 2.0
+      },
+      "base_snow_in": 0.1,
+      "nws_in": null,
+      "nws_ice_in": null,
+      "nws_disagrees": false
+     }
+    },
+    "forecast_method": "resort_ratio",
+    "day1_method": "nbm_raw",
+    "days": [
+     {
+      "date": "2026-11-28",
+      "snow_in": 0.1,
+      "precip_in": 0.18,
+      "precip_type": "mix",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [],
+      "hi_f": 33.0,
+      "lo_f": 30.0,
+      "gust_mph": 15.0,
+      "freezing_level_ft": 3018.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-29",
+      "snow_in": 0.0,
+      "precip_in": 0.03,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 38.0,
+      "lo_f": 30.0,
+      "gust_mph": 18.0,
+      "freezing_level_ft": 7382.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-30",
+      "snow_in": 0.3,
+      "precip_in": 0.69,
+      "precip_type": "rain",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [],
+      "hi_f": 39.0,
+      "lo_f": 21.0,
+      "gust_mph": 47.0,
+      "freezing_level_ft": 7152.0,
+      "tags": [
+       "nw_upslope",
+       "wind_hold_watch"
+      ]
+     },
+     {
+      "date": "2026-12-01",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 25.0,
+      "lo_f": 19.0,
+      "gust_mph": 33.0,
+      "freezing_level_ft": 1673.0,
+      "tags": [
+       "nw_upslope"
+      ]
+     },
+     {
+      "date": "2026-12-02",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 32.0,
+      "lo_f": 20.0,
+      "gust_mph": 9.0,
+      "freezing_level_ft": 3182.0,
+      "tags": []
+     }
+    ],
+    "storm_type": "none",
+    "alerts": [],
+    "accumulation": {
+     "source": "resort",
+     "last7_in": [
+      null,
+      null,
+      null,
+      0.0,
+      null,
+      0.0,
+      null
+     ],
+     "season_in": 0.0,
+     "base_in": 0.0,
+     "not_resort_reported": [
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "CAMPTON 1.6 SSE, NH",
+       "snow_in": 0.0,
+       "elev_ft": 768,
+       "distance_mi": 14.2
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "NORTH HAVERHILL 2.9 E, NH",
+       "snow_in": 0.0,
+       "elev_ft": 974,
+       "distance_mi": 17.4
+      },
+      {
+       "date": "2026-11-24",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.01,
+       "elev_ft": 2228,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-25",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 2228,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-26",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.01,
+       "elev_ft": 2228,
+       "distance_mi": null
+      }
+     ]
+    }
+   },
+   {
+    "key": "cranmore",
+    "name": "Cranmore",
+    "state": "NH",
+    "summit_ft": 2000,
+    "base_ft": 500,
+    "season_open": null,
+    "favored_by": [],
+    "windows": {
+     "1d": {
+      "snow_in": 0.0,
+      "lo_in": 0.0,
+      "hi_in": 0.0,
+      "confidence": "high",
+      "by_model": {
+       "ncep_nbm_conus": 0.0
+      },
+      "base_snow_in": 0.0,
+      "nws_in": 0.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "3d": {
+      "snow_in": 0.0,
+      "lo_in": 0.0,
+      "hi_in": 0.0,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.0,
+       "ecmwf_ifs025": 0.0,
+       "gem_global": 0.0
+      },
+      "base_snow_in": 0.0,
+      "nws_in": 0.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "5d": {
+      "snow_in": 0.0,
+      "lo_in": 0.0,
+      "hi_in": 0.0,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.0,
+       "ecmwf_ifs025": 0.0,
+       "gem_global": 0.0
+      },
+      "base_snow_in": 0.0,
+      "nws_in": null,
+      "nws_ice_in": null,
+      "nws_disagrees": false
+     }
+    },
+    "forecast_method": "resort_ratio",
+    "day1_method": "nbm_ratio",
+    "days": [
+     {
+      "date": "2026-11-28",
+      "snow_in": 0.0,
+      "precip_in": 0.03,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 40.0,
+      "lo_f": 32.0,
+      "gust_mph": 16.0,
+      "freezing_level_ft": 3642.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-29",
+      "snow_in": 0.0,
+      "precip_in": 0.02,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 44.0,
+      "lo_f": 29.0,
+      "gust_mph": 9.0,
+      "freezing_level_ft": 7841.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-30",
+      "snow_in": 0.0,
+      "precip_in": 0.67,
+      "precip_type": "rain",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [
+       "summit"
+      ],
+      "hi_f": 42.0,
+      "lo_f": 26.0,
+      "gust_mph": 36.0,
+      "freezing_level_ft": 7087.0,
+      "tags": []
+     },
+     {
+      "date": "2026-12-01",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 32.0,
+      "lo_f": 23.0,
+      "gust_mph": 20.0,
+      "freezing_level_ft": 1608.0,
+      "tags": []
+     },
+     {
+      "date": "2026-12-02",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 34.0,
+      "lo_f": 23.0,
+      "gust_mph": 6.0,
+      "freezing_level_ft": 6168.0,
+      "tags": []
+     }
+    ],
+    "storm_type": "none",
+    "alerts": [],
+    "accumulation": {
+     "source": "none",
+     "last7_in": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "season_in": null,
+     "base_in": null,
+     "not_resort_reported": [
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "JACKSON 3.7 NW, NH",
+       "snow_in": 0.0,
+       "elev_ft": 1166,
+       "distance_mi": 10.9
+      },
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "NORTH CONWAY 1.8 SSE, NH",
+       "snow_in": 0.0,
+       "elev_ft": 561,
+       "distance_mi": 1.8
+      },
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "TAMWORTH 4, NH",
+       "snow_in": 0.0,
+       "elev_ft": 541,
+       "distance_mi": 15.3
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "JACKSON 3.7 NW, NH",
+       "snow_in": 0.0,
+       "elev_ft": 1166,
+       "distance_mi": 10.9
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "NORTH CONWAY 1.8 SSE, NH",
+       "snow_in": 0.0,
+       "elev_ft": 561,
+       "distance_mi": 1.8
+      },
+      {
+       "date": "2026-11-22",
+       "source": "ghcn",
+       "place": "TAMWORTH 4, NH",
+       "snow_in": 0.0,
+       "elev_ft": 541,
+       "distance_mi": 15.3
+      },
+      {
+       "date": "2026-11-24",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.01,
+       "elev_ft": 1063,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-25",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 1063,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-26",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 1063,
+       "distance_mi": null
+      }
+     ]
+    }
+   },
+   {
+    "key": "sunday_river",
+    "name": "Sunday River",
+    "state": "ME",
+    "summit_ft": 3140,
+    "base_ft": 800,
+    "season_open": null,
+    "favored_by": [],
+    "windows": {
+     "1d": {
+      "snow_in": 0.0,
+      "lo_in": 0.0,
+      "hi_in": 0.0,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.0,
+       "ecmwf_ifs025": 0.0,
+       "gem_global": 0.0
+      },
+      "base_snow_in": 0.0,
+      "nws_in": 0.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "3d": {
+      "snow_in": 0.0,
+      "lo_in": 0.0,
+      "hi_in": 0.0,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.0,
+       "ecmwf_ifs025": 0.0,
+       "gem_global": 0.0
+      },
+      "base_snow_in": 0.0,
+      "nws_in": 0.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "5d": {
+      "snow_in": 0.0,
+      "lo_in": 0.0,
+      "hi_in": 0.0,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.0,
+       "ecmwf_ifs025": 0.0,
+       "gem_global": 0.0
+      },
+      "base_snow_in": 0.0,
+      "nws_in": null,
+      "nws_ice_in": null,
+      "nws_disagrees": false
+     }
+    },
+    "forecast_method": "resort_ratio",
+    "day1_method": null,
+    "days": [
+     {
+      "date": "2026-11-28",
+      "snow_in": 0.0,
+      "precip_in": 0.02,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 34.0,
+      "lo_f": 28.0,
+      "gust_mph": 20.0,
+      "freezing_level_ft": 3084.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-29",
+      "snow_in": 0.0,
+      "precip_in": 0.01,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 36.0,
+      "lo_f": 24.0,
+      "gust_mph": 15.0,
+      "freezing_level_ft": 7677.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-30",
+      "snow_in": 0.0,
+      "precip_in": 0.64,
+      "precip_type": "rain",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [
+       "summit"
+      ],
+      "hi_f": 37.0,
+      "lo_f": 22.0,
+      "gust_mph": 42.0,
+      "freezing_level_ft": 7349.0,
+      "tags": [
+       "nw_upslope",
+       "wind_hold_watch"
+      ]
+     },
+     {
+      "date": "2026-12-01",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 25.0,
+      "lo_f": 19.0,
+      "gust_mph": 33.0,
+      "freezing_level_ft": 1312.0,
+      "tags": []
+     },
+     {
+      "date": "2026-12-02",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 29.0,
+      "lo_f": 18.0,
+      "gust_mph": 12.0,
+      "freezing_level_ft": 3970.0,
+      "tags": []
+     }
+    ],
+    "storm_type": "none",
+    "alerts": [],
+    "accumulation": {
+     "source": "resort",
+     "last7_in": [
+      null,
+      null,
+      null,
+      null,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "season_in": 0.0,
+     "base_in": 0.0,
+     "not_resort_reported": [
+      {
+       "date": "2026-11-24",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.01,
+       "elev_ft": 2100,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-25",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 2100,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-26",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 2100,
+       "distance_mi": null
+      }
+     ]
+    }
+   },
+   {
+    "key": "sugarloaf",
+    "name": "Sugarloaf",
+    "state": "ME",
+    "summit_ft": 4237,
+    "base_ft": 1417,
+    "season_open": null,
+    "favored_by": [],
+    "windows": {
+     "1d": {
+      "snow_in": 0.2,
+      "lo_in": 0.2,
+      "hi_in": 0.2,
+      "confidence": "high",
+      "by_model": {
+       "ecmwf_ifs": 0.2
+      },
+      "base_snow_in": 0.0,
+      "nws_in": 0.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "3d": {
+      "snow_in": 0.3,
+      "lo_in": 0.2,
+      "hi_in": 0.6,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.1,
+       "ecmwf_ifs025": 0.1,
+       "gem_global": 0.5
+      },
+      "base_snow_in": 0.0,
+      "nws_in": 0.0,
+      "nws_ice_in": 0.0,
+      "nws_disagrees": false
+     },
+     "5d": {
+      "snow_in": 0.3,
+      "lo_in": 0.2,
+      "hi_in": 0.6,
+      "confidence": "high",
+      "by_model": {
+       "gfs_global": 0.1,
+       "ecmwf_ifs025": 0.1,
+       "gem_global": 0.5
+      },
+      "base_snow_in": 0.0,
+      "nws_in": null,
+      "nws_ice_in": null,
+      "nws_disagrees": false
+     }
+    },
+    "forecast_method": "resort_ratio",
+    "day1_method": "ifs9_ratio",
+    "days": [
+     {
+      "date": "2026-11-28",
+      "snow_in": 0.2,
+      "precip_in": 0.03,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 29.0,
+      "lo_f": 24.0,
+      "gust_mph": 25.0,
+      "freezing_level_ft": 2920.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-29",
+      "snow_in": 0.0,
+      "precip_in": 0.01,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 30.0,
+      "lo_f": 23.0,
+      "gust_mph": 21.0,
+      "freezing_level_ft": 4495.0,
+      "tags": []
+     },
+     {
+      "date": "2026-11-30",
+      "snow_in": 0.1,
+      "precip_in": 0.65,
+      "precip_type": "rain",
+      "base_precip_type": "rain",
+      "freezing_rain_at": [
+       "summit"
+      ],
+      "hi_f": 33.0,
+      "lo_f": 17.0,
+      "gust_mph": 44.0,
+      "freezing_level_ft": 7349.0,
+      "tags": [
+       "nw_upslope",
+       "wind_hold_watch"
+      ]
+     },
+     {
+      "date": "2026-12-01",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 20.0,
+      "lo_f": 15.0,
+      "gust_mph": 37.0,
+      "freezing_level_ft": 1115.0,
+      "tags": [
+       "nw_upslope",
+       "wind_hold_watch"
+      ]
+     },
+     {
+      "date": "2026-12-02",
+      "snow_in": 0.0,
+      "precip_in": 0.0,
+      "precip_type": "dry",
+      "base_precip_type": "dry",
+      "freezing_rain_at": [],
+      "hi_f": 25.0,
+      "lo_f": 14.0,
+      "gust_mph": 14.0,
+      "freezing_level_ft": 4364.0,
+      "tags": []
+     }
+    ],
+    "storm_type": "none",
+    "alerts": [],
+    "accumulation": {
+     "source": "resort",
+     "last7_in": [
+      null,
+      null,
+      null,
+      null,
+      0.0,
+      0.0,
+      null
+     ],
+     "season_in": 0.0,
+     "base_in": 0.0,
+     "not_resort_reported": [
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "CARRABASSETT 1.9 SSE, ME",
+       "snow_in": 0.0,
+       "elev_ft": 786,
+       "distance_mi": 5.7
+      },
+      {
+       "date": "2026-11-21",
+       "source": "ghcn",
+       "place": "NORTH NEW PORTLAND 0.3 WSW, ME",
+       "snow_in": 0.0,
+       "elev_ft": 394,
+       "distance_mi": 15.8
+      },
+      {
+       "date": "2026-11-24",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 2306,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-25",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 2306,
+       "distance_mi": null
+      },
+      {
+       "date": "2026-11-26",
+       "source": "nohrsc",
+       "place": "NOHRSC 24 h grid",
+       "snow_in": 0.0,
+       "elev_ft": 2306,
+       "distance_mi": null
+      }
+     ]
+    }
+   }
+  ],
+  "discussions": [
+   {
+    "office": "BTV",
+    "kind": "AFD",
+    "issued_at": null,
+    "text": ".WHAT HAS CHANGED... As of 137 AM EST Saturday...\n\nNo significant changes have been made to the forecast with this update.\n\n.KEY MESSAGES... As of 244 AM EST Saturday...\n\n1. Showery weather expected this weekend with another widespread rain event on Monday.\n\n2. After cool temperatures on Tuesday, temperatures warm above seasonal averages with the next chances of rain returning late week into the weekend.\n\n.DISCUSSION... As of 244 AM EST Saturday...\n\nKEY MESSAGE 1: Beneficial rain showers will continue across the North Country through the weekend. A cold core upper level low will be situated overhead which will be supportive of steep low to mid-level lapse rates which will help drive additional shower activity this weekend. The 850 mb temperature overhead will hover around 0 to -1 C over the weekend which supports rain showers anywhere below 3000 ft. It's possible the summits pick up some minor snow accumulation through the weekend but will likely top out at an inch or two if they are lucky. A more widespread rain event is expected once again on Monday as a low pressure system tracks from the Mississippi River Valley up through western New York. This, again, is another warm solution with widespread rain expected through much of the day Monday. Rainfall totals won't be anything too impressive with generally a third to two thirds of an inch of rain expected through the duration of the event. Cold air is expected to wrap around the low pressure system Monday night but the cold air will likely lag the main moisture so any snow will likely be limited to upslope showers on the back end of the system.\n\nKEY MESSAGE 2: Temperatures are favored to cool sharply Tuesday with northwesterly flow advecting cold air into the region. Speeds will be down from Monday, fortunately, but still feeling quite brisk for the morning commute with apparent temperatures in the upper teens to around 20 degrees. Those outdoors should plan for these uncomfortable conditions. Highs are anticipated to top out generally in the 30s to around 40 degrees.\n\nTemperatures trend warmer midweek into the weekend as ridging returns with a slight southwest to northeast angle for the height contours aloft supporting some relative warm air advection. Temperatures will likely warm back to the upper 40s to low 50s by the end of the week, running 5 to 10 degrees above seasonal averages.\n\nModel consensus continues to favor a mature system to approach the region by the end of the week into the weekend. GFS and NBM solutions have trended towards the ECMWF solution with a later onset of precipitation with the front approach sometime Friday into Saturday. Model difference continue for a preceding trough, however, with some supporting lower chances of showers Thursday as a trough moves through Canada. Depending on system evolution, winds may be gusty around the low as it moves through with some models pointing to potential for isallobaric winds adding to gradient speeds. However, they agree on the initial precipitation phase being rain with some potential for backside cooling that could result in cooling profiles and potentially a little snowfall - still too early to tease out details at this time.",
+    "storm_words": [
+     "upslope"
+    ]
+   },
+   {
+    "office": "ALY",
+    "kind": "AFD",
+    "issued_at": null,
+    "text": ".WHAT HAS CHANGED... Bumped up temperatures a couple degrees through the rest of the night and lowered highs a couple degrees today given widespread cloud cover and PM showers tomorrow (especially for northern areas).\n\nAdditionally, rainfall amounts have trended up slightly for Sunday night into Monday, but no flooding is expected at this time.\n\n.KEY MESSAGES... 1) Unsettled and dreary weather will continue into Saturday with periods of light rain and widespread cloud cover. Some breaks of sun and milder temperatures return Sunday.\n\n2) Another storm system is expected to bring another round of rain showers and gusty winds Sunday into Monday, but impacts will be lower compared to the previous storm system.\n\n.DISCUSSION... KEY MESSAGE 1...As of 12:50 AM EST...989 mb sfc low continues to pull away to the N/NE of our region at this time. With our region still under the upper-level low (ULL) with moist cyclonic flow aloft, latest radar imagery shows few lingering light showers and patchy mist/drizzle for some of the high terrain areas, especially near our CWA border with BTV. With widespread cloud cover, temperatures are in the 30s to mid 40s, and are only expected to drop a couple more degrees between now and sunrise. Skies should remain cloudy into this morning, but if any breaks in the clouds do form then patchy fog could quickly develop.\n\nToday, we may see a brief reprieve from the showers/mist in the morning as the ULL begins to slide north and east of our region, but another upper shortwave and area of upper diffluence approaching from the west this afternoon will help to reinvigorate shower activity. Greatest coverage of showers will be across northern areas, especially in the westerly favored upslope areas of the ADKs and southern Greens. Precipitation will be mainly rain, although a few wet snowflakes could mix in over the highest peaks of the ADKs and southern Greens. Minimal, if any, snow accumulation is expected for these areas. With plenty of clouds around, temperatures today don't look to rise too much, with highs in the upper 30s (terrain) to upper 40s (valleys).\n\nShowers come to an end tonight as heights rise aloft and a weak ridge of high pressure builds into the region from the south. This will lead to mainly dry conditions Sunday, and temperatures should be a little warmer (40s to low 50s) under transient upper ridging. While there will be fewer low and mid clouds around Sunday, high clouds will be increasing, especially during the afternoon, ahead of our next weather system.\n\nKEY MESSAGE 2...Sunday, a northern stream trough tracking through southern Canada will phase with a southern stream shortwave tracking across the center of the country. As these two features phase and become negatively tilted over the Ohio Valley, an associated sfc low will track through the eastern Great Lakes and into upstate NY. Ahead of this system, strong low-level warm advection/isentropic lift will overlap with increasing moisture transport into our area. We will see areas of showers overspread the region Sunday evening or Sunday night, coming to an end Monday during the day Monday. This system will be fairly progressive. So, even with pretty impressive dynamical forcing, qpf amounts don't look all that high. Latest NBM has nudged up qpf amounts closer to deterministic guidance, with a widespread quarter to half inch for most areas and up to three quarters of an inch for some of the higher terrain areas. Temperatures will be warm enough that precip should fall almost entirely as rain, although as cooler air wraps into the backside of this system we could see a brief changeover to wet snow across the high terrain areas of the ADKs and southern Greens. This would be especially true if we see some westerly upslope flow leading to precip lingering a little longer in these areas compared to the rest of the region. Regardless, only minimal additional snow accumulations expected in the highest elevations. A few additional light lake effect rain/snow showers can't be ruled out Monday after the main sfc low departs, but an overall lack of moisture and relatively low inversion heights should prevent much in the way of lake effect precip reaching into our area.\n\nThe bigger story will be the gusty winds behind this system's cold front Monday. As the system pulls away into Maritime Canada, it will deepen beneath a coupled upper jet right entrance/left exit region. The strengthening sfc low combined with high pressure building in from the west will result in a tightening pressure gradient across eastern NY and western New England. With cold advection helping to support BL mixing, winds could gust in excess of 30-40 mph. Will continue to monitor if some wind advisories may be needed. The most likely locations would be for portions of the Mohawk Valley, Capital District, and Berkshires due to W/NW flow channeling. For these areas, the NBM has a 30-60% chance of hitting wind advisory criteria. Highs Monday should occur in the morning, with temperatures dropping through the afternoon in the wake of the cold front.\n\nBeyond this system, tranquil weather is then expected through at least the middle to end of next week. High pressure and quasi-zonal flow aloft will lead to dry conditions with temperatures trending back above normal for the end of the week. The next chance for precip (rain) comes towards the very end of the workweek or next weekend.",
+    "storm_words": [
+     "inland_runner",
+     "upslope"
+    ]
+   },
+   {
+    "office": "GYX",
+    "kind": "AFD",
+    "issued_at": null,
+    "text": ".WHAT HAS CHANGED... No significant changes to the forecast with this early morning update. Just made minor adjustments to PoPs as showers taper off this morning outside of the mountains, as well as adjusting the aviation discussion for the 12Z TAFs.\n\n.KEY MESSAGES... 1. Unsettled weather will continue through today before improvement is foreseen for Sunday.\n\n2. Heavy rain Monday morning followed by strong winds and mild temperatures. Cooler temperatures return by Tuesday onward with more tranquil conditions.\n\n.DISCUSSION... KEY MESSAGE 1 DESCRIPTION...\n\nUpslope rain and snow showers will continue today in the mountains and foothills with the lower elevations drying out. Temperatures return to near/above normal. While some sunshine is likely on the coastal plain this morning, clouds will move back in this afternoon.\n\nLate this afternoon and evening into the overnight another short wave trough moves across New England, albeit not very strong. Along and north of the track a relatively narrow band of precipitation is likely to form as forcing for ascent increases. Temperatures will be marginal but some light rain and snow is likely. At this time most of the forecast area will experience rain but a change to snow is likely for a time in the mountains. Amounts will be light. A few snowflakes could possibly mix in at lower elevations during the night tonight.\n\nKEY MESSAGE 2 DESCRIPTION...\n\nA potent, negatively-tilted shortwave quickly approaches Sunday night into Monday morning. Strong lift will allow precipitation, mainly rain, to quickly overspread the region overnight and into Monday morning before tapering off south of the mountains in the afternoon, although there may still be a few showers after. While the upper-level low will track north of the region, along the U.S./Canada border, guidance has been hinting at a secondary surface low developing along the Maine coastline, which may enhance precipitation/winds locally here.\n\nIn addition to the strong lift, forecast soundings depict a small amount of MUCAPE, so rainfall could be heavy at times. The majority of the rain will likely happen in a 4-6 hour window immediately ahead of the cold front, where a quick 0.5-1.5\" may fall. The progressive nature of the system should put a ceiling on totals, but the Monday morning commute will likely be quite messy given the timing. Upslope flow will likely continue in northern NH and surrounding mountains during the afternoon/evening, which will switch over to light snow as 850 mb temperatures drop to -5C by 0Z. Light accumulations in the mountains will be possible.\n\nThe other hazard with this next system will be strong winds. Two distinct bursts expected: 1.) from the south immediately ahead of the cold front Monday morning, and 2.) westerly in a strong cold air advection regime Monday afternoon-night. Starting with Monday morning, a 45-55 kt S/SSE low-level jet crosses the entire region. However, recent trends have shown a much stronger jet of around 60- 80 kts just offshore, so continuing to monitor trends. Downpours may help momentum transfer some wind to the surface in otherwise rather inverted mixing profiles. The more confident period of stronger winds will be from Monday afternoon and Monday evening once the rain tapers. Seeing 50-55 kts from the west at 850 mb in a well-mixed cold-air advection environment with a good pressure rise couplet, plus a potential downslope wind signature on the eastern slopes of the mountains. Combined with a decent signal on the EFI (Extreme Forecast Index) for strong winds, confidence is increasing in one or two bursts of strong winds Monday, which may cause isolated tree damage and power outages.\n\nDecreasing winds on Tuesday will signal a quieter period of weather with cooler, but near seasonable temperatures. Low chances for precipitation return on Thursday-Friday, with timing/confidence uncertain currently.",
+    "storm_words": [
+     "upslope",
+     "low_level_jet"
+    ]
+   }
+  ],
+  "stale_models": [],
+  "verification": []
+ },
+ "output": {
+  "headline": "3.5″ for Sugarbush today; rain Monday at all eight",
+  "best_bet": {
+   "mountain": "sugarbush",
+   "day": "2026-11-28",
+   "why": "Sugarbush has the most snow of the eight today, 3.5″ at the summit, and gusts reach only 18 mph. It is a mix of snow and rain up top with rain at the base, and NWS Burlington forecasts only 1″, so expect a thin, wet coat."
+  },
+  "storm": "Showers under a cold upper low today bring a mix of snow and rain to the summits of Sugarbush, Killington, Pico, Stratton and Loon, with rain at the base, while Cranmore, Sunday River and Sugarloaf stay dry. Sunday brings freezing rain to the upper mountain at Killington and Pico, with rain at their base; Sugarbush, Stratton, Loon, Cranmore, Sunday River and Sugarloaf are dry Sunday. Monday a low tracks from the Mississippi Valley through western New York, which NWS Albany describes as an inland runner, bringing rain to all eight Monday, with freezing rain at the summits of Killington, Cranmore, Sunday River and Sugarloaf. Totals are small and the models agree closely (high confidence): Sugarbush gets the most today at 3.5″, but NWS Burlington has 1″, and Killington's 1.2″ compares with NWS Burlington's 0.5″. This report uses the resort-ratio numbers, which are fitted to each resort's own reports, but treat the NWS Burlington figures as the low end. NWS Burlington, NWS Albany and NWS Gray all mention upslope behind the front Monday night, but the cold air arrives after the moisture and the models add almost nothing; NWS Gray and NWS Albany call the Monday winds the bigger story.",
+  "mountains": {
+   "killington": "Today brings 1.2″ at the summit in a mix of snow and rain; rain at the base. Sunday is freezing rain up top, with rain at the base, and Monday is rain, with a period of freezing rain on the upper mountain and gusts near 41 mph. Tuesday and Wednesday are dry.",
+   "pico": "Today brings 0.7″ up top in a mix of snow and rain, with rain at the base. Sunday is freezing rain on the upper mountain, with rain at the base. Monday is rain; Tuesday and Wednesday are dry.",
+   "sugarbush": "Today brings 3.5″ at the summit in a mix of snow and rain, with rain at the base; NWS Burlington has about 1″. Sunday is dry, and Monday is rain. Tuesday and Wednesday are dry.",
+   "stratton": "Today is a mix of snow and rain up top, with 0.8″ at the summit and rain at the base. Sunday is dry; Monday is rain, with gusts to 44 mph that could slow summit lifts. Tuesday and Wednesday are dry.",
+   "loon": "Today is a mix of snow and rain up top, with just 0.1″ at the summit and rain at the base. Sunday is dry; Monday is rain, with gusts to 47 mph that could hold summit lifts. Tuesday and Wednesday are dry.",
+   "cranmore": "Today and Sunday are dry. Monday is rain, with a period of freezing rain at the summit. Tuesday and Wednesday are dry.",
+   "sunday_river": "Today and Sunday are dry. Monday is rain, with a period of freezing rain at the summit and gusts to 42 mph. Tuesday and Wednesday are dry.",
+   "sugarloaf": "Today and Sunday are dry. Monday is rain, with a period of freezing rain at the summit and gusts to 44 mph; Tuesday is dry, but gusts to 37 mph could hold the summit lifts above treeline. Wednesday is dry."
+  },
+  "cautions": [
+   "Mixing today: a mix of snow and rain at the summits of Killington, Pico, Sugarbush, Stratton and Loon, with rain at the base.",
+   "Freezing rain Sunday on the upper mountain at Killington and Pico.",
+   "Freezing rain Monday on the upper mountain at Killington, Cranmore, Sunday River and Sugarloaf.",
+   "Wind hold watch Monday: gusts of 41–47 mph at Killington, Stratton, Loon, Sunday River and Sugarloaf could stop summit lifts.",
+   "Wind hold watch Tuesday at Sugarloaf: gusts to 37 mph could hold the summit lifts above treeline."
+  ]
+ }
+}

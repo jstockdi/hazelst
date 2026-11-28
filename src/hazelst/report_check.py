@@ -13,9 +13,17 @@ splits the same way ("a little freezing rain Sunday and rain Monday").
 
 A phrase is tied to the mountains it names; a phrase that names none is tied
 to the mountains named last in its sentence, else (inside `mountains[key]` and
-`best_bet.why`) to that entry's mountain. It is tied to the days it names
-(weekday names, today, tonight, tomorrow, weekend); a phrase that names no day
-inherits the days of the previous phrase in the same section. A phrase tied to
+`best_bet.why`) to that entry's mountain. A mountain group names its members:
+"the Vermont summits" (or mountains, resorts, peaks, bases) is every Vermont
+mountain in the digest, likewise Maine and New Hampshire; "all eight" is every
+mountain; "the rest" is every mountain not yet named in that sentence. A snow
+amount tied to a group must fit each member of the group.
+
+A phrase is tied to the days it names (weekday names, today, tonight,
+tomorrow, weekend); a phrase that names no day inherits the days of the
+previous phrase in the same section. A phrase that names no day but says
+"otherwise" ("dry otherwise") is tied to every forecast day the section has
+not named, and its precip words must hold on each of them. A phrase tied to
 no mountain is regional: its precip-type words are not checked, and its snow
 numbers are checked against every mountain.
 
@@ -38,7 +46,15 @@ from hazelst.digest import DigestDay, DigestMountain, ReportDigest
 from hazelst.models import Elevation, PrecipType
 
 Rule = Literal[
-    "headline", "mountains", "snow_number", "precip_type", "best_bet", "storm_type", "cautions"
+    "headline",
+    "mountains",
+    "snow_number",
+    "precip_type",
+    "best_bet",
+    "storm_type",
+    "cautions",
+    "voice",
+    "snow_line",
 ]
 
 SNOW_TOLERANCE_IN = 0.5
@@ -80,7 +96,10 @@ COMPATIBLE: dict[PrecipType, frozenset[PrecipType]] = {
     "dry": frozenset({"dry"}),
 }
 
-NEGATION = re.compile(r"\b(?:no|not|without|never|nor)\b(?:\W+\w+){0,3}\W*$", re.I)
+# "little snow" denies snow; "a little snow" claims it.
+NEGATION = re.compile(
+    r"(?:\b(?:no|not|without|never|nor)\b|(?<!\ba )\blittle\b)(?:\W+\w+){0,3}\W*$", re.I
+)
 # "dry until afternoon", "dry through Thursday midday": a part of the day, not the day.
 DRY_PARTIAL = re.compile(r"^(?:\W+\w+){0,3}?\W+(?:until|till|before|through|ahead)\b", re.I)
 # Elevation words: a precip word is read at the nearest one in its phrase.
@@ -127,7 +146,39 @@ NOT_SNOW_AFTER = re.compile(
     r"^\s*(?:of\s+)?(?:ice|glaze|liquid|rain|water|precip(?:itation)?|freezing)", re.I
 )
 
+# Mountain groups (state codes from the digest). Only the state word is matched, so the
+# noun after it ("summits", "bases") still names the elevation.
+STATE_GROUPS: tuple[tuple[str, str], ...] = (
+    ("VT", "vermont"),
+    ("NH", r"new\s+hampshire"),
+    ("ME", "maine"),
+)
+GROUP_NOUN = (
+    r"(?=(?:\s+four|\s+two)?\s+(?:summits?|mountains?|resorts?|peaks?|bases?|ski areas?)\b)"
+)
+ALL_MOUNTAINS = r"\ball eight\b"
+REST = r"\bthe rest\b(?!\s+of\b(?!\s+(?:them|the\s+(?:mountains|resorts|summits|eight))\b))"
+# "through Monday", whole days only ("through Thursday midday" is part of a day).
+THROUGH_DAY = re.compile(
+    r"\b(?:through|thru)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b"
+    r"(?!\s+(?:morning|midday|noon|afternoon|evening))",
+    re.I,
+)
+# A phrase about the days the section has not named ("dry otherwise").
+OTHERWISE = re.compile(r"\botherwise\b", re.I)
+
 CLAUSE_SPLIT = re.compile(r"([;—]|:(?!\d)|\s–\s|\bwhile\b|\bbut\b|\bthen\b|\bwith\b)", re.I)
+# "with" does not split a mix claim ("snow mixed with rain", "mixes a little snow with rain").
+MIX_BEFORE_WITH = re.compile(r"\bmix(?:es|ed|ing)?\b(?:\W+\w+){0,3}\W*$", re.I)
+# Words a bare list item may carry besides names and days ("Saturday night", "Pico up top").
+BARE_WORDS = 3
+# A day aside is not a list item ("Behind Friday's cold front", "nothing falls through Tuesday").
+BARE_DAY_WORDS = 1
+DAY_WORD = re.compile(
+    r"\b(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day(?:[’']s)?|today|tonight|tomorrow"
+    r"|weekend|night|morning|afternoon|evening|the|a|at|on|in|of|to)\b",
+    re.I,
+)
 SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 LIST_SPLIT = re.compile(r"(,(?=\s|$)|\band\b)", re.I)
 
@@ -155,14 +206,19 @@ class Clause:
     days: list[date]
     section: str
     follows: list[DigestMountain] = field(default_factory=list)
+    # Members of a group the phrase names: a snow amount must fit each of them.
+    grouped: list[DigestMountain] = field(default_factory=list)
+    # True for an "otherwise" phrase: its precip words must hold on every day.
+    every_day: bool = False
 
 
 @dataclass
 class _Names:
-    """Mountain names and day words for one digest."""
+    """Mountain names, mountain groups, and day words for one digest."""
 
     digest: ReportDigest
     mountain_re: re.Pattern[str] = field(init=False)
+    name_re: re.Pattern[str] = field(init=False)
     by_name: dict[str, DigestMountain] = field(init=False)
 
     def __post_init__(self) -> None:
@@ -171,16 +227,62 @@ class _Names:
             self.by_name[m.name.lower()] = m
             self.by_name[m.key.replace("_", " ")] = m
         names = sorted(self.by_name, key=len, reverse=True)
-        self.mountain_re = re.compile(r"\b(?:" + "|".join(map(re.escape, names)) + r")\b", re.I)
+        name_alt = "|".join(map(re.escape, names))
+        self.name_re = re.compile(rf"\b(?:{name_alt})\b", re.I)
+        groups = [f"(?P<{code}>\\b{word}(?:[’']s)?{GROUP_NOUN})" for code, word in STATE_GROUPS]
+        groups += [f"(?P<all>{ALL_MOUNTAINS})", f"(?P<rest>{REST})"]
+        self.mountain_re = re.compile(rf"(?P<name>\b(?:{name_alt})\b)|" + "|".join(groups), re.I)
 
-    def mountains_in(self, text: str) -> tuple[list[DigestMountain], str]:
-        """Mountains named in `text`, and the text with their names blanked out."""
+    def resolve(
+        self, match: re.Match[str], named: list[DigestMountain]
+    ) -> tuple[list[DigestMountain], bool]:
+        """The mountains one match names, and whether it is a group."""
+        if match.group("name"):
+            return [self.by_name[match.group(0).lower()]], False
+        mountains = self.digest.mountains
+        if match.group("all"):
+            return list(mountains), True
+        if match.group("rest"):
+            return [m for m in mountains if m not in named], True
+        code = next(c for c, _ in STATE_GROUPS if match.group(c))
+        return [m for m in mountains if m.state == code], True
+
+    def mountains_in(
+        self, text: str, before: Iterable[DigestMountain] = ()
+    ) -> tuple[list[DigestMountain], str]:
+        """Mountains named in `text` (groups expanded), and the text with the names blanked.
+
+        `before` holds the mountains already named in the sentence, which "the rest" excludes.
+        """
+        found, _ = self.mountains_grouped(text, before)
+        return found, self.mountain_re.sub(" ", text)
+
+    def mountains_grouped(
+        self, text: str, before: Iterable[DigestMountain] = ()
+    ) -> tuple[list[DigestMountain], list[DigestMountain]]:
+        """Mountains named in `text`, and the members of the groups among them."""
+        named = list(before)
         found: list[DigestMountain] = []
+        grouped: list[DigestMountain] = []
         for match in self.mountain_re.finditer(text):
+            members, is_group = self.resolve(match, named)
+            for m in members:
+                if m not in found:
+                    found.append(m)
+                if m not in named:
+                    named.append(m)
+                if is_group and m not in grouped:
+                    grouped.append(m)
+        return found, grouped
+
+    def names_in(self, text: str) -> tuple[list[DigestMountain], str]:
+        """Mountains named by name only (no groups), and the text with them blanked."""
+        found: list[DigestMountain] = []
+        for match in self.name_re.finditer(text):
             m = self.by_name[match.group(0).lower()]
             if m not in found:
                 found.append(m)
-        return found, self.mountain_re.sub(" ", text)
+        return found, self.name_re.sub(" ", text)
 
     def days_in(self, text: str) -> list[date]:
         days = self.digest.days
@@ -203,7 +305,18 @@ class _Names:
             for d in days:
                 if d.weekday() in (5, 6):
                     add(d)
-        return found
+        # "through Monday": every day from the earliest one named (else the first) to Monday.
+        for match in THROUGH_DAY.finditer(lowered):
+            end = next(
+                (d for d in days if d.strftime("%A").lower() == match.group(1).lower()), None
+            )
+            if end is None:
+                continue
+            start = min([d for d in found if d < end], default=days[0])
+            for d in days:
+                if start <= d <= end:
+                    add(d)
+        return sorted(found)
 
 
 def _claims(text: str) -> bool:
@@ -212,10 +325,44 @@ def _claims(text: str) -> bool:
     )
 
 
+LEAD_COMMA = re.compile(r",\s*(?:and\s*)?$", re.I)
+
+
+# The height where snow turns to rain is a setup, not a precip claim.
+SNOW_LINE = re.compile(
+    r"\b(?:rain[-/ ](?:and[- ])?)?snow(?:[-/ ]rain)?[- ](?:line|level)s?\b", re.I
+)
+
+
+def _has_elevation(text: str) -> bool:
+    return any(pattern.search(text) for _, pattern in ELEVATION_WORDS)
+
+
+def _shares_claim(names: _Names, before: str, rest: str) -> bool:
+    """True when `before` is a mountain list with no claim and no day of its own, and
+    the part after it (`rest`, names blanked) names no day either."""
+    named, before_rest = names.mountains_in(before)
+    return (
+        bool(named)
+        and not _claims(before_rest)
+        and not names.days_in(before_rest)
+        and not names.days_in(rest)
+    )
+
+
+def _bare(text: str, names_mountain: bool) -> bool:
+    """True for a list item that is only a name or day ("Pico up top", "Saturday night")."""
+    limit = BARE_WORDS if names_mountain else BARE_DAY_WORDS
+    return len(re.findall(r"\w+", DAY_WORD.sub(" ", text))) <= limit
+
+
 def _phrases(names: _Names, clause: str) -> list[str]:
-    """A clause's list items. A comma or "and" starts a new phrase only before a part
-    that makes its own claim about its own mountain or day; other parts join the
-    phrase before them (or, at the start, the first phrase after them)."""
+    """A clause's list items. A comma or "and" starts a new phrase before a part about
+    its own mountain or day (or "otherwise") that makes its own claim or says more than a
+    bare list item ("and Tuesday's gusts could hold the lifts"); other parts join the
+    phrase before them. At the start, parts join the first phrase after them, except
+    that a part with a claim stays a phrase of its own when a comma follows it, or when
+    it names its elevation and the next phrase names a day."""
     parts = LIST_SPLIT.split(clause)
     phrases: list[str] = []
     pending = ""
@@ -223,9 +370,30 @@ def _phrases(names: _Names, clause: str) -> list[str]:
         piece = parts[i]
         joiner = parts[i - 1] if i else ""
         named, rest = names.mountains_in(piece)
-        own = (bool(named) or bool(names.days_in(rest))) and _claims(rest)
-        if own:
-            phrases.append(pending + piece)
+        subject = bool(named) or bool(names.days_in(rest)) or bool(OTHERWISE.search(rest))
+        own = subject and (_claims(rest) or not _bare(rest, bool(named)))
+        if own and phrases and _shares_claim(names, phrases[-1], rest):
+            # "only the upper mountain at Sugarbush, Killington and Pico gets wet snow":
+            # the claim at the end of a mountain list is about the whole list.
+            phrases[-1] += joiner + piece
+        elif own:
+            # A leading claim with no subject joins a later part in an "and" list ("snow
+            # and rain mixed Saturday", "snow and rain mixed at Stratton"). After a comma,
+            # or before a day when it names its elevation, it keeps the context of the
+            # clause instead ("with freezing rain, Stratton gets rain"; "1″ of wet snow
+            # up top, after rain today"; "with rain at the base, and Saturday adds").
+            lead = names.mountains_in(pending)[1]
+            if (
+                pending
+                and _claims(lead)
+                and (
+                    LEAD_COMMA.search(pending)
+                    or (bool(names.days_in(rest)) and _has_elevation(lead))
+                )
+            ):
+                phrases += [pending, piece]
+            else:
+                phrases.append(pending + piece)
             pending = ""
         elif phrases:
             phrases[-1] += joiner + piece
@@ -236,13 +404,28 @@ def _phrases(names: _Names, clause: str) -> list[str]:
     return phrases
 
 
+def _clause_parts(sentence: str) -> list[str]:
+    """`CLAUSE_SPLIT.split`, with a "with" after a mix word joined back into its clause."""
+    parts = CLAUSE_SPLIT.split(sentence)
+    out = parts[:1]
+    for i in range(1, len(parts), 2):
+        delimiter, clause = parts[i], parts[i + 1]
+        if delimiter.lower() == "with" and MIX_BEFORE_WITH.search(out[-1]):
+            out[-1] += delimiter + clause
+        else:
+            out += [delimiter, clause]
+    return out
+
+
 def _clauses(
     names: _Names, section: str, text: str, default: DigestMountain | None, day: date | None
 ) -> Iterator[Clause]:
     current_days: list[date] = [day] if day else []
+    section_days: list[date] = list(current_days)
     for sentence in SENTENCE_SPLIT.split(text):
         sentence_mountains: list[DigestMountain] = []
-        parts = CLAUSE_SPLIT.split(sentence)
+        sentence_named: list[DigestMountain] = []
+        parts = _clause_parts(sentence)
         # re.split with a group: [clause, delimiter, clause, delimiter, ...]
         for i in range(0, len(parts), 2):
             clause = parts[i]
@@ -250,27 +433,43 @@ def _clauses(
                 continue
             after_with = i > 0 and parts[i - 1].lower() == "with"
             for j, phrase in enumerate(_phrases(names, clause)):
-                named, rest = names.mountains_in(phrase)
+                named, grouped = names.mountains_grouped(phrase, sentence_named)
+                _, rest = names.mountains_in(phrase)
                 days = names.days_in(rest)
+                every_day = False
                 if days:
                     current_days = days
+                    section_days += [d for d in days if d not in section_days]
+                elif OTHERWISE.search(rest):
+                    current_days = [d for d in names.digest.days if d not in section_days]
+                    every_day = True
                 follows: list[DigestMountain] = []
                 if named:
                     if after_with and j == 0:
                         follows = sentence_mountains
                     sentence_mountains = named
+                    sentence_named += [m for m in named if m not in sentence_named]
                 # A phrase that names no mountain is about the mountains named last in
                 # its sentence ("Killington gets 0.9″, but it falls as a mix"), else the
                 # section's own mountain.
                 mountains = list(sentence_mountains) or ([default] if default else [])
-                yield Clause(rest, mountains, list(current_days), section, follows)
+                yield Clause(
+                    rest,
+                    mountains,
+                    list(current_days),
+                    section,
+                    follows,
+                    grouped if named else [],
+                    every_day,
+                )
 
 
 def _sections(draft: ReportDraft, digest: ReportDigest) -> Iterator[Clause]:
     names = _Names(digest)
-    best = digest.mountain(draft.best_bet.mountain)
     yield from _clauses(names, "headline", draft.headline, None, None)
-    yield from _clauses(names, "best_bet", draft.best_bet.why, best, draft.best_bet.day)
+    if draft.best_bet is not None:
+        bet = draft.best_bet
+        yield from _clauses(names, "best_bet", bet.why, digest.mountain(bet.mountain), bet.day)
     yield from _clauses(names, "storm", draft.storm, None, None)
     for key, text in draft.mountains.items():
         yield from _clauses(names, f"mountains.{key}", text, digest.mountain(key), None)
@@ -289,7 +488,7 @@ def check_headline(draft: ReportDraft, digest: ReportDigest) -> list[CheckError]
     words = len(headline.split())
     if words > HEADLINE_MAX_WORDS:
         errors.append(CheckError("headline", f"{words} words; at most {HEADLINE_MAX_WORDS}"))
-    named, rest = _Names(digest).mountains_in(headline)
+    named, rest = _Names(digest).names_in(headline)
     if not named and not EVERY_MOUNTAIN.search(rest):
         errors.append(CheckError("headline", 'names no resort (name them, or say "all eight")'))
     forecast_days = {d.strftime("%A").lower() for d in digest.days}
@@ -323,8 +522,8 @@ def check_mountains(draft: ReportDraft, digest: ReportDigest) -> list[CheckError
 
 def precip_claims(text: str) -> list[tuple[int, PrecipType, str]]:
     """Precip-type claims in a phrase: (offset, type, word), skipping negated and
-    partial-day uses."""
-    taken: list[tuple[int, int]] = []
+    partial-day uses and the snow line ("the snow line sits near 3,000 ft")."""
+    taken: list[tuple[int, int]] = [m.span() for m in SNOW_LINE.finditer(text)]
     found: list[tuple[int, PrecipType, str]] = []
     for kind, pattern in PRECIP_WORDS:
         for match in pattern.finditer(text):
@@ -334,7 +533,8 @@ def precip_claims(text: str) -> list[tuple[int, PrecipType, str]]:
             taken.append((start, end))
             if NEGATION.search(text[:start]):
                 continue
-            if kind == "dry" and DRY_PARTIAL.match(text[end:]):
+            partial = DRY_PARTIAL.match(text[end:])
+            if kind == "dry" and partial and not THROUGH_DAY.search(text, end):
                 continue
             found.append((start, kind, match.group(0)))
     return sorted(found)
@@ -346,10 +546,19 @@ def precip_words(text: str) -> list[tuple[PrecipType, str]]:
 
 
 def elevation_at(text: str, offset: int) -> Elevation | None:
-    """The elevation named nearest to `offset` in a phrase, or None when it names none."""
+    """The elevation named nearest to `offset` within its list part (between commas and
+    "and"s) of a phrase, or None when that part names none: in "snow up top, rain at the
+    base" the snow is at the summit and the rain at the base."""
+    start, end = 0, len(text)
+    for match in LIST_SPLIT.finditer(text):
+        if match.end() <= offset:
+            start = match.end()
+        elif match.start() >= offset:
+            end = match.start()
+            break
     best: tuple[int, Elevation] | None = None
     for elevation, pattern in ELEVATION_WORDS:
-        for match in pattern.finditer(text):
+        for match in pattern.finditer(text, start, end):
             distance = abs(match.start() - offset)
             if best is None or distance < best[0]:
                 best = (distance, elevation)
@@ -385,15 +594,31 @@ def check_precip_types(draft: ReportDraft, digest: ReportDigest) -> list[CheckEr
     errors: list[CheckError] = []
     seen: set[tuple[str, str, str, str, Elevation | None]] = set()
     for clause in _sections(draft, digest):
-        if not clause.days or not clause.mountains:
+        if not clause.mountains:
             continue
+        # A claim that names no day must hold on at least one forecast day.
+        clause_days = clause.days or digest.days
         for offset, kind, word in precip_claims(clause.text):
             elevation = elevation_at(clause.text, offset)
+            # "dry otherwise" and "dry through Monday" are claims about every one of the days.
+            every_day = clause.every_day or (
+                kind == "dry" and THROUGH_DAY.search(clause.text) is not None
+            )
             for mountain in clause.mountains:
-                days = [d for day in clause.days if (d := mountain.day(day))]
-                if not days or any(accepts(d, kind, elevation) for d in days):
+                days = [d for day in clause_days if (d := mountain.day(day))]
+                if every_day:
+                    days = [d for d in days if not accepts(d, kind, elevation)]
+                    if not days:
+                        continue
+                elif not days or any(accepts(d, kind, elevation) for d in days):
                     continue
-                label = _day_label(clause.days)
+                label = (
+                    _day_label(d.date for d in days)
+                    if every_day
+                    else _day_label(clause.days)
+                    if clause.days
+                    else "any day"
+                )
                 key = (mountain.key, label, clause.section, word.lower(), elevation)
                 if key in seen:
                     continue
@@ -440,6 +665,15 @@ def _snow_ok(value: float, mountains: Iterable[DigestMountain]) -> bool:
     return False
 
 
+def _fits(lo: float, hi: float, mountain: DigestMountain) -> bool:
+    """True when an amount from `lo` to `hi` (equal for one number) fits one mountain's numbers."""
+    values, ranges = snow_values(mountain)
+    tol = SNOW_TOLERANCE_IN + 1e-9
+    if any(lo - tol <= v <= hi + tol for v in values):
+        return True
+    return any(r_lo - 1e-9 <= hi and lo <= r_hi + 1e-9 for r_lo, r_hi in ranges)
+
+
 def check_snow_numbers(draft: ReportDraft, digest: ReportDigest) -> list[CheckError]:
     errors: list[CheckError] = []
     for clause in _sections(draft, digest):
@@ -447,26 +681,43 @@ def check_snow_numbers(draft: ReportDraft, digest: ReportDigest) -> list[CheckEr
         for match in SNOW_AMOUNT.finditer(clause.text):
             if NOT_SNOW_AFTER.match(clause.text[match.end() :]):
                 continue
+            amount = match.group(0).strip()
+            bounds: list[float] = []
             for group in ("a", "b"):
                 raw = match.group(group)
                 if raw is None:
                     continue
                 value = _number(raw)
+                bounds.append(value)
                 if not _snow_ok(value, scope) and not _snow_ok(value, clause.follows):
                     who = ", ".join(m.name for m in clause.mountains) or "any mountain"
                     errors.append(
                         CheckError(
                             "snow_number",
-                            f"{clause.section}: {match.group(0).strip()!r} matches no snow value"
+                            f"{clause.section}: {amount!r} matches no snow value"
                             f" for {who} (± {SNOW_TOLERANCE_IN}″ or a window range)",
                         )
                     )
                     break
+            else:
+                lo, hi = min(bounds), max(bounds)
+                misfits = [m.name for m in clause.grouped if not _fits(lo, hi, m)]
+                if misfits:
+                    errors.append(
+                        CheckError(
+                            "snow_number",
+                            f"{clause.section}: {amount!r} is said of a group, but matches no"
+                            f" snow value for {', '.join(misfits)} (name the mountains it fits)",
+                        )
+                    )
     return errors
 
 
 def check_best_bet(draft: ReportDraft, digest: ReportDigest) -> list[CheckError]:
+    """A best bet, when there is one, names an open mountain and a forecast day."""
     bet = draft.best_bet
+    if bet is None:
+        return []
     mountain = digest.mountain(bet.mountain)
     errors: list[CheckError] = []
     if mountain is None:
@@ -498,7 +749,7 @@ def check_storm_types(draft: ReportDraft, digest: ReportDigest) -> list[CheckErr
     supported = supported_storm_words(digest)
     texts = [
         ("headline", draft.headline),
-        ("best_bet", draft.best_bet.why),
+        *((("best_bet", draft.best_bet.why),) if draft.best_bet else ()),
         ("storm", draft.storm),
         *((f"mountains.{k}", v) for k, v in draft.mountains.items()),
         *((f"cautions[{i}]", v) for i, v in enumerate(draft.cautions)),
@@ -562,6 +813,89 @@ def check_cautions(draft: ReportDraft, digest: ReportDigest) -> list[CheckError]
     return errors
 
 
+# A snow-line height must sit near the digest's freezing level for that phrase.
+SNOW_LINE_TOLERANCE_FT = 700
+LINE_WORDS = re.compile(r"snow[- ]?(?:line|level)|freezing level", re.I)
+HEIGHT = re.compile(r"\b(\d{1,2},\d{3}|\d{3,5})(?:\s*|-)(?:ft|feet|foot)\b", re.I)
+# Heights in discussion text, ranges included ("snow levels fall into the 1500 to 2000 foot range").
+DISCUSSION_HEIGHT = re.compile(
+    r"\b(\d{1,2},?\d{3})(?:\s*(?:-|–|to)\s*(\d{1,2},?\d{3}))?\s*(?:-|\s)?(?:ft|feet|foot)\b",
+    re.I,
+)
+
+
+def discussion_heights(digest: ReportDigest) -> list[float]:
+    """Every height an NWS discussion states, in feet."""
+    heights: list[float] = []
+    for d in digest.discussions:
+        for match in DISCUSSION_HEIGHT.finditer(" ".join(d.text.split())):
+            heights += [float(g.replace(",", "")) for g in match.groups() if g]
+    return heights
+
+
+def check_snow_line(draft: ReportDraft, digest: ReportDigest) -> list[CheckError]:
+    """A snow-line or freezing-level height is within `SNOW_LINE_TOLERANCE_FT` of a
+    `freezing_level_ft` for the phrase's mountains (any, when it names none) and days
+    (any, when it names none), or is a height an NWS discussion states."""
+    errors: list[CheckError] = []
+    stated = discussion_heights(digest)
+    for clause in _sections(draft, digest):
+        if not LINE_WORDS.search(clause.text):
+            continue
+        mountains = clause.mountains or digest.mountains
+        days = clause.days or digest.days
+        levels = [
+            d.freezing_level_ft
+            for m in mountains
+            for day in days
+            if (d := m.day(day)) is not None and d.freezing_level_ft is not None
+        ]
+        for match in HEIGHT.finditer(clause.text):
+            feet = float(match.group(1).replace(",", ""))
+            if feet in stated:
+                continue
+            if not any(abs(feet - level) <= SNOW_LINE_TOLERANCE_FT for level in levels):
+                near = f"{min(levels):,.0f}–{max(levels):,.0f} ft" if levels else "none"
+                errors.append(
+                    CheckError(
+                        "snow_line",
+                        f"{clause.section}: snow line {match.group(0)!r} is not within"
+                        f" {SNOW_LINE_TOLERANCE_FT} ft of a freezing level for"
+                        f" {_day_label(days)} (freezing_level_ft {near}) or a height a"
+                        " discussion states",
+                    )
+                )
+    return errors
+
+
+# Banned in every section (owner, J37): "Today is the day here", "Saturday's the day".
+IS_THE_DAY = re.compile(r"\bis\s+the\s+day\b|\b\w+[’']s\s+the\s+day\b", re.I)
+
+
+def _texts(draft: ReportDraft) -> list[tuple[str, str]]:
+    """Every prose field of a draft as (section, text)."""
+    return [
+        ("headline", draft.headline),
+        *((("best_bet", draft.best_bet.why),) if draft.best_bet else ()),
+        ("storm", draft.storm),
+        *((f"mountains.{k}", v) for k, v in draft.mountains.items()),
+        *((f"cautions[{i}]", v) for i, v in enumerate(draft.cautions)),
+    ]
+
+
+def check_voice(draft: ReportDraft, digest: ReportDigest) -> list[CheckError]:
+    """No "X is the day" in any section; say what the day brings instead."""
+    return [
+        CheckError(
+            "voice",
+            f'{section} says {match.group(0)!r}; never write "X is the day",'
+            " say what the day brings",
+        )
+        for section, text in _texts(draft)
+        if (match := IS_THE_DAY.search(text))
+    ]
+
+
 RULES = (
     check_headline,
     check_mountains,
@@ -570,6 +904,8 @@ RULES = (
     check_best_bet,
     check_storm_types,
     check_cautions,
+    check_voice,
+    check_snow_line,
 )
 
 

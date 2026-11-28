@@ -34,23 +34,30 @@ Cranmore, Sunday River, and Sugarloaf.
    "Thursday night" belongs to Thursday.
 4. **Storm type only when named.** Say clipper, coastal storm, nor'easter, or
    inland runner only when a mountain's `storm_type` or a discussion's
-   `storm_words` names it. Say "upslope" only when a day carries the
-   `nw_upslope` tag or a discussion names upslope. Otherwise describe what
-   happens ("snow Thursday, drying Sunday"). A track never decides snow vs
-   rain: a coastal low on 2026-11-25 brought ice and rain.
-5. **Disagreement and confidence.** When a window has `nws_disagrees`, say
-   which source the report leans on and why. When `confidence` is low (models
-   spread more than 6″), say so in the storm section and give the range.
+   `storm_words` names it, and name at most one per report. Say "upslope"
+   only when a day carries the `nw_upslope` tag or a discussion names
+   upslope. Otherwise describe what happens ("snow Thursday, drying Sunday").
+   A track never decides snow vs rain: a coastal low on 2026-11-25 brought ice
+   and rain.
+5. **Disagreement and confidence.** When a window has `nws_disagrees`, give
+   the NWS number once, in plain words ("though NWS Burlington says 1″", "NWS
+   has a third of that"). Never explain the report's method, the models, or
+   which numbers it uses. When `confidence` is low (models spread more than
+   6″), say so plainly in the storm section and give the range.
 6. **Explain differences** between mountains with tags and `favored_by`, not
    with general claims.
 7. **Cautions** list wind holds, mixing, freezing rain, and every active NWS
-   alert by its exact event name, and nothing else. Each `wind_hold_likely`
-   day gets a caution naming the mountain, the day, and the wind hold.
-8. **Credit forecasters** as "NWS Burlington", "NWS Albany", "NWS Gray", and
-   "WPC".
-9. **Best bet** is a mountain that is open that day (`season_open` on or
-   before it) and a day in the digest. A `null` `season_open` means the
-   opening date is not known: do not say the mountain is closed or not open.
+   alert by its exact event name, and nothing else: one item per day, merging
+   that day's hazards. Each `wind_hold_likely` day names the mountain, the
+   day, and the wind hold.
+8. **Credit forecasters** only when they disagree with the report or add
+   something it lacks, once each, as "NWS Burlington", "NWS Albany", "NWS
+   Gray", or "WPC".
+9. **Best bet**, when a day is worth chasing, is a mountain that is open that
+   day (`season_open` on or before it) and a day in the digest. When none is
+   (only mixed or wet snow under about 2″, rain everywhere, or nothing open),
+   there is no best bet. A `null` `season_open` means the opening date is not
+   known: do not say the mountain is closed or not open.
 
 ## Regional patterns
 
@@ -89,4 +96,4 @@ Cranmore, Sunday River, and Sugarloaf.
 A 0–100 ranking used to order mountains: 24-hour summit snow (50%), summit
 temperature at or below 20 °F (20%), gusts below the wind-hold watch threshold
 (20%), and no mixing (10%). The best bet usually has the highest powder score
-for its day; say why when it does not.
+for its day.

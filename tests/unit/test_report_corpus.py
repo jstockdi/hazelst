@@ -7,6 +7,9 @@ the draft it revised. Each digest was re-derived on frank from the same ingest
 run with the J33 code (`base_precip_type`, `freezing_rain_at`; every stored
 `precip_type` and tag reproduced exactly) and carries only the digest tags.
 
+Call 9 (2026-11-28 7 AM, J37) was written by the J33 code, so its stored digest
+is used as is; the report-write example is built on it.
+
 Every output must pass `report-check`. The drafts handed to `report-revise`
 are the morning draft re-checked on a later edition's numbers; their errors
 below are genuine contradictions with those numbers, and the list is exact.
@@ -15,11 +18,13 @@ below are genuine contradictions with those numbers, and the list is exact.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from hazelst.agents.prompts import role_prompt
 from hazelst.agents.schemas import ReportDraft
 from hazelst.digest import ReportDigest
 from hazelst.report_check import check
@@ -40,7 +45,7 @@ def errors(call_id: int, field: str) -> list[str]:
 
 
 def test_corpus_has_every_stored_draft() -> None:
-    assert CALLS == [1, 2, 3, 4, 5, 6]
+    assert CALLS == [1, 2, 3, 4, 5, 6, 9]
 
 
 @pytest.mark.parametrize("call_id", CALLS)
@@ -73,3 +78,13 @@ def test_owner_approved_headline_passes_on_run_181() -> None:
     headline = "4\N{EN DASH}5″ for Killington, Pico and Sugarbush Saturday; rain Monday"
     draft = ReportDraft.model_validate(record["output"]).model_copy(update={"headline": headline})
     assert check(draft, ReportDigest.model_validate(record["digest"])) == []
+
+
+def test_report_write_example_passes_on_its_digest() -> None:
+    # The complete example in report-write.md is built on 2026-11-28's 7 AM digest (call 9),
+    # around the owner-reviewed storm paragraph (J37 v2). It must pass as written.
+    match = re.search(r"```json\n(.*?)\n```", role_prompt("report-write"), re.S)
+    assert match is not None
+    example = ReportDraft.model_validate_json(match.group(1))
+    assert example.storm.startswith("A marginal setup: the snow line sits near 3,000 ft")
+    assert check(example, ReportDigest.model_validate(load(9)["digest"])) == []

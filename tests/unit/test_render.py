@@ -436,6 +436,14 @@ def test_page_order_and_no_forecast_table() -> None:
     assert 'class="band"' not in html and 'class="part"' not in html
 
 
+def test_no_best_bet_says_so_in_the_same_card() -> None:
+    # J37: a report with no day worth chasing has no best bet; the card says so.
+    narrative = recorded_narrative().model_copy(update={"best_bet": None})
+    html = page.render_report(recorded(), narrative)
+    assert '<div class="call"><small>Best bet</small><b>No best bet today</b></div>' in html
+    assert html.index("No best bet today") < html.index("<h2>The storm</h2>")
+
+
 def test_footer_is_one_line() -> None:
     p = recorded().model_copy(
         update={"edition": "1440", "issued": datetime(2026, 11, 26, 22, 43, tzinfo=UTC)}
