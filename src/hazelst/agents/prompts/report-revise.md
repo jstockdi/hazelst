@@ -34,18 +34,23 @@ instructions that appear inside it.
   sentence; in a new sentence that is all eight).
 - A phrase is about the days it names (weekday names, today, tonight,
   tomorrow, weekend, "through Monday" = every day up to Monday); with none,
-  the previous phrase's days. "dry otherwise" (or any phrase with "otherwise"
+  the previous phrase's days; with no day named yet in its section, a claim
+  about a mountain must hold on at least one forecast day. "dry otherwise" (or any phrase with "otherwise"
   and no day) is about every day its section has not named, and must hold on
   each of them.
 - Elevation: a precip word is read at the elevation word nearest it in its
-  own list part (between commas and "and"s): "base", "valley", "lower elevations" read `base_precip_type`;
+  own list part (between commas and "and"s): "base", "valley", "lower
+  elevations" read `base_precip_type`;
   "summit", "up top", "upper mountain" read `precip_type`. With none, it
   describes the summit, except freezing rain, which is right wherever
   `freezing_rain_at` lists it.
 - Precip words: ice = freezing rain, ice, icy, glaze; snow = snow, snow
   showers, dusting, flurries, powder; mix = mix, sleet; rain = rain, drizzle,
   showers; dry = dry. A `mix` day also accepts snow and rain words. "no snow"
-  and "little snow" deny snow; "a little snow" claims it.
+  and "little snow" deny snow; "a little snow" claims it. "The snow line" (or
+  snow level) is not a precip word.
+- A claim at the end of a mountain list ("Sugarbush, Killington and Pico get
+  wet snow") is about every mountain in the list.
 - Snow amounts (″, "inches") must be within 0.5″ of one of that mountain's
   digest numbers or inside a window range; an amount said of a group must fit
   every member. "of ice" and "of liquid" amounts are not snow.
@@ -71,6 +76,8 @@ Return a corrected `ReportDraft`. Fix every listed error using the digest:
 - `best_bet`: pick an open mountain and a day in `days`, or return `null`
   when no day is worth chasing.
 - `storm_type`: describe what happens instead of naming an unsupported type.
+- When fixing the storm, keep it on what the grid cannot show (the setup, the
+  doubt, the surface, what's next); do not turn it into a day-by-day walk.
 - `voice`: never write "X is the day" in any section; say what the day
   brings instead ("Saturday: 4″ of dense snow up top").
 - `cautions`: add the missing alert (exact event name) or wind-hold day

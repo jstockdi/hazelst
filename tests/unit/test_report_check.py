@@ -560,3 +560,32 @@ def test_is_the_day_fails_in_every_section() -> None:
     bet = {"mountain": "loon", "day": "2026-11-28", "why": "Saturday is the day for Loon."}
     assert rules(check(with_draft(best_bet=bet), digest())) == ["voice"]
     assert check(draft(loon="Saturday: snow up top, the day's only snow."), digest()) == []
+
+
+# --- storm v2: the setup, the doubt, the surface (J37) -----------------------------------
+# A v2 storm often names no day, so a day-less claim must still be checked.
+
+
+def test_a_claim_with_no_day_must_hold_on_some_forecast_day() -> None:
+    assert check(with_storm("Loon gets snow up top."), digest()) == []
+    (error,) = check(with_storm("Cranmore gets snow."), digest())
+    assert str(error) == (
+        "precip_type: Cranmore any day: storm says 'snow' (snow); precip_type is dry/ice/rain"
+    )
+
+
+def test_a_claim_at_the_end_of_a_mountain_list_covers_the_list() -> None:
+    ok = "Only the upper mountain at Killington, Pico and Sugarbush gets wet snow mixed with rain."
+    assert check(with_storm(ok), digest()) == []
+    # Cranmore, first in the list, used to escape: the claim bound only to the last name.
+    bad = "Only the upper mountain at Cranmore, Killington and Pico gets wet snow mixed with rain."
+    errors = check(with_storm(bad), digest())
+    assert {e.message.split(":")[0] for e in errors} == {"Cranmore any day"}
+    assert [e.message.split(" says ")[1].split(" ")[0] for e in errors] == ["'snow'", "'mixed'"]
+
+
+@pytest.mark.parametrize(
+    "text", ["the snow line sits near 3,000 ft", "a rain-snow line at the summits", "snow levels"]
+)
+def test_the_snow_line_is_not_a_precip_claim(text: str) -> None:
+    assert precip_words(text) == []

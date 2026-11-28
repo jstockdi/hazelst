@@ -22,8 +22,8 @@ like, then what spoils it.
   words: "though NWS Burlington says 1″", "NWS has a third of that".
 - Confidence in plain words: "a solid bet", "could easily be half that". When
   `confidence` is `low`, give the range.
-- Say each fact once. The storm, the mountains, and the cautions each have
-  their own job; do not repeat a phrase across them.
+- Say each fact once. The storm explains; the mountains and the cautions give
+  the days. Do not repeat a phrase across them.
 
 ## Input
 
@@ -35,7 +35,8 @@ The user message is a JSON digest (`ReportDigest`):
   (`1d` / `3d` / `5d` from 6 AM: `snow_in`, range `lo_in`–`hi_in`,
   `confidence`, `by_model`, `nws_in`, `nws_disagrees`), `days[]` (`snow_in`,
   `precip_in`, `precip_type`, `base_precip_type`, `freezing_rain_at`,
-  temperatures, `gust_mph`, `tags`), `storm_type`, `alerts`, and
+  temperatures, `gust_mph`, `freezing_level_ft`, `tags`), `storm_type`,
+  `alerts`, and
   `accumulation` when known.
 - Precip type for each day, by elevation: `precip_type` is the summit's
   (`snow`, `ice` = freezing rain, `rain`, `mix`, `dry`), `base_precip_type` the
@@ -72,11 +73,18 @@ Return a `ReportDraft`:
   does not matter. Return `null` when no day is worth chasing: only mixed or
   wet snow under about 2″, rain everywhere, or nothing open. The page then
   says "No best bet today".
-- `storm`: 3–4 sentences, organized by day, not by mountain. Name only the
-  mountains that matter; use a group for the rest ("the rest stay dry").
-  Give the amounts that matter, NWS once if it disagrees, and end with what
-  comes next, using only what the digest supports (temperatures, the next
-  snow, a refreeze).
+- `storm`: 3–4 sentences on what the page's grid cannot show. The grid
+  already shows every amount and each day's snow, rain, or ice; do not retell
+  it. Cover:
+  - why: the setup in plain words (a snow line near the summits, cold air
+    arriving after the moisture);
+  - the doubt: where the forecast could be wrong and which way (our number
+    against NWS, the freezing level, a wide model range);
+  - the surface: how the snow changes over the days (wet snow, then glaze,
+    then rain, then a refreeze);
+  - what's next, using only what the digest supports.
+  Use a grid number only when the sentence explains it or doubts it. No
+  day-by-day walk, and no lists of which mountains stay dry.
 - `mountains`: exactly one entry per mountain key, 1–2 sentences each. Start
   with that mountain's best day and what it will ride like. Mention other days
   only when something happens; cover the rest with "dry otherwise". Say when a
@@ -100,7 +108,7 @@ its facts.
     "day": "2026-11-28",
     "why": "Soft, heavy turns on the upper mountain today: 3.5″ of wet snow, though NWS Burlington says 1″. Go early; Monday's rain washes it out."
   },
-  "storm": "Today: wet snow mixed with rain on the Vermont summits and Loon, rain at the bases. Sugarbush gets the most at 3.5″, though NWS Burlington says 1″. Sunday glazes Killington's upper mountain with freezing rain. Monday, an inland runner brings rain to all eight and gusts in the 40s that could stop summit lifts. Tuesday turns cold after the moisture leaves: expect a refreeze, not new snow.",
+  "storm": "A marginal setup: the snow line sits near 3,000 ft, so only the upper mountain at Sugarbush, Killington and Pico gets wet snow mixed with rain. Our 3.5″ at Sugarbush is the models' best case; NWS Burlington says an inch or two at most, and that's the safer bet. Monday's inland runner rains on whatever falls. The cold arrives after the moisture leaves, so Tuesday brings a hard refreeze, not fresh snow.",
   "mountains": {
     "killington": "Today: 1.2″ of wet snow mixed with rain up top, rain at the base. Sunday glazes the upper mountain with freezing rain, Monday is rain with gusts to 41 mph; dry otherwise.",
     "pico": "Today: 0.7″ of wet snow and rain up top, rain at the base. Sunday is freezing rain on the upper mountain and Monday is rain; dry otherwise.",
@@ -137,8 +145,9 @@ that fails comes back with the errors. To pass:
   lists it.
 - A phrase with no mountain is about the mountains named last in its
   sentence (in a mountain's entry, that mountain); a phrase with no day is
-  about the last day named. "dry otherwise" covers every day that entry has
-  not named.
+  about the last day named, and with no day named yet it must hold on at
+  least one forecast day. "dry otherwise" covers every day that entry has not
+  named. "The snow line" is a setup, not a precip word.
 - Groups count as naming their members, and every member must fit: "the
   Vermont summits" (Killington, Pico, Sugarbush, Stratton), "the Maine
   mountains" (Sunday River, Sugarloaf), "the New Hampshire mountains" (Loon,

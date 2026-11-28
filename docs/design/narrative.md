@@ -31,9 +31,11 @@ week's weather. The full sample run is in [the sample run](../experiments/2026-1
 - Voice (J37): a ski and snowboard forecaster writing for people choosing
   where and when to ride. Lead with where and when the best turns are, then
   the surface (wet, dense, glazed, firm, refrozen), then what spoils it. The
-  storm is 3–4 sentences by day; each mountain is 1–2 sentences starting with
-  its best day ("dry otherwise" for the rest); cautions are one item per day.
-  Never explain the method or the models.
+  storm is 3–4 sentences on what the grid cannot show: the setup, the doubt,
+  how the surface changes, and what's next; it uses a grid number only to
+  explain or doubt it. Each mountain is 1–2 sentences starting with its best
+  day ("dry otherwise" for the rest); cautions are one item per day. Never
+  explain the method or the models, and never write "X is the day".
 - Name a storm type only if `storm_type` or a discussion names it. Otherwise
   describe what happens ("snow Thursday, drying Sunday").
 - Precip type words (snow, ice, freezing rain, rain, mix) must match the

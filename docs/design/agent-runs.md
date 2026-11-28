@@ -215,7 +215,11 @@ How `report_check.py` reads the prose (so a draft can be written to pass):
   names, today / tonight / tomorrow, weekend, "through Monday" = each day up
   to Monday); one that names no day keeps the previous phrase's days, except
   an "otherwise" phrase ("dry otherwise"), which is about every day its
-  section has not named and must hold on each of them. Phrases about no
+  section has not named and must hold on each of them. A claim about a
+  mountain with no day named yet in its section must hold on at least one
+  forecast day. A claim at the end of a mountain list with no day of its own
+  ("Sugarbush, Killington and Pico get wet snow") covers the whole list. "The
+  snow line" (snow level, rain-snow line) is not a precip word. Phrases about no
   mountain (regional) are not precip-checked; their snow numbers must match
   some mountain.
 - Mountain groups (J37) name their members: "the Vermont summits" (or

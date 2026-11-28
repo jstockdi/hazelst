@@ -82,9 +82,9 @@ def test_owner_approved_headline_passes_on_run_181() -> None:
 
 def test_report_write_example_passes_on_its_digest() -> None:
     # The complete example in report-write.md is built on 2026-11-28's 7 AM digest (call 9),
-    # around the owner-approved storm paragraph (J37). It must pass as written.
+    # around the owner-reviewed storm paragraph (J37 v2). It must pass as written.
     match = re.search(r"```json\n(.*?)\n```", role_prompt("report-write"), re.S)
     assert match is not None
     example = ReportDraft.model_validate_json(match.group(1))
-    assert example.storm.startswith("Today: wet snow mixed with rain on the Vermont summits")
+    assert example.storm.startswith("A marginal setup: the snow line sits near 3,000 ft")
     assert check(example, ReportDigest.model_validate(load(9)["digest"])) == []

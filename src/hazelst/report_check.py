@@ -320,8 +320,26 @@ def _claims(text: str) -> bool:
 LEAD_COMMA = re.compile(r",\s*(?:and\s*)?$", re.I)
 
 
+# The height where snow turns to rain is a setup, not a precip claim.
+SNOW_LINE = re.compile(
+    r"\b(?:rain[-/ ](?:and[- ])?)?snow(?:[-/ ]rain)?[- ](?:line|level)s?\b", re.I
+)
+
+
 def _has_elevation(text: str) -> bool:
     return any(pattern.search(text) for _, pattern in ELEVATION_WORDS)
+
+
+def _shares_claim(names: _Names, before: str, rest: str) -> bool:
+    """True when `before` is a mountain list with no claim and no day of its own, and
+    the part after it (`rest`, names blanked) names no day either."""
+    named, before_rest = names.mountains_in(before)
+    return (
+        bool(named)
+        and not _claims(before_rest)
+        and not names.days_in(before_rest)
+        and not names.days_in(rest)
+    )
 
 
 def _bare(text: str) -> bool:
@@ -345,7 +363,11 @@ def _phrases(names: _Names, clause: str) -> list[str]:
         named, rest = names.mountains_in(piece)
         subject = bool(named) or bool(names.days_in(rest)) or bool(OTHERWISE.search(rest))
         own = subject and (_claims(rest) or not _bare(rest))
-        if own:
+        if own and phrases and _shares_claim(names, phrases[-1], rest):
+            # "only the upper mountain at Sugarbush, Killington and Pico gets wet snow":
+            # the claim at the end of a mountain list is about the whole list.
+            phrases[-1] += joiner + piece
+        elif own:
             # A leading claim with no subject joins a later part in an "and" list ("snow
             # and rain mixed Saturday", "snow and rain mixed at Stratton"). After a comma,
             # or before a day when it names its elevation, it keeps the context of the
@@ -491,8 +513,8 @@ def check_mountains(draft: ReportDraft, digest: ReportDigest) -> list[CheckError
 
 def precip_claims(text: str) -> list[tuple[int, PrecipType, str]]:
     """Precip-type claims in a phrase: (offset, type, word), skipping negated and
-    partial-day uses."""
-    taken: list[tuple[int, int]] = []
+    partial-day uses and the snow line ("the snow line sits near 3,000 ft")."""
+    taken: list[tuple[int, int]] = [m.span() for m in SNOW_LINE.finditer(text)]
     found: list[tuple[int, PrecipType, str]] = []
     for kind, pattern in PRECIP_WORDS:
         for match in pattern.finditer(text):
@@ -562,12 +584,14 @@ def check_precip_types(draft: ReportDraft, digest: ReportDigest) -> list[CheckEr
     errors: list[CheckError] = []
     seen: set[tuple[str, str, str, str, Elevation | None]] = set()
     for clause in _sections(draft, digest):
-        if not clause.days or not clause.mountains:
+        if not clause.mountains:
             continue
+        # A claim that names no day must hold on at least one forecast day.
+        clause_days = clause.days or digest.days
         for offset, kind, word in precip_claims(clause.text):
             elevation = elevation_at(clause.text, offset)
             for mountain in clause.mountains:
-                days = [d for day in clause.days if (d := mountain.day(day))]
+                days = [d for day in clause_days if (d := mountain.day(day))]
                 if clause.every_day:
                     days = [d for d in days if not accepts(d, kind, elevation)]
                     if not days:
@@ -578,6 +602,8 @@ def check_precip_types(draft: ReportDraft, digest: ReportDigest) -> list[CheckEr
                     _day_label(d.date for d in days)
                     if clause.every_day
                     else _day_label(clause.days)
+                    if clause.days
+                    else "any day"
                 )
                 key = (mountain.key, label, clause.section, word.lower(), elevation)
                 if key in seen:
