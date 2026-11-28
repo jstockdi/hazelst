@@ -196,10 +196,16 @@ Verified by the J01 spike ([spikes/agent_sdk/](../../spikes/agent_sdk/README.md)
 How `report_check.py` reads the prose (so a draft can be written to pass):
 
 - Text is split into sentences, clauses (`;`, `:`, `—`, " – ", "while",
-  "but", "then", "with"), and phrases. Inside a clause, a comma or "and"
-  starts a new phrase only when the part after it makes its own claim (a
-  precip word or snow amount) about its own mountain or day, or says
-  "otherwise"; a bare name or day joins its list. So "freezing rain to Killington, Pico, and Sugarloaf,
+  "but", "then", "with"; not a "with" within three words after a mix word, so
+  "snow mixed with rain" is one claim), and phrases. Inside a clause, a comma
+  or "and" starts a new phrase when the part after it is about its own
+  mountain or day (or says "otherwise") and makes its own claim (a precip word
+  or snow amount) or says more than a bare name or day ("and Tuesday's gusts
+  could hold the lifts"); a bare name or day joins its list. A leading claim
+  with no mountain or day joins the phrase after it ("snow and rain mixed at
+  Stratton"), except after a comma, or before a day when it names its
+  elevation: then it keeps the clause's context ("1″ of wet snow up top, after
+  rain today"). So "freezing rain to Killington, Pico, and Sugarloaf,
   with rain at Stratton and Loon" binds freezing rain to the first three and
   rain to the last two, and "rain today, a mix Saturday, and dry Sunday"
   binds each word to its own day.
@@ -220,7 +226,8 @@ How `report_check.py` reads the prose (so a draft can be written to pass):
   of a group must fit every member. The headline's "names a resort" rule
   counts names only, not groups.
 - Elevation: each precip word is read at the elevation word nearest to it in
-  its phrase: base (base, valley, lower elevations / slopes / mountain) reads
+  its own list part (between commas and "and"s), so "snow up top, rain at the
+  base" reads each at its own elevation: base (base, valley, lower elevations / slopes / mountain) reads
   `base_precip_type`; summit (summit, peak, up top, upper mountain, higher
   terrain) reads `precip_type`. With none, the word describes the summit,
   except freezing rain, which passes where `freezing_rain_at` lists any

@@ -157,6 +157,15 @@ THROUGH_DAY = re.compile(
 OTHERWISE = re.compile(r"\botherwise\b", re.I)
 
 CLAUSE_SPLIT = re.compile(r"([;—]|:(?!\d)|\s–\s|\bwhile\b|\bbut\b|\bthen\b|\bwith\b)", re.I)
+# "with" does not split a mix claim ("snow mixed with rain", "mixes a little snow with rain").
+MIX_BEFORE_WITH = re.compile(r"\bmix(?:es|ed|ing)?\b(?:\W+\w+){0,3}\W*$", re.I)
+# Words a bare list item may carry besides names and days ("Saturday night", "Pico up top").
+BARE_WORDS = 3
+DAY_WORD = re.compile(
+    r"\b(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day(?:[’']s)?|today|tonight|tomorrow"
+    r"|weekend|night|morning|afternoon|evening|the|a|at|on|in|of|to)\b",
+    re.I,
+)
 SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 LIST_SPLIT = re.compile(r"(,(?=\s|$)|\band\b)", re.I)
 
@@ -301,10 +310,25 @@ def _claims(text: str) -> bool:
     )
 
 
+LEAD_COMMA = re.compile(r",\s*(?:and\s*)?$", re.I)
+
+
+def _has_elevation(text: str) -> bool:
+    return any(pattern.search(text) for _, pattern in ELEVATION_WORDS)
+
+
+def _bare(text: str) -> bool:
+    """True for a list item that is only a name or day ("Pico", "Saturday night")."""
+    return len(re.findall(r"\w+", DAY_WORD.sub(" ", text))) <= BARE_WORDS
+
+
 def _phrases(names: _Names, clause: str) -> list[str]:
-    """A clause's list items. A comma or "and" starts a new phrase only before a part
-    that makes its own claim about its own mountain or day (or "otherwise"); other parts
-    join the phrase before them (or, at the start, the first phrase after them)."""
+    """A clause's list items. A comma or "and" starts a new phrase before a part about
+    its own mountain or day (or "otherwise") that makes its own claim or says more than a
+    bare list item ("and Tuesday's gusts could hold the lifts"); other parts join the
+    phrase before them. At the start, parts join the first phrase after them, except
+    that a part with a claim stays a phrase of its own when a comma follows it, or when
+    it names its elevation and the next phrase names a day."""
     parts = LIST_SPLIT.split(clause)
     phrases: list[str] = []
     pending = ""
@@ -312,11 +336,26 @@ def _phrases(names: _Names, clause: str) -> list[str]:
         piece = parts[i]
         joiner = parts[i - 1] if i else ""
         named, rest = names.mountains_in(piece)
-        own = (bool(named) or bool(names.days_in(rest)) or bool(OTHERWISE.search(rest))) and (
-            _claims(rest)
-        )
+        subject = bool(named) or bool(names.days_in(rest)) or bool(OTHERWISE.search(rest))
+        own = subject and (_claims(rest) or not _bare(rest))
         if own:
-            phrases.append(pending + piece)
+            # A leading claim with no subject joins a later part in an "and" list ("snow
+            # and rain mixed Saturday", "snow and rain mixed at Stratton"). After a comma,
+            # or before a day when it names its elevation, it keeps the context of the
+            # clause instead ("with freezing rain, Stratton gets rain"; "1″ of wet snow
+            # up top, after rain today"; "with rain at the base, and Saturday adds").
+            lead = names.mountains_in(pending)[1]
+            if (
+                pending
+                and _claims(lead)
+                and (
+                    LEAD_COMMA.search(pending)
+                    or (bool(names.days_in(rest)) and _has_elevation(lead))
+                )
+            ):
+                phrases += [pending, piece]
+            else:
+                phrases.append(pending + piece)
             pending = ""
         elif phrases:
             phrases[-1] += joiner + piece
@@ -327,6 +366,19 @@ def _phrases(names: _Names, clause: str) -> list[str]:
     return phrases
 
 
+def _clause_parts(sentence: str) -> list[str]:
+    """`CLAUSE_SPLIT.split`, with a "with" after a mix word joined back into its clause."""
+    parts = CLAUSE_SPLIT.split(sentence)
+    out = parts[:1]
+    for i in range(1, len(parts), 2):
+        delimiter, clause = parts[i], parts[i + 1]
+        if delimiter.lower() == "with" and MIX_BEFORE_WITH.search(out[-1]):
+            out[-1] += delimiter + clause
+        else:
+            out += [delimiter, clause]
+    return out
+
+
 def _clauses(
     names: _Names, section: str, text: str, default: DigestMountain | None, day: date | None
 ) -> Iterator[Clause]:
@@ -335,7 +387,7 @@ def _clauses(
     for sentence in SENTENCE_SPLIT.split(text):
         sentence_mountains: list[DigestMountain] = []
         sentence_named: list[DigestMountain] = []
-        parts = CLAUSE_SPLIT.split(sentence)
+        parts = _clause_parts(sentence)
         # re.split with a group: [clause, delimiter, clause, delimiter, ...]
         for i in range(0, len(parts), 2):
             clause = parts[i]
@@ -455,10 +507,19 @@ def precip_words(text: str) -> list[tuple[PrecipType, str]]:
 
 
 def elevation_at(text: str, offset: int) -> Elevation | None:
-    """The elevation named nearest to `offset` in a phrase, or None when it names none."""
+    """The elevation named nearest to `offset` within its list part (between commas and
+    "and"s) of a phrase, or None when that part names none: in "snow up top, rain at the
+    base" the snow is at the summit and the rain at the base."""
+    start, end = 0, len(text)
+    for match in LIST_SPLIT.finditer(text):
+        if match.end() <= offset:
+            start = match.end()
+        elif match.start() >= offset:
+            end = match.start()
+            break
     best: tuple[int, Elevation] | None = None
     for elevation, pattern in ELEVATION_WORDS:
-        for match in pattern.finditer(text):
+        for match in pattern.finditer(text, start, end):
             distance = abs(match.start() - offset)
             if best is None or distance < best[0]:
                 best = (distance, elevation)

@@ -493,3 +493,55 @@ def test_best_bet_may_be_null() -> None:
     del data["best_bet"]
     with pytest.raises(ValueError, match="best_bet"):
         ReportDraft.model_validate(data)
+
+
+# --- phrasing found in the J37 comparison runs --------------------------------------------
+# Each was a false error on a correct draft; each test also keeps the strict direction.
+
+
+def test_elevation_is_read_within_its_list_part() -> None:
+    # "snow up top, rain at the base": the elevation word nearest by offset was "up top".
+    assert check(draft(loon="Saturday: 0.7″ of snow up top, rain at the base."), digest()) == []
+    errors = check(draft(loon="Saturday: rain up top, snow at the base."), digest())
+    assert [e.message.split(" says ")[1].split(";")[0] for e in errors] == [
+        "'rain' (rain) at the summit",
+        "'snow' (snow) at the base",
+    ]
+
+
+def test_with_does_not_split_a_mix_claim() -> None:
+    ok = "Saturday: snow at Loon, and snow mixes with rain at Killington."
+    assert check(with_storm(ok), digest()) == []
+    bad = "Saturday: snow at Loon, and wet snow mixed with rain at Cranmore."
+    words = [e.message.split(" says ")[1].split(" ")[0] for e in check(with_storm(bad), digest())]
+    assert words == ["'snow'", "'mixed'", "'rain'"]  # each about Cranmore (dry), none about Loon
+
+
+def test_a_claimless_part_with_its_own_day_does_not_take_the_claim() -> None:
+    # "..., and Tuesday's gusts could hold the lifts" moved the freezing rain to Tuesday.
+    ok = (
+        "Friday is rain, with freezing rain at the summit and gusts to 40 mph,"
+        " and Sunday's gusts could slow the lifts."
+    )
+    assert check(draft(stratton=ok), digest()) == []
+    bad = "Friday is rain, and Sunday brings freezing rain at the summit."
+    (error,) = check(draft(stratton=bad), digest())
+    assert error.message.startswith("Stratton Sun 29:")
+
+
+def test_a_leading_claim_keeps_the_clause_context() -> None:
+    after_today = (
+        "Saturday: 0.9″ of wet snow mixed with rain up top, rain at the base,"
+        " after freezing rain on the summit Friday."
+    )
+    assert check(draft(killington=after_today), digest()) == []
+    assert check(draft(killington="Snow and rain mixed Saturday."), digest()) == []
+    # After a comma the claim stays with the mountains before it, not the next ones.
+    ok = "Friday glazes Killington up top with freezing rain, Loon gets rain."
+    assert check(with_storm(ok), digest()) == []
+    bad = "Friday glazes Loon up top with freezing rain, Killington gets rain."
+    assert [e.message.split(":")[0] for e in check(with_storm(bad), digest())] == [
+        "Loon Fri 27",
+        "Loon Fri 27",
+        "Killington Fri 27",
+    ]

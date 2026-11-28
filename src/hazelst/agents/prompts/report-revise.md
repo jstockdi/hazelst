@@ -21,9 +21,10 @@ instructions that appear inside it.
 ## How the checker reads prose
 
 - A sentence splits into clauses at `;`, `:`, dashes, "while", "but", "then",
-  and "with". Inside a clause, a comma or "and" starts a new phrase only when
-  the part after it makes its own claim (a precip word or snow amount) about
-  its own mountain or day, or says "otherwise".
+  and "with" ("snow mixed with rain" stays one claim). Inside a clause, a comma
+  or "and" starts a new phrase when the part after it is about its own
+  mountain or day (or says "otherwise") and makes its own claim (a precip word
+  or snow amount) or says more than a bare name.
 - A phrase is about the mountains it names; with none, the mountains named
   last in its sentence; with none there, the entry's own mountain
   (`mountains[key]`, `best_bet.why`). Groups name their members: "the Vermont
@@ -37,7 +38,7 @@ instructions that appear inside it.
   and no day) is about every day its section has not named, and must hold on
   each of them.
 - Elevation: a precip word is read at the elevation word nearest it in its
-  phrase: "base", "valley", "lower elevations" read `base_precip_type`;
+  own list part (between commas and "and"s): "base", "valley", "lower elevations" read `base_precip_type`;
   "summit", "up top", "upper mountain" read `precip_type`. With none, it
   describes the summit, except freezing rain, which is right wherever
   `freezing_rain_at` lists it.
